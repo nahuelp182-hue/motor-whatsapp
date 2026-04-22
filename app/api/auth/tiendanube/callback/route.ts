@@ -41,9 +41,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err }, { status: 500 })
   }
 
-  const data = await res.json() as { access_token: string; user_id: number }
-  const storeId = String(data.user_id)
-  const token = data.access_token
+  const data = await res.json() as Record<string, unknown>
+  const storeId = String(data.user_id ?? data.store_id ?? data.id ?? '')
+  const token = String(data.access_token ?? '')
+
+  if (!storeId || !token) {
+    return NextResponse.json({ error: 'Missing fields', raw: data }, { status: 500 })
+  }
 
   // Guardar token en el Store
   await prisma.store.updateMany({
