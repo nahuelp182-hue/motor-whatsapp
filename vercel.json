@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/send-pending",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 * * * *"
     }
   ]
 }
