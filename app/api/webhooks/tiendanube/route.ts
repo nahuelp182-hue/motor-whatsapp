@@ -3,15 +3,15 @@ import { prisma } from '@/lib/prisma'
 import { CampaignService } from '@/services/CampaignService'
 
 export async function POST(req: NextRequest) {
-  const storeToken = req.headers.get('x-store-token')
+  const tnStoreId = req.headers.get('x-linkedstore')
   const event = req.headers.get('x-tiendanube-topic') ?? req.headers.get('x-nuvemshop-topic')
 
-  if (!storeToken || !event) {
+  if (!tnStoreId || !event) {
     return NextResponse.json({ error: 'Missing headers' }, { status: 400 })
   }
 
   const store = await prisma.store.findFirst({
-    where: { tiendanube_access_token: storeToken, is_active: true },
+    where: { tiendanube_store_id: tnStoreId, is_active: true },
   })
 
   if (!store) {
