@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Store {
+  id                      String   @id @default(cuid())
+  nombre                  String
+  tiendanube_access_token String
+  tiendanube_store_id     String
+  whatsapp_api_token      String
+  is_active               Boolean  @default(true)
+  marketing_spend         Float    @default(0)
+  createdAt               DateTime @default(now())
+
+  customers   Customer[]
+  campaigns   Campaign[]
+  coupons     Coupon[]
+  messageLogs MessageLog[]
+}
+
+model Customer {
+  id                     String   @id @default(cuid())
+  store_id               String
+  tiendanube_customer_id String
+  nombre                 String
+  telefono               String
+  total_spent            Float    @default(0)
+  createdAt              DateTime @default(now())
+
+  store       Store        @relation(fields: [store_id], references: [id])
+  coupons     Coupon[]
+  messageLogs MessageLog[]
+
+  @@unique([store_id, tiendanube_customer_id])
+}
+
+model Campaign {
+  id            String       @id @default(cuid())
+  store_id      String
+  tipo          CampaignType
+  configuracion Json
+  is_active     Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+
+  store       Store        @relation(fields: [store_id], references: [id])
+  coupons     Coupon[]
+  messageLogs MessageLog[]
+}
+
+model Coupon {
+  id          String   @id @default(cuid())
+  store_id    String
+  codigo      String   @unique
+  customer_id String
+  campaign_id String
+  is_used     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  store    Store    @relation(fields: [store_id], references: [id])
+  customer Customer @relation(fields: [customer_id], references: [id])
+  campaign Campaign @relation(fields: [campaign_id], references: [id])
+}
+
+model MessageLog {
+  id            String       @id @default(cuid())
+  store_id      String
+  customer_id   String
+  campaign_id   String
+  estado        MessageState @default(PENDING)
+  tipo_evento   String
+  error_details String?
+  scheduled_for DateTime?
+  createdAt     DateTime     @default(now())
+
+  store    Store    @relation(fields: [store_id], references: [id])
+  customer Customer @relation(fields: [customer_id], references: [id])
+  campaign Campaign @relation(fields: [campaign_id], references: [id])
+}
+
+enum CampaignType {
+  RECOVERY
+  REFERRAL
+  REFILL
+}
+
+enum MessageState {
+  PENDING
+  SENT
+  FAILED
+}
