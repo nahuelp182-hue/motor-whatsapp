@@ -24,15 +24,23 @@ export default function DashboardPage() {
   const [storeId, setStoreId] = useState<string>('all')
   const [data, setData] = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const url = storeId === 'all' ? '/api/metrics' : `/api/metrics?storeId=${storeId}`
     setLoading(true)
     fetch(url)
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`)
+        return r.json()
+      })
       .then((d: ApiResponse) => {
         setData(d)
         if (d.stores.length) setStores(d.stores)
+        setLoading(false)
+      })
+      .catch((e: Error) => {
+        setError(e.message)
         setLoading(false)
       })
   }, [storeId])
@@ -64,6 +72,12 @@ export default function DashboardPage() {
 
       {loading && (
         <div className="text-white/30 text-center py-20">Cargando métricas...</div>
+      )}
+
+      {error && (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-red-400 text-sm font-mono break-all">
+          {error}
+        </div>
       )}
 
       {!loading && m && (
