@@ -27,8 +27,8 @@ export async function GET(req: NextRequest) {
   // Intercambiar code por access_token
   const res = await fetch('https://www.tiendanube.com/apps/authorize/token', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
       client_id: TN_APP_ID,
       client_secret: TN_CLIENT_SECRET,
       grant_type: 'authorization_code',
