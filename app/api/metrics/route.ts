@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
+  try {
   const storeId = req.nextUrl.searchParams.get('storeId') ?? undefined
 
   const whereStore = storeId ? { store_id: storeId } : {}
@@ -69,4 +70,8 @@ export async function GET(req: NextRequest) {
     messages: { sent: messagesSent, failed: messagesFailed },
     salesByDay: Object.entries(salesByDay).map(([date, revenue]) => ({ date, revenue })),
   })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }
