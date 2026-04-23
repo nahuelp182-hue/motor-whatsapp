@@ -38,10 +38,10 @@ export async function POST(req: NextRequest) {
 
   switch (event) {
     case 'checkout/abandoned':
-      service.handleAbandonedCart(body).catch(console.error)
+      await service.handleAbandonedCart(body)
       break
     case 'order/paid':
-      service.handleOrderPaid(body).catch(console.error)
+      await service.handleOrderPaid(body)
       break
     default:
       break
