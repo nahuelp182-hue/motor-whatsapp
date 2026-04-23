@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('hub.verify_token')
   const challenge = req.nextUrl.searchParams.get('hub.challenge')
 
-  if (mode === 'subscribe' && token === process.env.INSTAGRAM_VERIFY_TOKEN) {
+  const verifyToken = process.env.INSTAGRAM_VERIFY_TOKEN ?? 'micelium_ig_webhook_2026'
+  if (mode === 'subscribe' && token === verifyToken) {
     return new NextResponse(challenge, { status: 200 })
   }
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
