@@ -216,9 +216,13 @@ export class CampaignService {
 
   private normalizePhone(raw: string): string {
     const d = raw.replace(/\D/g, '')
-    if (d.startsWith('0')) return '54' + d.slice(1)
-    if (!d.startsWith('54')) return '54' + d
-    return d
+    // Remove leading 0 (local format)
+    const local = d.startsWith('0') ? d.slice(1) : d
+    // Already has country code
+    if (local.startsWith('549')) return local
+    if (local.startsWith('54')) return '549' + local.slice(2)
+    // Add Argentina country code + 9 for mobile
+    return '549' + local
   }
 
   private generateCouponCode(nombre: string, id: string): string {
