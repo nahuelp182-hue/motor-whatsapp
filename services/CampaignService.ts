@@ -106,12 +106,15 @@ export class CampaignService {
    */
   async handleOrderPaid(data: TNOrder) {
     const totalAmount = parseFloat(data.total)
+
+    // Registrar cliente y gasto en DB para TODOS los pedidos pagos
+    const customer = await this.upsertCustomer(data, totalAmount)
+
+    // REFERRAL: solo si supera el umbral y hay campaña activa
     if (totalAmount < 200000) return
 
     const campaign = await this.getActiveCampaign(CampaignType.REFERRAL)
     if (!campaign) return
-
-    const customer = await this.upsertCustomer(data, totalAmount)
 
     // Un solo cupón por cliente por campaña
     const existingCoupon = await prisma.coupon.findFirst({
@@ -162,17 +165,19 @@ export class CampaignService {
 
   private async upsertCustomer(data: TNOrder, extraSpend = 0) {
     const telefono = this.normalizePhone(data.contact_phone)
+    // Usamos el teléfono normalizado como clave única de cliente real
+    // data.id es el ID de la ORDEN, no del cliente — no sirve como clave
     return prisma.customer.upsert({
       where: {
         store_id_tiendanube_customer_id: {
           store_id: this.store.id,
-          tiendanube_customer_id: String(data.id),
+          tiendanube_customer_id: telefono,
         },
       },
       update: { total_spent: { increment: extraSpend } },
       create: {
         store_id: this.store.id,
-        tiendanube_customer_id: String(data.id),
+        tiendanube_customer_id: telefono,
         nombre: data.contact_name,
         telefono,
         total_spent: extraSpend,
