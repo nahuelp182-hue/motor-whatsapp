@@ -14,22 +14,42 @@ type Metrics = {
 }
 type Messages = { sent: number; failed: number }
 type SalesDay = { date: string; revenue: number }
-type ApiResponse = { stores: Store[]; metrics: Metrics; messages: Messages; salesByDay: SalesDay[] }
+type ApiResponse = {
+  stores: Store[]
+  period: { year: number; month: number }
+  metaSpend: number
+  metrics: Metrics
+  messages: Messages
+  salesByDay: SalesDay[]
+}
 
 const ARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
+const MONTHS = [
+  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
+]
+
+const currentYear  = new Date().getFullYear()
+const currentMonth = new Date().getMonth() + 1
+const YEARS = [currentYear - 1, currentYear, currentYear + 1]
+
 export default function DashboardPage() {
-  const [stores, setStores] = useState<Store[]>([])
+  const [stores, setStores]   = useState<Store[]>([])
   const [storeId, setStoreId] = useState<string>('all')
-  const [data, setData] = useState<ApiResponse | null>(null)
+  const [year, setYear]       = useState<number>(currentYear)
+  const [month, setMonth]     = useState<number>(currentMonth)
+  const [data, setData]       = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
 
   useEffect(() => {
-    const url = storeId === 'all' ? '/api/metrics' : `/api/metrics?storeId=${storeId}`
+    const params = new URLSearchParams({ year: String(year), month: String(month) })
+    if (storeId !== 'all') params.set('storeId', storeId)
     setLoading(true)
-    fetch(url)
+    setError(null)
+    fetch('/api/metrics?' + params.toString())
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`)
         return r.json()
@@ -43,31 +63,51 @@ export default function DashboardPage() {
         setError(e.message)
         setLoading(false)
       })
-  }, [storeId])
+  }, [storeId, year, month])
 
-  const m = data?.metrics
+  const m    = data?.metrics
   const msgs = data?.messages
+
+  const selectClass = "rounded-xl border border-white/10 bg-white/5 backdrop-blur-md px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
 
   return (
     <main className="min-h-screen bg-[#0a0a0f] text-white p-6 md:p-10">
+
       {/* Header */}
-      <div className="flex items-center justify-between mb-10">
+      <div className="flex flex-col gap-4 mb-10 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Motor WhatsApp</h1>
           <p className="text-sm text-white/40 mt-1">Dashboard de métricas</p>
         </div>
 
-        {/* Store selector */}
-        <select
-          value={storeId}
-          onChange={(e) => setStoreId(e.target.value)}
-          className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-md px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-        >
-          <option value="all">Todas las tiendas</option>
-          {stores.map((s) => (
-            <option key={s.id} value={s.id}>{s.nombre}</option>
-          ))}
-        </select>
+        {/* Filtros */}
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* Año */}
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={selectClass}>
+            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+
+          {/* Mes */}
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={selectClass}>
+            {MONTHS.map((name, i) => (
+              <option key={i + 1} value={i + 1}>{name}</option>
+            ))}
+          </select>
+
+          {/* Tienda */}
+          <select value={storeId} onChange={(e) => setStoreId(e.target.value)} className={selectClass}>
+            <option value="all">Todas las tiendas</option>
+            {stores.map((s) => (
+              <option key={s.id} value={s.id}>{s.nombre}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Período activo */}
+      <div className="mb-6 text-xs text-white/30 uppercase tracking-widest">
+        {MONTHS[(data?.period.month ?? month) - 1]} {data?.period.year ?? year}
+        {data?.metaSpend ? ` · Gasto Meta: ${ARS(data.metaSpend)}` : ''}
       </div>
 
       {loading && (
@@ -87,12 +127,12 @@ export default function DashboardPage() {
             <MetricCard
               label="CAC"
               value={ARS(m.cac)}
-              sub="por nuevo cliente"
+              sub="gasto Meta / nuevos clientes"
             />
             <MetricCard
               label="LTV promedio"
               value={ARS(m.ltv)}
-              sub="por cliente"
+              sub="por cliente (lifetime)"
               highlight={m.ltv > m.cac}
             />
             <MetricCard
@@ -102,35 +142,34 @@ export default function DashboardPage() {
               highlight={(m.ltv / m.cac) >= 3}
             />
             <MetricCard
-              label="Ingresos totales"
+              label="Revenue del mes"
               value={ARS(m.totalRevenue)}
-              sub={`${m.totalCustomers} clientes`}
+              sub={`${m.newCustomers} clientes nuevos`}
             />
             <MetricCard
-              label="Nuevos (30d)"
-              value={String(m.newCustomers)}
-              sub="clientes nuevos"
+              label="Clientes totales"
+              value={String(m.totalCustomers)}
+              sub="en toda la historia"
             />
             <MetricCard
-              label="ROI WhatsApp"
+              label="ROI Meta"
               value={`${m.whatsappRoi.toFixed(0)}%`}
-              sub={`${msgs?.sent ?? 0} enviados / ${msgs?.failed ?? 0} fallidos`}
+              sub={`enviados ${msgs?.sent ?? 0} / fallidos ${msgs?.failed ?? 0}`}
               highlight={m.whatsappRoi > 0}
             />
           </div>
 
-          {/* Gráfico ventas + Calendario */}
+          {/* Gráfico + Calendario */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Area chart ventas 30d */}
             <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-6">
               <h3 className="text-sm font-semibold text-white/60 uppercase tracking-widest mb-6">
-                Ingresos últimos 30 días
+                Ingresos por día — {MONTHS[month - 1]} {year}
               </h3>
               <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={data?.salesByDay ?? []}>
                   <defs>
                     <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
+                      <stop offset="5%"  stopColor="#34d399" stopOpacity={0.3} />
                       <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
                     </linearGradient>
                   </defs>
@@ -138,7 +177,7 @@ export default function DashboardPage() {
                   <XAxis
                     dataKey="date"
                     tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
-                    tickFormatter={(v: string) => v.slice(5)}
+                    tickFormatter={(v: string) => v.slice(8)} // solo el día
                     axisLine={false} tickLine={false}
                   />
                   <YAxis
@@ -160,14 +199,13 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             </div>
 
-            {/* Calendario */}
             <EcommerceCalendar />
           </div>
 
           {/* WhatsApp breakdown */}
           <div className="mt-6 grid grid-cols-2 gap-4">
             <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-6">
-              <p className="text-xs text-white/40 uppercase tracking-widest mb-3">Mensajes enviados</p>
+              <p className="text-xs text-white/40 uppercase tracking-widest mb-3">Mensajes del mes</p>
               <div className="flex gap-6">
                 <div>
                   <p className="text-3xl font-bold text-emerald-400">{msgs?.sent ?? 0}</p>
@@ -180,10 +218,10 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-6">
-              <p className="text-xs text-white/40 uppercase tracking-widest mb-3">Clientes totales</p>
-              <p className="text-3xl font-bold text-white">{m.totalCustomers}</p>
+              <p className="text-xs text-white/40 uppercase tracking-widest mb-3">Gasto Meta Ads</p>
+              <p className="text-3xl font-bold text-white">{ARS(data?.metaSpend ?? 0)}</p>
               <p className="text-xs text-white/30 mt-1">
-                LTV total: {ARS(m.totalRevenue)}
+                {MONTHS[month - 1]} {year} · CAC: {ARS(m.cac)}
               </p>
             </div>
           </div>
