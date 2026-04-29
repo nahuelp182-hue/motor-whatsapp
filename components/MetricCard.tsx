@@ -40,7 +40,7 @@ export function MetricCard({
       </div>
 
       <div>
-        <p className={`text-2xl font-bold tracking-tight leading-none ${highlight ? 'text-orange-300' : 'text-white'}`}>
+        <p className={`text-2xl font-bold tracking-tight leading-none font-mono ${highlight ? 'text-orange-300' : 'text-white'}`}>
           {value}
         </p>
         {sub && (
