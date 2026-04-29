@@ -1,284 +1,371 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid, Legend, LineChart, Line,
 } from 'recharts'
 import { MetricCard } from '@/components/MetricCard'
 import { EcommerceCalendar } from '@/components/EcommerceCalendar'
 
-type Store    = { id: string; nombre: string }
-type Metrics  = { cac: number; ltv: number; totalRevenue: number; totalCustomers: number; newCustomers: number; whatsappRoi: number }
-type Messages = { sent: number; failed: number }
-type SalesDay = { date: string; revenue: number }
-type ApiResponse = { stores: Store[]; period: { year: number; month: number }; metaSpend: number; metrics: Metrics; messages: Messages; salesByDay: SalesDay[] }
+// ── Types ─────────────────────────────────────────────────────────────────────
+type TimelineDay = { date: string; revenue: number; spend: number; clicks: number; net: number }
+type Summary = {
+  totalRevenue: number; metaSpend: number; netRevenue: number
+  newCustomers: number; cac: number; ltv: number
+  clicks: number; impressions: number; reach: number; roas: number
+}
+type Analytics = { period: { since: string; until: string }; summary: Summary; timeline: TimelineDay[] }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const ARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+const NUM = (n: number) =>
+  new Intl.NumberFormat('es-AR').format(n)
 
-const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-const now = new Date()
-const YEARS = [now.getFullYear() - 2, now.getFullYear() - 1, now.getFullYear()]
+const today  = new Date().toISOString().slice(0, 10)
+const y = new Date().getFullYear()
+const m = new Date().getMonth() + 1
+const pad = (n: number) => String(n).padStart(2, '0')
+const monthStart = `${y}-${pad(m)}-01`
 
+const PRESETS = [
+  { label: 'Este mes',   since: monthStart, until: today },
+  { label: 'Mes ant.',   since: `${m === 1 ? y-1 : y}-${pad(m===1?12:m-1)}-01`, until: `${y}-${pad(m)}-01` },
+  { label: '2026',       since: '2026-01-01', until: '2026-12-31' },
+  { label: '2025',       since: '2025-01-01', until: '2025-12-31' },
+  { label: '2024',       since: '2024-01-01', until: '2024-12-31' },
+  { label: 'Todo',       since: '2022-01-01', until: today },
+]
+
+// ── Tooltip personalizado ─────────────────────────────────────────────────────
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: {name:string;value:number;color:string}[]; label?: string }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#0d0d18]/95 p-3 text-xs shadow-2xl backdrop-blur-md">
+      <p className="text-white/40 mb-2">{label}</p>
+      {payload.map((p) => (
+        <div key={p.name} className="flex items-center gap-2 mb-1">
+          <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+          <span className="text-white/60">{p.name}:</span>
+          <span className="text-white font-semibold">{typeof p.value === 'number' && p.value > 1000 ? ARS(p.value) : NUM(p.value)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [stores, setStores]   = useState<Store[]>([])
-  const [storeId, setStoreId] = useState('all')
-  const [year, setYear]       = useState(now.getFullYear())
-  const [month, setMonth]     = useState(now.getMonth() + 1)
-  const [data, setData]       = useState<ApiResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [since, setSince]       = useState(monthStart)
+  const [until, setUntil]       = useState(today)
+  const [activePreset, setPreset] = useState('Este mes')
+  const [data, setData]         = useState<Analytics | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+  const [chartView, setChartView] = useState<'revenue'|'spend'|'clicks'|'net'>('revenue')
 
-  useEffect(() => {
-    const p = new URLSearchParams({ year: String(year), month: String(month) })
-    if (storeId !== 'all') p.set('storeId', storeId)
+  const load = useCallback(() => {
     setLoading(true); setError(null)
-    fetch('/api/metrics?' + p)
+    fetch(`/api/analytics?since=${since}&until=${until}`)
       .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json() })
-      .then((d: ApiResponse) => { setData(d); if (d.stores.length) setStores(d.stores); setLoading(false) })
+      .then((d: Analytics) => { setData(d); setLoading(false) })
       .catch((e: Error) => { setError(e.message); setLoading(false) })
-  }, [storeId, year, month])
+  }, [since, until])
 
-  const m    = data?.metrics
-  const msgs = data?.messages
-  const sparkRevenue = data?.salesByDay.map(d => d.revenue) ?? []
+  useEffect(() => { load() }, [load])
 
-  const sel = `${MONTHS[(data?.period.month ?? month) - 1]} ${data?.period.year ?? year}`
+  function applyPreset(p: typeof PRESETS[0]) {
+    setPreset(p.label); setSince(p.since); setUntil(p.until)
+  }
 
-  const selectCls = [
-    'rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm',
-    'px-3 py-1.5 text-xs text-white/70 focus:outline-none focus:border-orange-500/40',
-    'transition-colors hover:border-white/20 cursor-pointer appearance-none pr-7',
-  ].join(' ')
+  const s = data?.summary
+  const tl = data?.timeline ?? []
+  const sparkRevenue = tl.map(d => d.revenue)
+
+  // ── chart view config
+  const chartConfig = {
+    revenue: { key: 'revenue', label: 'Ingresos',   color: '#f97316' },
+    spend:   { key: 'spend',   label: 'Gasto Meta', color: '#818cf8' },
+    clicks:  { key: 'clicks',  label: 'Clicks',     color: '#34d399' },
+    net:     { key: 'net',     label: 'Neto',        color: '#facc15' },
+  }
+  const cc = chartConfig[chartView]
+
+  const inputCls = 'rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70 focus:outline-none focus:border-orange-500/40 transition-colors'
+  const btnCls   = (active: boolean) => `px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all ${active ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30' : 'text-white/30 hover:text-white/60 border border-transparent'}`
 
   return (
-    <main
-      className="min-h-screen text-white p-6 md:p-10 font-sans"
-      style={{ background: 'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(249,115,22,0.08) 0%, transparent 70%), #080810' }}
+    <main className="min-h-screen text-white p-5 md:p-8 font-sans"
+      style={{ background: 'radial-gradient(ellipse 90% 40% at 50% -5%, rgba(249,115,22,0.07) 0%, transparent 60%), #07070f' }}
     >
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-5 mb-8 sm:flex-row sm:items-center sm:justify-between">
+
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-4 mb-7 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-orange-400/70 mb-1">Motor WhatsApp</p>
-          <h1 className="text-xl font-bold tracking-tight text-white">Panel de métricas</h1>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-orange-400/60 mb-1">Motor WhatsApp</p>
+          <h1 className="text-lg font-bold tracking-tight">Panel de métricas</h1>
         </div>
 
+        {/* Controles de fecha */}
         <div className="flex flex-wrap gap-2 items-center">
-          {[
-            { value: year, onChange: setYear, options: YEARS.map(y=>({v:y,l:String(y)})) },
-            { value: month, onChange: setMonth, options: MONTHS.map((n,i)=>({v:i+1,l:n})) },
-          ].map((sel, idx) => (
-            <div key={idx} className="relative">
-              <select
-                value={sel.value}
-                onChange={e => sel.onChange(Number(e.target.value))}
-                className={selectCls}
-              >
-                {sel.options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-              </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white/30 text-[10px]">▾</span>
-            </div>
-          ))}
-          <div className="relative">
-            <select value={storeId} onChange={e => setStoreId(e.target.value)} className={selectCls}>
-              <option value="all">Todas</option>
-              {stores.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-            </select>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white/30 text-[10px]">▾</span>
+          {/* Presets */}
+          <div className="flex gap-1 flex-wrap">
+            {PRESETS.map(p => (
+              <button key={p.label} onClick={() => applyPreset(p)} className={btnCls(activePreset === p.label)}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Rango custom */}
+          <div className="flex items-center gap-1">
+            <input type="date" value={since} max={until}
+              onChange={e => { setSince(e.target.value); setPreset('') }}
+              className={inputCls} />
+            <span className="text-white/20 text-xs">→</span>
+            <input type="date" value={until} min={since} max={today}
+              onChange={e => { setUntil(e.target.value); setPreset('') }}
+              className={inputCls} />
           </div>
         </div>
       </div>
 
-      {/* ── Period label ──────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-6">
-        <span className="text-[10px] uppercase tracking-[0.18em] text-white/20">{sel}</span>
-        {data?.metaSpend ? (
-          <>
-            <span className="w-px h-3 bg-white/10" />
-            <span className="text-[10px] text-orange-400/60">Meta Ads: {ARS(data.metaSpend)}</span>
-          </>
+      {/* ── Period label ────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 mb-5">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-white/20">
+          {since} → {until}
+        </span>
+        {s?.metaSpend ? (
+          <><span className="w-px h-3 bg-white/10" />
+          <span className="text-[10px] text-orange-400/50">Meta: {ARS(s.metaSpend)}</span></>
         ) : null}
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center py-32 gap-3">
-          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-bounce [animation-delay:0ms]" />
-          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-bounce [animation-delay:150ms]" />
-          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-bounce [animation-delay:300ms]" />
+        <div className="flex items-center justify-center py-32 gap-2">
+          {[0,150,300].map(d=>(
+            <span key={d} className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-bounce" style={{animationDelay:`${d}ms`}} />
+          ))}
         </div>
       )}
+      {error && <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-red-400/80 text-xs font-mono">{error}</div>}
 
-      {error && (
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-5 text-red-400/80 text-xs font-mono">{error}</div>
-      )}
-
-      {!loading && m && (
+      {!loading && s && (
         <>
-          {/* ── KPI grid ─────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          {/* ── KPI row ─────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-5">
+            <MetricCard label="Ingresos brutos"   value={ARS(s.totalRevenue)} sub={`${s.newCustomers} ventas`} sparkData={sparkRevenue} />
+            <MetricCard label="Gasto Meta"         value={ARS(s.metaSpend)}   sub="período seleccionado" />
             <MetricCard
-              label="CAC"
-              value={ARS(m.cac)}
-              sub="gasto Meta / nuevos"
-              sparkData={sparkRevenue}
+              label="Ingreso neto"
+              value={ARS(s.netRevenue)}
+              sub="bruto − gasto ads"
+              highlight={s.netRevenue > 0}
+              sparkData={tl.map(d => d.net)}
             />
-            <MetricCard
-              label="LTV promedio"
-              value={ARS(m.ltv)}
-              sub="por cliente"
-              highlight={m.ltv > m.cac}
-              sparkData={sparkRevenue}
-            />
-            <MetricCard
-              label="LTV / CAC"
-              value={m.cac > 0 ? `${(m.ltv / m.cac).toFixed(1)}x` : '—'}
-              sub="salud del negocio"
-              highlight={(m.ltv / m.cac) >= 3}
-            />
-            <MetricCard
-              label="Revenue"
-              value={ARS(m.totalRevenue)}
-              sub={`${m.newCustomers} clientes nuevos`}
-              sparkData={sparkRevenue}
-            />
-            <MetricCard
-              label="Clientes totales"
-              value={String(m.totalCustomers)}
-              sub="acumulado histórico"
-            />
-            <MetricCard
-              label="ROI Meta"
-              value={`${m.whatsappRoi > 0 ? '+' : ''}${m.whatsappRoi.toFixed(0)}%`}
-              sub={`${msgs?.sent ?? 0} enviados`}
-              highlight={m.whatsappRoi > 0}
-            />
+            <MetricCard label="ROAS"               value={`${s.roas.toFixed(1)}x`}  sub="revenue / spend" highlight={s.roas >= 3} />
+            <MetricCard label="CAC"                value={ARS(s.cac)}          sub="spend / nuevos clientes" />
+            <MetricCard label="LTV promedio"       value={ARS(s.ltv)}          sub="lifetime value" highlight={s.ltv > s.cac} sparkData={sparkRevenue} />
+            <MetricCard label="Clicks Meta"        value={NUM(s.clicks)}       sub={`${NUM(s.impressions)} impresiones`} sparkData={tl.map(d=>d.clicks)} />
+            <MetricCard label="Alcance Meta"       value={NUM(s.reach)}        sub="personas únicas" />
           </div>
 
-          {/* ── Main chart + calendar ─────────────────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-
-            {/* Area chart */}
-            <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
-              <div className="flex items-baseline justify-between mb-6">
-                <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/30">
-                  Ingresos por día — {sel}
-                </h3>
-                <span className="text-xs font-bold text-orange-400">
-                  {ARS(m.totalRevenue)}
-                </span>
+          {/* ── Net revenue highlight ───────────────────────────────── */}
+          <div className="rounded-2xl border border-orange-500/15 bg-gradient-to-r from-orange-950/30 to-transparent p-5 mb-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-white/30 mb-1">Resultado del período</p>
+              <p className="text-3xl font-bold" style={{ color: s.netRevenue >= 0 ? '#fb923c' : '#f87171' }}>
+                {ARS(s.netRevenue)}
+              </p>
+              <p className="text-xs text-white/30 mt-1">
+                {ARS(s.totalRevenue)} ingresos − {ARS(s.metaSpend)} ads
+              </p>
+            </div>
+            <div className="flex gap-6 text-center">
+              <div>
+                <p className="text-lg font-bold text-white">{s.roas.toFixed(2)}x</p>
+                <p className="text-[10px] text-white/30">ROAS</p>
               </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={data?.salesByDay ?? []} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="mainGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%"   stopColor="#f97316" stopOpacity={0.5} />
-                      <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid vertical={false} strokeDasharray="0" stroke="rgba(255,255,255,0.03)" />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10, fontFamily: 'inherit' }}
-                    tickFormatter={(v: string) => v.slice(8)}
-                    axisLine={false} tickLine={false} interval={2}
-                  />
-                  <YAxis
-                    tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10, fontFamily: 'inherit' }}
-                    tickFormatter={(v: number) => `$${(v/1000).toFixed(0)}k`}
-                    axisLine={false} tickLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: 'rgba(10,10,20,0.92)',
-                      border: '1px solid rgba(249,115,22,0.2)',
-                      borderRadius: 12,
-                      fontSize: 12,
-                      fontFamily: 'inherit',
-                    }}
-                    labelStyle={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}
-                    formatter={(v: unknown) => [ARS(Number(v)), 'Ingresos']}
-                    cursor={{ stroke: 'rgba(249,115,22,0.3)', strokeWidth: 1 }}
-                  />
-                  <Area
-                    type="monotone" dataKey="revenue"
-                    stroke="#f97316" strokeWidth={2}
-                    fill="url(#mainGrad)"
-                    dot={false}
-                    activeDot={{ r: 4, fill: '#f97316', strokeWidth: 0 }}
-                  />
-                </AreaChart>
+              <div>
+                <p className="text-lg font-bold text-white">{ARS(s.cac)}</p>
+                <p className="text-[10px] text-white/30">CAC</p>
+              </div>
+              <div>
+                <p className={`text-lg font-bold ${(s.ltv/s.cac)>=3?'text-emerald-400':'text-orange-400'}`}>
+                  {s.cac>0?(s.ltv/s.cac).toFixed(1):'-'}x
+                </p>
+                <p className="text-[10px] text-white/30">LTV/CAC</p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Main chart ──────────────────────────────────────────── */}
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-5">
+            <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+              <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/30">
+                Evolución del período
+              </h3>
+              <div className="flex gap-1">
+                {(Object.keys(chartConfig) as (keyof typeof chartConfig)[]).map(k => (
+                  <button key={k} onClick={() => setChartView(k)}
+                    className={btnCls(chartView === k)}>
+                    {chartConfig[k].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={tl} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"   stopColor={cc.color} stopOpacity={0.4} />
+                    <stop offset="100%" stopColor={cc.color} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" />
+                <XAxis dataKey="date" tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                  tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
+                  interval={Math.max(0, Math.floor(tl.length / 12))} />
+                <YAxis tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                  tickFormatter={(v:number) => v>999?`$${(v/1000).toFixed(0)}k`:String(v)}
+                  axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: `${cc.color}40`, strokeWidth: 1 }} />
+                <Area type="monotone" dataKey={cc.key} name={cc.label}
+                  stroke={cc.color} strokeWidth={2}
+                  fill="url(#areaGrad)" dot={false}
+                  activeDot={{ r: 4, fill: cc.color, strokeWidth: 0 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* ── Revenue vs Spend + Calendar ─────────────────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+
+            {/* Combo chart Revenue vs Spend */}
+            <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+              <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/30 mb-5">Ingresos vs Gasto Meta</h3>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={tl} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barGap={2}>
+                  <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" />
+                  <XAxis dataKey="date" tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                    tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
+                    interval={Math.max(0, Math.floor(tl.length / 10))} />
+                  <YAxis tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                    tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
+                    axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
+                  <Bar dataKey="revenue" name="Ingresos"   fill="#f97316" opacity={0.8} radius={[2,2,0,0]} />
+                  <Bar dataKey="spend"   name="Gasto Meta" fill="#818cf8" opacity={0.6} radius={[2,2,0,0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
 
             <EcommerceCalendar />
           </div>
 
-          {/* ── Bottom row ───────────────────────────────────────── */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* ── Tráfico Meta ─────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
 
-            {/* Gasto Meta */}
-            <div className="rounded-2xl border border-orange-500/10 bg-gradient-to-br from-orange-950/40 to-transparent p-5">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-orange-400/50 mb-3">Gasto Meta Ads</p>
-              <p className="text-2xl font-bold text-orange-300">{ARS(data?.metaSpend ?? 0)}</p>
-              <p className="text-[10px] text-white/25 mt-1.5">{sel} · CAC: {ARS(m.cac)}</p>
-              <div className="mt-4 h-px bg-gradient-to-r from-orange-500/20 to-transparent" />
-              <div className="mt-3 flex justify-between text-[10px] text-white/30">
-                <span>Nuevos clientes</span>
-                <span className="text-white/60 font-semibold">{m.newCustomers}</span>
+            {/* Clicks por día */}
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/30">Tráfico Meta Ads / día</h3>
+                <span className="text-xs font-bold text-emerald-400">{NUM(s.clicks)} clicks</span>
+              </div>
+              <ResponsiveContainer width="100%" height={150}>
+                <LineChart data={tl} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" />
+                  <XAxis dataKey="date" tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                    tickFormatter={(v:string)=>v.slice(5)} axisLine={false} tickLine={false}
+                    interval={Math.max(0, Math.floor(tl.length/8))} />
+                  <YAxis tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                    axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(52,211,153,0.3)', strokeWidth: 1 }} />
+                  <Line type="monotone" dataKey="clicks" name="Clicks"
+                    stroke="#34d399" strokeWidth={2} dot={false}
+                    activeDot={{ r: 3, fill: '#34d399', strokeWidth: 0 }} />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="mt-3 pt-3 border-t border-white/5 flex justify-between text-[10px] text-white/25">
+                <span>Impresiones totales</span>
+                <span className="text-white/50">{NUM(s.impressions)}</span>
               </div>
             </div>
 
-            {/* Mensajes */}
+            {/* Fuentes de tráfico */}
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+              <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/30 mb-4">Fuentes de tráfico</h3>
+              <div className="space-y-3">
+                {/* Meta Ads */}
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-white/60 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />Meta Ads (pago)
+                    </span>
+                    <span className="text-white/80 font-semibold">{NUM(s.clicks)} clicks</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div className="h-full rounded-full bg-orange-400/60" style={{ width: '100%' }} />
+                  </div>
+                </div>
+                {/* Orgánico - requiere GA4 */}
+                <div className="opacity-30">
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-white/60 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />Orgánico
+                    </span>
+                    <span className="text-white/40 text-[10px]">requiere GA4</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/5" />
+                </div>
+                <div className="opacity-30">
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-white/60 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-indigo-400 inline-block" />Directo
+                    </span>
+                    <span className="text-white/40 text-[10px]">requiere GA4</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/5" />
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-white/5 rounded-xl bg-white/[0.02] p-3">
+                <p className="text-[10px] text-white/30 leading-relaxed">
+                  Para ver orgánico y directo conectá <span className="text-indigo-300">Google Analytics 4</span> con el store ID de GA4.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Bottom: Mensajes + LTV barra ────────────────────────── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
               <p className="text-[10px] uppercase tracking-[0.18em] text-white/25 mb-3">Mensajes WhatsApp</p>
-              <div className="flex gap-6 items-end">
-                <div>
-                  <p className="text-2xl font-bold text-emerald-400">{msgs?.sent ?? 0}</p>
-                  <p className="text-[10px] text-white/25 mt-1">Exitosos</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-red-400/80">{msgs?.failed ?? 0}</p>
-                  <p className="text-[10px] text-white/25 mt-1">Fallidos</p>
-                </div>
-              </div>
-              <div className="mt-4 h-px bg-white/5" />
-              <div className="mt-3 flex justify-between text-[10px] text-white/30">
-                <span>Tasa de entrega</span>
-                <span className="text-white/60 font-semibold">
-                  {((msgs?.sent ?? 0) + (msgs?.failed ?? 0)) > 0
-                    ? `${(((msgs?.sent ?? 0) / ((msgs?.sent ?? 0) + (msgs?.failed ?? 0))) * 100).toFixed(0)}%`
-                    : '—'}
-                </span>
+              <div className="flex gap-8">
+                <div><p className="text-2xl font-bold text-emerald-400">0</p><p className="text-[10px] text-white/25 mt-1">Enviados</p></div>
+                <div><p className="text-2xl font-bold text-red-400/70">0</p><p className="text-[10px] text-white/25 mt-1">Fallidos</p></div>
               </div>
             </div>
-
-            {/* LTV health */}
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-white/25 mb-3">Salud del negocio</p>
-              <div className="flex items-end gap-2">
-                <p className={`text-2xl font-bold ${(m.ltv / m.cac) >= 3 ? 'text-emerald-400' : 'text-orange-400'}`}>
-                  {m.cac > 0 ? `${(m.ltv / m.cac).toFixed(1)}x` : '—'}
+              <p className="text-[10px] uppercase tracking-[0.18em] text-white/25 mb-3">LTV / CAC ratio</p>
+              <div className="flex items-end gap-2 mb-3">
+                <p className={`text-2xl font-bold ${(s.ltv/s.cac)>=3?'text-emerald-400':'text-orange-400'}`}>
+                  {s.cac>0?(s.ltv/s.cac).toFixed(1):'-'}x
                 </p>
-                <p className="text-[10px] text-white/30 mb-0.5">LTV / CAC</p>
+                <p className="text-[10px] text-white/30 mb-0.5">objetivo: ≥3x</p>
               </div>
-              <div className="mt-3 w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
+              <div className="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-700"
                   style={{
-                    width: `${Math.min(100, (m.ltv / m.cac / 5) * 100)}%`,
-                    background: (m.ltv / m.cac) >= 3
-                      ? 'linear-gradient(90deg, #34d399, #10b981)'
-                      : 'linear-gradient(90deg, #f97316, #fb923c)',
-                  }}
-                />
+                    width: `${Math.min(100, (s.ltv/s.cac/5)*100)}%`,
+                    background: (s.ltv/s.cac)>=3 ? 'linear-gradient(90deg,#34d399,#10b981)' : 'linear-gradient(90deg,#f97316,#fb923c)'
+                  }} />
               </div>
-              <div className="mt-3 flex justify-between text-[10px] text-white/25">
-                <span>LTV: {ARS(m.ltv)}</span>
-                <span>CAC: {ARS(m.cac)}</span>
+              <div className="mt-2 flex justify-between text-[10px] text-white/25">
+                <span>LTV {ARS(s.ltv)}</span><span>CAC {ARS(s.cac)}</span>
               </div>
             </div>
-
           </div>
         </>
       )}
