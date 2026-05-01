@@ -71,6 +71,10 @@ function payColor(label: string): string {
 
 export async function GET(req: NextRequest) {
   try {
+    if (!TN_TOKEN) {
+      return NextResponse.json({ error: 'TN_ACCESS_TOKEN not configured in Vercel env vars', products: [], payments: [], timeline: [], summary: { totalOrders: 0, totalRevenue: 0, avgOrderValue: 0 } })
+    }
+
     const p     = req.nextUrl.searchParams
     const since = p.get('since') ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)
     const until = p.get('until') ?? new Date().toISOString().slice(0,10)
