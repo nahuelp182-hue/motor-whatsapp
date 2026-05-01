@@ -5,229 +5,252 @@ const ARS = (n: number) =>
 const NUM = (n: number) =>
   new Intl.NumberFormat('es-AR').format(n)
 
-type FunnelStage = {
-  id:       string
-  label:    string
-  sublabel: string
-  value:    number
-  display:  string
-  color:    string
-  icon:     string
-  tip:      string
-  momDelta?: number   // % vs mes anterior (positivo = mejoró)
+function pctDelta(cur: number, prev?: number) {
+  if (!prev || prev === 0) return undefined
+  return ((cur - prev) / prev) * 100
 }
 
-type ConversionRate = {
-  label: string
-  rate: number
-  benchmark: number   // tasa saludable de referencia
-}
-
-function DeltaBadge({ delta }: { delta?: number }) {
-  if (delta === undefined || delta === null) return null
-  const up = delta >= 0
+function DeltaBadge({ delta, invert = false }: { delta?: number; invert?: boolean }) {
+  if (delta === undefined) return null
+  const good = invert ? delta <= 0 : delta >= 0
   return (
-    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
-      up ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10'
+    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 ${
+      good ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10'
     }`}>
-      {up ? '↑' : '↓'} {Math.abs(Math.round(delta))}%
+      {delta >= 0 ? '↑' : '↓'}{Math.abs(Math.round(delta))}%
     </span>
   )
 }
 
-function ConvArrow({ rate, benchmark }: { rate: number; benchmark: number }) {
-  const good = rate >= benchmark
-  return (
-    <div className="flex flex-col items-center gap-0.5 py-1">
-      <div className="w-px h-3 bg-white/10" />
-      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
-        good
-          ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5'
-          : 'text-orange-400 border-orange-500/20 bg-orange-500/5'
-      }`}>
-        {rate.toFixed(1)}%
-      </span>
-      <div className="w-px h-3 bg-white/10" />
-      <div className={`w-2 h-2 border-r-2 border-b-2 rotate-45 -mt-1.5 ${
-        good ? 'border-emerald-500/30' : 'border-orange-500/30'
-      }`} />
-    </div>
-  )
+type StageConfig = {
+  label: string; sub: string; value: number; display: string
+  color: string; topPct: number; botPct: number
 }
 
 export function FunnelViz({
   reach, clicks, orders, repeats,
   revenue, avgTicket,
-  prevReach, prevClicks, prevOrders, prevRepeats,
+  prevReach, prevClicks, prevOrders,
 }: {
   reach: number; clicks: number; orders: number; repeats: number
   revenue: number; avgTicket: number
-  prevReach?: number; prevClicks?: number; prevOrders?: number; prevRepeats?: number
+  prevReach?: number; prevClicks?: number; prevOrders?: number
 }) {
-  // Tasas de conversión
-  const ctr  = reach  > 0 ? (clicks  / reach)  * 100 : 0   // Click-through rate
-  const cvr  = clicks > 0 ? (orders  / clicks)  * 100 : 0   // Conversion rate
-  const rr   = orders > 0 ? (repeats / orders)  * 100 : 0   // Repeat rate
+  const ctr = reach  > 0 ? (clicks  / reach)  * 100 : 0
+  const cvr = clicks > 0 ? (orders  / clicks)  * 100 : 0
+  const rr  = orders > 0 ? (repeats / orders)  * 100 : 0
 
-  // Deltas vs período anterior
-  function pctDelta(cur: number, prev?: number) {
-    if (!prev || prev === 0) return undefined
-    return ((cur - prev) / prev) * 100
-  }
-  const deltaReach   = pctDelta(reach,   prevReach)
-  const deltaClicks  = pctDelta(clicks,  prevClicks)
-  const deltaOrders  = pctDelta(orders,  prevOrders)
-  const deltaRepeats = pctDelta(repeats, prevRepeats)
+  // Porcentajes relativos para el ancho del embudo
+  const max = Math.max(reach, 1)
+  function pct(v: number) { return Math.max(8, Math.round((v / max) * 100)) }
 
-  // Ancho relativo de cada etapa (el mayor = 100%)
-  const maxVal = Math.max(reach, 1)
-  function barWidth(v: number, min = 18) {
-    return Math.max(min, Math.round((v / maxVal) * 100))
-  }
-
-  const stages: (FunnelStage & { width: number })[] = [
+  const stages: StageConfig[] = [
     {
-      id: 'reach', label: 'Alcance', sublabel: 'personas que vieron tus anuncios',
-      value: reach, display: NUM(reach), color: '#818cf8',
-      icon: '👁', tip: 'Personas únicas expuestas a tus anuncios en Meta. Primer punto de contacto.',
-      momDelta: deltaReach, width: barWidth(reach),
+      label: 'Alcance',          sub: 'personas que vieron el anuncio',
+      value: reach,  display: NUM(reach),
+      color: '#818cf8',
+      topPct: 100,   botPct: pct(clicks),
     },
     {
-      id: 'clicks', label: 'Visitas a la tienda', sublabel: 'clicks desde Meta Ads',
-      value: clicks, display: NUM(clicks), color: '#f97316',
-      icon: '🖱', tip: 'Personas que hicieron click en el anuncio y llegaron al sitio.',
-      momDelta: deltaClicks, width: barWidth(clicks, 14),
+      label: 'Clicks al sitio',  sub: 'visitas desde Meta Ads',
+      value: clicks, display: NUM(clicks),
+      color: '#f97316',
+      topPct: pct(clicks), botPct: pct(orders),
     },
     {
-      id: 'orders', label: 'Compras', sublabel: `${ARS(avgTicket)} ticket promedio`,
-      value: orders, display: `${NUM(orders)} órd.`, color: '#34d399',
-      icon: '🛒', tip: 'Órdenes pagas en Tiendanube en el período.',
-      momDelta: deltaOrders, width: barWidth(orders, 10),
+      label: 'Compras',          sub: `ticket prom. ${ARS(avgTicket)}`,
+      value: orders, display: `${NUM(orders)} órd.`,
+      color: '#34d399',
+      topPct: pct(orders), botPct: pct(repeats),
     },
     {
-      id: 'repeats', label: 'Recompras', sublabel: 'clientes que volvieron',
-      value: repeats, display: NUM(repeats), color: '#facc15',
-      icon: '🔄', tip: 'Clientes que compraron en más de un mes distinto.',
-      momDelta: deltaRepeats, width: barWidth(repeats, 7),
+      label: 'Recompras',        sub: 'clientes que volvieron',
+      value: repeats, display: NUM(repeats),
+      color: '#facc15',
+      topPct: pct(repeats), botPct: Math.max(4, pct(repeats) - 6),
     },
   ]
 
-  const conversions: ConversionRate[] = [
-    { label: 'CTR',  rate: ctr,  benchmark: 1.0 },
-    { label: 'Conv', rate: cvr,  benchmark: 0.5 },
-    { label: 'Rep.',  rate: rr,   benchmark: 15  },
+  const conversions = [
+    { label: 'CTR',  rate: ctr,  bench: 1.0,  from: 'Alcance',   to: 'Clicks' },
+    { label: 'Conv', rate: cvr,  bench: 0.5,  from: 'Clicks',    to: 'Compras' },
+    { label: 'Rep.',  rate: rr,   bench: 15,   from: 'Compras',   to: 'Recompras' },
+  ]
+
+  const deltas = [
+    pctDelta(reach,  prevReach),
+    pctDelta(clicks, prevClicks),
+    pctDelta(orders, prevOrders),
+    undefined,
   ]
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
+    <div className="flex flex-col lg:flex-row gap-8">
 
-      {/* ── Embudo visual ───────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center gap-0">
-        {stages.map((stage, i) => (
-          <div key={stage.id} className="w-full flex flex-col items-center">
-            {/* Barra trapezoidal */}
-            <div
-              className="relative flex items-center justify-between px-4 py-3 rounded-xl transition-all"
-              style={{
-                width: `${stage.width}%`,
-                background: `${stage.color}18`,
-                border:     `1px solid ${stage.color}30`,
-              }}
-            >
-              {/* Ícono + label */}
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-base leading-none flex-shrink-0">{stage.icon}</span>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-white/80 truncate">{stage.label}</p>
-                  <p className="text-[9px] text-white/35 truncate hidden sm:block">{stage.sublabel}</p>
-                </div>
-              </div>
+      {/* ── Embudo visual ────────────────────────────────────────── */}
+      <div className="flex-1">
+        <svg
+          viewBox="0 0 400 340"
+          className="w-full"
+          style={{ maxHeight: 360 }}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            {stages.map((s, i) => (
+              <linearGradient key={i} id={`fg${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor={s.color} stopOpacity="0.45" />
+                <stop offset="100%" stopColor={s.color} stopOpacity="0.25" />
+              </linearGradient>
+            ))}
+            {stages.map((s, i) => (
+              <linearGradient key={`b${i}`} id={`bg${i}`} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%"   stopColor={s.color} stopOpacity="0.08" />
+                <stop offset="50%"  stopColor={s.color} stopOpacity="0.18" />
+                <stop offset="100%" stopColor={s.color} stopOpacity="0.08" />
+              </linearGradient>
+            ))}
+          </defs>
 
-              {/* Valor + delta */}
-              <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                <DeltaBadge delta={stage.momDelta} />
-                <span className="text-sm font-bold font-mono"
-                  style={{ color: stage.color }}>
-                  {stage.display}
-                </span>
-              </div>
-            </div>
+          {stages.map((s, i) => {
+            const segH   = 72
+            const gap    = 8
+            const y      = i * (segH + gap)
+            const cx     = 200
+            const topW   = (s.topPct / 100) * 380
+            const botW   = (s.botPct / 100) * 380
+            const x1     = cx - topW / 2
+            const x2     = cx + topW / 2
+            const x3     = cx + botW / 2
+            const x4     = cx - botW / 2
+            const points = `${x1},${y} ${x2},${y} ${x3},${y + segH} ${x4},${y + segH}`
 
-            {/* Flecha de conversión entre etapas */}
-            {i < stages.length - 1 && (
-              <ConvArrow
-                rate={conversions[i].rate}
-                benchmark={conversions[i].benchmark}
-              />
-            )}
-          </div>
-        ))}
+            return (
+              <g key={i}>
+                {/* Sombra */}
+                <polygon points={points}
+                  fill="rgba(0,0,0,0.2)"
+                  transform="translate(2,3)"
+                />
+                {/* Fondo con gradiente de color */}
+                <polygon points={points} fill={`url(#bg${i})`} />
+                {/* Borde superior */}
+                <line x1={x1} y1={y} x2={x2} y2={y}
+                  stroke={s.color} strokeWidth="2" strokeOpacity="0.7" />
+                {/* Bordes laterales */}
+                <line x1={x1} y1={y} x2={x4} y2={y + segH}
+                  stroke={s.color} strokeWidth="1" strokeOpacity="0.3" />
+                <line x1={x2} y1={y} x2={x3} y2={y + segH}
+                  stroke={s.color} strokeWidth="1" strokeOpacity="0.3" />
+
+                {/* Barra de progreso interna horizontal */}
+                <rect x={x1 + 4} y={y + segH - 6} width={topW - 8} height={3}
+                  rx="1.5" fill="rgba(255,255,255,0.06)" />
+                <rect x={x1 + 4} y={y + segH - 6}
+                  width={(topW - 8) * (s.topPct / 100)} height={3}
+                  rx="1.5" fill={s.color} opacity="0.5" />
+
+                {/* Label */}
+                <text x={cx} y={y + 22}
+                  textAnchor="middle" fontSize="13" fontWeight="700"
+                  fill="white" opacity="0.9" fontFamily="Manrope, sans-serif">
+                  {s.label}
+                </text>
+
+                {/* Valor principal */}
+                <text x={cx} y={y + 42}
+                  textAnchor="middle" fontSize="17" fontWeight="800"
+                  fill={s.color} fontFamily="DM Mono, monospace">
+                  {s.display}
+                </text>
+
+                {/* Sub */}
+                <text x={cx} y={y + 58}
+                  textAnchor="middle" fontSize="9" fill="white" opacity="0.4"
+                  fontFamily="Manrope, sans-serif">
+                  {s.sub}
+                </text>
+
+                {/* Badge MoM — lado derecho */}
+                {deltas[i] !== undefined && (
+                  <g>
+                    <rect x={cx + topW / 2 + 4} y={y + 14}
+                      width={48} height={18} rx="6"
+                      fill={deltas[i]! >= 0 ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)'} />
+                    <text x={cx + topW / 2 + 28} y={y + 27}
+                      textAnchor="middle" fontSize="10" fontWeight="700"
+                      fill={deltas[i]! >= 0 ? '#34d399' : '#f87171'}
+                      fontFamily="DM Mono, monospace">
+                      {deltas[i]! >= 0 ? '↑' : '↓'}{Math.abs(Math.round(deltas[i]!))}%
+                    </text>
+                  </g>
+                )}
+
+                {/* Tasa de conversión entre etapas */}
+                {i < stages.length - 1 && (() => {
+                  const conv = conversions[i]
+                  const good = conv.rate >= conv.bench
+                  const gy   = y + segH + gap / 2
+                  return (
+                    <g>
+                      <line x1={cx - 28} y1={gy} x2={cx + 28} y2={gy}
+                        stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                      <rect x={cx - 26} y={gy - 9} width={52} height={18} rx="6"
+                        fill={good ? 'rgba(52,211,153,0.12)' : 'rgba(249,115,22,0.12)'}
+                        stroke={good ? 'rgba(52,211,153,0.3)' : 'rgba(249,115,22,0.3)'}
+                        strokeWidth="0.8" />
+                      <text x={cx} y={gy + 5}
+                        textAnchor="middle" fontSize="10" fontWeight="700"
+                        fill={good ? '#34d399' : '#f97316'}
+                        fontFamily="DM Mono, monospace">
+                        {conv.label} {conv.rate.toFixed(1)}%
+                      </text>
+                    </g>
+                  )
+                })()}
+              </g>
+            )
+          })}
+        </svg>
       </div>
 
-      {/* ── Panel de métricas de conversión ─────────────────────── */}
-      <div className="lg:w-64 flex flex-col gap-3">
+      {/* ── Panel métricas ───────────────────────────────────────── */}
+      <div className="lg:w-60 flex flex-col gap-3">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-1">Benchmarks</p>
 
-        {/* Header */}
-        <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-1">Tasas de conversión</p>
+        {[
+          { label: 'CTR (Alcance → Click)', rate: ctr, bench: 1.0, unit: '%', barScale: 20, desc: '≥1.0% Meta promedio' },
+          { label: 'CVR (Click → Compra)',  rate: cvr, bench: 0.5, unit: '%', barScale: 40, desc: '≥0.5% e-commerce AR' },
+          { label: 'Recompra',              rate: rr,  bench: 15,  unit: '%', barScale: 3,  desc: '≥15% cliente fiel' },
+        ].map(m => (
+          <div key={m.label} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] text-white/50">{m.label}</span>
+              <span className={`text-sm font-mono font-bold ${m.rate >= m.bench ? 'text-emerald-400' : 'text-orange-400'}`}>
+                {m.rate.toFixed(2)}{m.unit}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden mb-1.5">
+              <div className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${Math.min(100, m.rate * m.barScale)}%`, background: m.rate >= m.bench ? '#34d399' : '#f97316' }} />
+            </div>
+            <p className="text-[9px] text-white/25">{m.desc}</p>
+          </div>
+        ))}
 
-        {/* CTR */}
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] text-white/50">Alcance → Visitas (CTR)</span>
-            <span className={`text-sm font-mono font-bold ${ctr >= 1 ? 'text-emerald-400' : 'text-orange-400'}`}>
-              {ctr.toFixed(2)}%
-            </span>
-          </div>
-          <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div className="h-full rounded-full" style={{ width: `${Math.min(100, ctr * 20)}%`, background: ctr >= 1 ? '#34d399' : '#f97316' }} />
-          </div>
-          <p className="text-[9px] text-white/25 mt-1.5">Referencia: ≥1.0% — Meta promedio industria</p>
-        </div>
-
-        {/* CVR */}
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] text-white/50">Visitas → Compras (CVR)</span>
-            <span className={`text-sm font-mono font-bold ${cvr >= 0.5 ? 'text-emerald-400' : 'text-orange-400'}`}>
-              {cvr.toFixed(2)}%
-            </span>
-          </div>
-          <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div className="h-full rounded-full" style={{ width: `${Math.min(100, cvr * 40)}%`, background: cvr >= 0.5 ? '#34d399' : '#f97316' }} />
-          </div>
-          <p className="text-[9px] text-white/25 mt-1.5">Referencia: ≥0.5% — e-commerce AR promedio</p>
-        </div>
-
-        {/* Repeat rate */}
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] text-white/50">Compras → Recompras</span>
-            <span className={`text-sm font-mono font-bold ${rr >= 15 ? 'text-emerald-400' : 'text-orange-400'}`}>
-              {rr.toFixed(1)}%
-            </span>
-          </div>
-          <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div className="h-full rounded-full" style={{ width: `${Math.min(100, rr * 3)}%`, background: rr >= 15 ? '#34d399' : '#f97316' }} />
-          </div>
-          <p className="text-[9px] text-white/25 mt-1.5">Referencia: ≥15% — cliente fidelizado</p>
-        </div>
-
-        {/* Revenue por click */}
-        <div className="rounded-xl border border-orange-500/10 bg-orange-500/5 p-4">
+        <div className="rounded-xl border border-orange-500/10 bg-orange-500/5 p-3.5 mt-1">
           <p className="text-[10px] text-white/45 mb-1">Revenue por click</p>
           <p className="text-lg font-mono font-bold text-orange-400">
             {clicks > 0 ? ARS(revenue / clicks) : '—'}
           </p>
-          <p className="text-[9px] text-white/30 mt-0.5">Cada click generó este valor promedio en ventas</p>
+          <p className="text-[9px] text-white/30 mt-0.5">Cada click generó este valor en ventas</p>
         </div>
 
-        {/* Revenue por persona alcanzada */}
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5">
           <p className="text-[10px] text-white/45 mb-1">Revenue por persona alcanzada</p>
-          <p className="text-lg font-mono font-bold text-white/70">
+          <p className="text-base font-mono font-bold text-white/70">
             {reach > 0 ? ARS(revenue / reach) : '—'}
           </p>
-          <p className="text-[9px] text-white/30 mt-0.5">Eficiencia total del embudo de ventas</p>
+          <p className="text-[9px] text-white/30 mt-0.5">Eficiencia total del embudo</p>
         </div>
       </div>
     </div>

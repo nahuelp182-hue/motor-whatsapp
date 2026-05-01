@@ -21,7 +21,7 @@ export function MetricCard({
     : null
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl p-5 flex flex-col justify-between min-h-[130px] transition-all duration-300 group
+    <div className={`relative rounded-2xl p-5 flex flex-col justify-between min-h-[130px] transition-all duration-300 group
       ${highlight
         ? 'bg-gradient-to-br from-orange-950/60 to-orange-900/20 border border-orange-500/20'
         : 'bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.07]'
@@ -63,9 +63,9 @@ export function MetricCard({
         <p className="text-[9px] text-white/25 mt-1">vs mes anterior</p>
       )}
 
-      {/* Sparkline */}
+      {/* Sparkline — overflow-hidden solo en este wrapper para no bloquear tooltips */}
       {sparkData && sparkData.length > 1 && (
-        <div className="absolute bottom-0 left-0 right-0 h-10 opacity-40 group-hover:opacity-70 transition-opacity">
+        <div className="absolute bottom-0 left-0 right-0 h-10 overflow-hidden rounded-b-2xl opacity-40 group-hover:opacity-70 transition-opacity pointer-events-none">
           <SparklineChart data={sparkData} color={highlight ? '#f97316' : '#ffffff'} />
         </div>
       )}
