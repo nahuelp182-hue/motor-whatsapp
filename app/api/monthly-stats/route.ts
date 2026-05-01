@@ -164,9 +164,11 @@ export async function GET(_req: NextRequest) {
       }
     })
 
-    // ── 6. MoM deltas para el mes actual ────────────────────────────────────
-    const cur  = series[series.length - 1]
-    const prev = series[series.length - 2]
+    // ── 6. MoM deltas: compara el último mes COMPLETO vs el anterior ────────
+    // "Completo" = el más reciente que tenga al menos 1 orden
+    const withOrders = series.filter(s => s.orders > 0)
+    const cur  = withOrders[withOrders.length - 1] ?? series[series.length - 1]
+    const prev = withOrders[withOrders.length - 2] ?? series[series.length - 2]
     function delta(a: number, b: number) {
       if (b === 0) return a > 0 ? 100 : 0
       return Math.round(((a - b) / b) * 100 * 10) / 10
@@ -176,9 +178,13 @@ export async function GET(_req: NextRequest) {
       spend:     delta(cur.spend,     prev.spend),
       net:       delta(cur.net,       prev.net),
       orders:    delta(cur.orders,    prev.orders),
+      clicks:    delta(cur.clicks,    prev.clicks),
+      reach:     delta(cur.reach,     prev.reach),
       roas:      delta(cur.roas,      prev.roas),
       cac:       delta(cur.cac,       prev.cac),
       avgTicket: delta(cur.avgTicket, prev.avgTicket),
+      curMonth:  cur.key,
+      prevMonth: prev.key,
     }
 
     return NextResponse.json({

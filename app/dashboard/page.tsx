@@ -37,7 +37,7 @@ type MonthStat = {
   net: number; orders: number; clicks: number; reach: number
   roas: number; cac: number; avgTicket: number
 }
-type MoM = { revenue: number; spend: number; net: number; orders: number; roas: number; cac: number; avgTicket: number }
+type MoM = { revenue: number; spend: number; net: number; orders: number; clicks: number; reach: number; roas: number; cac: number; avgTicket: number; curMonth: string; prevMonth: string }
 type MonthlyData = {
   series: MonthStat[]; mom: MoM
   repeatRate: number; repeatCount: number; totalUnique: number; totalCustomers: number
@@ -256,6 +256,11 @@ export default function DashboardPage() {
       {!loading && s && (
         <>
           {/* ── KPI row ─────────────────────────────────────────────── */}
+          {monthly?.mom && (
+            <p className="text-[10px] text-white/25 mb-3">
+              ↕ comparando <span className="text-white/40 font-mono">{monthly.mom.curMonth}</span> vs <span className="text-white/40 font-mono">{monthly.mom.prevMonth}</span>
+            </p>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-5">
             <MetricCard label="Ingresos brutos"  value={ARS(tnRevenue)}        sub={`${tnOrders} órdenes`}               mom={monthly?.mom.revenue}   sparkData={mergedTimeline.map(d=>d.revenue)}
               tip="Total facturado en el período según órdenes pagadas en Tiendanube. No descuenta costos." />
