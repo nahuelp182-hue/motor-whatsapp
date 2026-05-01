@@ -21,7 +21,7 @@ export function MetricCard({
     : null
 
   return (
-    <div className={`relative rounded-2xl p-5 flex flex-col justify-between min-h-[130px] transition-all duration-300 group
+    <div className={`relative rounded-2xl p-5 flex flex-col justify-between min-h-[130px] transition-all duration-300 group hover:z-[100]
       ${highlight
         ? 'bg-gradient-to-br from-orange-950/60 to-orange-900/20 border border-orange-500/20'
         : 'bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.07]'

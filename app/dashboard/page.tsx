@@ -338,7 +338,6 @@ export default function DashboardPage() {
                   prevReach={prev?.reach}
                   prevClicks={prev?.clicks}
                   prevOrders={prev?.orders}
-                  prevRepeats={undefined}
                 />
               )
             })()}

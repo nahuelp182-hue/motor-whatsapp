@@ -31,34 +31,30 @@ export function FunnelViz({
 
   const STAGES = [
     {
-      label: 'Alcance',        sub: 'personas que vieron el anuncio',
+      label: 'Alcance',         sub: 'personas que vieron el anuncio',
       value: reach,   display: NUM(reach),
-      color: '#818cf8',
-      colorBg: 'linear-gradient(180deg, rgba(129,140,248,0.65) 0%, rgba(129,140,248,0.30) 100%)',
-      topPct: 100,            botPct: wpct(clicks, 8),
+      color: '#818cf8', rgb: '129,140,248',
+      topPct: 100,              botPct: wpct(clicks, 8),
       delta: pctDelta(reach, prevReach),
     },
     {
       label: 'Clicks al sitio', sub: 'llegaron desde Meta Ads',
       value: clicks,  display: NUM(clicks),
-      color: '#f97316',
-      colorBg: 'linear-gradient(180deg, rgba(249,115,22,0.65) 0%, rgba(249,115,22,0.30) 100%)',
-      topPct: wpct(clicks, 8), botPct: wpct(orders, 5),
+      color: '#f97316', rgb: '249,115,22',
+      topPct: wpct(clicks, 8),  botPct: wpct(orders, 5),
       delta: pctDelta(clicks, prevClicks),
     },
     {
-      label: 'Compras',         sub: `ticket prom. ${ARS(avgTicket)}`,
+      label: 'Compras',          sub: `ticket prom. ${ARS(avgTicket)}`,
       value: orders,  display: `${NUM(orders)} órd.`,
-      color: '#34d399',
-      colorBg: 'linear-gradient(180deg, rgba(52,211,153,0.65) 0%, rgba(52,211,153,0.30) 100%)',
-      topPct: wpct(orders, 5), botPct: wpct(repeats, 4),
+      color: '#34d399', rgb: '52,211,153',
+      topPct: wpct(orders, 5),  botPct: wpct(repeats, 4),
       delta: pctDelta(orders, prevOrders),
     },
     {
-      label: 'Recompras',       sub: 'compraron en 2+ meses',
+      label: 'Recompras',        sub: 'compraron en 2+ meses',
       value: repeats, display: NUM(repeats),
-      color: '#facc15',
-      colorBg: 'linear-gradient(180deg, rgba(250,204,21,0.65) 0%, rgba(250,204,21,0.30) 100%)',
+      color: '#facc15', rgb: '250,204,21',
       topPct: wpct(repeats, 4), botPct: Math.max(3, wpct(repeats, 4) - 5),
       delta: undefined,
     },
@@ -73,44 +69,47 @@ export function FunnelViz({
   return (
     <div className="flex flex-col lg:flex-row gap-8">
 
-      {/* ── Embudo CSS ───────────────────────────────────────────── */}
+      {/* ── Embudo SVG ───────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col items-center gap-0">
         {STAGES.map((s, i) => {
-          // clip-path trapecio: (topLeft, topRight, botRight, botLeft)
+          // Puntos del trapecio en coordenadas 0-100 (viewBox)
           const lTop = (100 - s.topPct) / 2
           const rTop = 100 - lTop
           const lBot = (100 - s.botPct) / 2
           const rBot = 100 - lBot
-          const clipPath = `polygon(${lTop}% 0%, ${rTop}% 0%, ${rBot}% 100%, ${lBot}% 100%)`
+
+          const gradId = `fg-${i}`
 
           return (
             <div key={i} className="w-full flex flex-col items-center">
 
-              {/* Trapecio */}
+              {/* Trapecio via SVG */}
               <div className="relative w-full" style={{ height: 76 }}>
 
-                {/* Fondo con clip-path */}
-                <div style={{
-                  position:   'absolute',
-                  inset:      0,
-                  clipPath,
-                  background: s.colorBg,
-                  filter:     `drop-shadow(0 0 6px ${s.color}55)`,
-                }} />
+                <svg
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+                >
+                  <defs>
+                    <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stopColor={s.color} stopOpacity="0.7" />
+                      <stop offset="100%" stopColor={s.color} stopOpacity="0.25" />
+                    </linearGradient>
+                  </defs>
+                  {/* Relleno del trapecio */}
+                  <polygon
+                    points={`${lTop},0 ${rTop},0 ${rBot},100 ${lBot},100`}
+                    fill={`url(#${gradId})`}
+                  />
+                  {/* Borde superior luminoso */}
+                  <line
+                    x1={lTop} y1="1.5" x2={rTop} y2="1.5"
+                    stroke={s.color} strokeWidth="3" strokeLinecap="round"
+                  />
+                </svg>
 
-                {/* Borde superior (línea de color) */}
-                <div style={{
-                  position:     'absolute',
-                  top:           0,
-                  left:         `${lTop}%`,
-                  right:        `${100 - rTop}%`,
-                  height:        3,
-                  background:    s.color,
-                  borderRadius: '2px 2px 0 0',
-                  boxShadow:    `0 0 12px ${s.color}88`,
-                }} />
-
-                {/* Contenido centrado */}
+                {/* Contenido centrado (sobre el SVG) */}
                 <div style={{
                   position:       'absolute',
                   inset:          0,
@@ -120,13 +119,13 @@ export function FunnelViz({
                   justifyContent: 'center',
                   gap:             2,
                 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.8)', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.04em' }}>
                     {s.label}
                   </span>
                   <span style={{ fontSize: 20, fontWeight: 800, color: s.color, fontFamily: "'DM Mono',monospace", lineHeight: 1 }}>
                     {s.display}
                   </span>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>
                     {s.sub}
                   </span>
                 </div>
@@ -157,13 +156,7 @@ export function FunnelViz({
                 const c    = CONV[i]
                 const good = c.rate >= c.bench
                 return (
-                  <div style={{
-                    display:        'flex',
-                    flexDirection:  'column',
-                    alignItems:     'center',
-                    gap:             0,
-                    margin:         '2px 0',
-                  }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, margin: '2px 0' }}>
                     <div style={{ width: 1, height: 8, background: 'rgba(255,255,255,0.12)' }} />
                     <div style={{
                       padding:      '3px 12px',
