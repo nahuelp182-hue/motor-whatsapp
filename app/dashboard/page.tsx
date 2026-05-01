@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid, Legend, LineChart, Line,
+  ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from 'recharts'
 import { MetricCard } from '@/components/MetricCard'
 import { EcommerceCalendar } from '@/components/EcommerceCalendar'
+import { PaymentDonut } from '@/components/PaymentDonut'
+import { ProductsChart } from '@/components/ProductsChart'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = { date: string; revenue: number; spend: number; clicks: number; net: number }
@@ -16,6 +18,14 @@ type Summary = {
   clicks: number; impressions: number; reach: number; roas: number
 }
 type Analytics = { period: { since: string; until: string }; summary: Summary; timeline: TimelineDay[] }
+
+type Product = { name: string; units: number; revenue: number; orders: number; pct: number }
+type Payment = { label: string; count: number; revenue: number; pct: number; color: string }
+type OrdersData = {
+  products: Product[]; payments: Payment[]
+  timeline: { date: string; revenue: number }[]
+  summary: { totalOrders: number; totalRevenue: number; avgOrderValue: number }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const ARS = (n: number) =>
@@ -57,26 +67,36 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [since, setSince]       = useState(monthStart)
-  const [until, setUntil]       = useState(today)
+  const [since, setSince]         = useState(monthStart)
+  const [until, setUntil]         = useState(today)
   const [activePreset, setPreset] = useState('Este mes')
-  const [data, setData]         = useState<Analytics | null>(null)
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string | null>(null)
+  const [data, setData]           = useState<Analytics | null>(null)
+  const [ordersData, setOrdersData] = useState<OrdersData | null>(null)
+  const [loading, setLoading]     = useState(true)
+  const [ordersLoading, setOrdersLoading] = useState(true)
+  const [error, setError]         = useState<string | null>(null)
   const [chartView, setChartView] = useState<'revenue'|'spend'|'clicks'|'net'>('revenue')
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
 
   const load = useCallback(() => {
-    setLoading(true); setError(null)
-    fetch(`/api/analytics?since=${since}&until=${until}`)
-      .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json() })
-      .then((d: Analytics) => { setData(d); setLoading(false) })
-      .catch((e: Error) => { setError(e.message); setLoading(false) })
+    setLoading(true); setOrdersLoading(true); setError(null)
+    Promise.all([
+      fetch(`/api/analytics?since=${since}&until=${until}`)
+        .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json() }),
+      fetch(`/api/orders-analytics?since=${since}&until=${until}`)
+        .then(async r => r.json()),
+    ]).then(([analytics, orders]) => {
+      setData(analytics as Analytics)
+      setOrdersData(orders as OrdersData)
+      setLoading(false)
+      setOrdersLoading(false)
+    }).catch((e: Error) => { setError(e.message); setLoading(false); setOrdersLoading(false) })
   }, [since, until])
 
   useEffect(() => { load() }, [load])
 
   function applyPreset(p: typeof PRESETS[0]) {
-    setPreset(p.label); setSince(p.since); setUntil(p.until)
+    setPreset(p.label); setSince(p.since); setUntil(p.until); setSelectedProduct(null)
   }
 
   const s = data?.summary
@@ -338,32 +358,164 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ── Bottom: Mensajes + LTV barra ────────────────────────── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* ── Bottom: Mensajes + LTV ───────────────────────────────── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
               <p className="text-[10px] uppercase tracking-[0.18em] text-white/25 mb-3">Mensajes WhatsApp</p>
               <div className="flex gap-8">
-                <div><p className="text-2xl font-bold text-emerald-400">0</p><p className="text-[10px] text-white/25 mt-1">Enviados</p></div>
-                <div><p className="text-2xl font-bold text-red-400/70">0</p><p className="text-[10px] text-white/25 mt-1">Fallidos</p></div>
+                <div><p className="text-2xl font-bold font-mono text-emerald-400">0</p><p className="text-[10px] text-white/25 mt-1">Enviados</p></div>
+                <div><p className="text-2xl font-bold font-mono text-red-400/70">0</p><p className="text-[10px] text-white/25 mt-1">Fallidos</p></div>
               </div>
             </div>
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
               <p className="text-[10px] uppercase tracking-[0.18em] text-white/25 mb-3">LTV / CAC ratio</p>
               <div className="flex items-end gap-2 mb-3">
-                <p className={`text-2xl font-bold ${(s.ltv/s.cac)>=3?'text-emerald-400':'text-orange-400'}`}>
+                <p className={`text-2xl font-bold font-mono ${(s.ltv/s.cac)>=3?'text-emerald-400':'text-orange-400'}`}>
                   {s.cac>0?(s.ltv/s.cac).toFixed(1):'-'}x
                 </p>
-                <p className="text-[10px] text-white/30 mb-0.5">objetivo: ≥3x</p>
+                <p className="text-[10px] text-white/30 mb-0.5">objetivo ≥3x</p>
               </div>
               <div className="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
                 <div className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${Math.min(100, (s.ltv/s.cac/5)*100)}%`,
-                    background: (s.ltv/s.cac)>=3 ? 'linear-gradient(90deg,#34d399,#10b981)' : 'linear-gradient(90deg,#f97316,#fb923c)'
-                  }} />
+                  style={{ width:`${Math.min(100,(s.ltv/s.cac/5)*100)}%`, background:(s.ltv/s.cac)>=3?'linear-gradient(90deg,#34d399,#10b981)':'linear-gradient(90deg,#f97316,#fb923c)' }} />
               </div>
               <div className="mt-2 flex justify-between text-[10px] text-white/25">
                 <span>LTV {ARS(s.ltv)}</span><span>CAC {ARS(s.cac)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ══ SECCIÓN VENTAS POR PRODUCTO ══════════════════════════ */}
+          <div className="mb-2">
+            <div className="flex items-center gap-3 mb-4">
+              <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/30">Ventas por producto</h2>
+              {selectedProduct && (
+                <button onClick={() => setSelectedProduct(null)}
+                  className="text-[10px] text-orange-400/70 border border-orange-500/20 rounded-lg px-2 py-0.5 hover:border-orange-500/40 transition-colors">
+                  ✕ limpiar filtro
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+              {/* Lista de productos — filtro clickeable */}
+              <div className="lg:col-span-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/25 mb-4">
+                  {ordersData?.summary.totalOrders ?? 0} órdenes · {ARS(ordersData?.summary.totalRevenue ?? 0)}
+                </p>
+                {ordersLoading
+                  ? <div className="text-white/20 text-xs py-8 text-center">Cargando...</div>
+                  : <ProductsChart
+                      data={ordersData?.products ?? []}
+                      selected={selectedProduct}
+                      onSelect={setSelectedProduct}
+                    />
+                }
+              </div>
+
+              {/* Timeline filtrada por producto */}
+              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+                <div className="flex items-baseline justify-between mb-4">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-white/25">
+                    {selectedProduct ? `Ingresos — ${selectedProduct.slice(0,30)}…` : 'Ingresos totales por día'}
+                  </p>
+                  <span className="text-xs font-mono font-bold text-orange-400">
+                    {ARS(ordersData?.summary.totalRevenue ?? 0)}
+                  </span>
+                </div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart
+                    data={ordersData?.timeline ?? []}
+                    margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="prodGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%"   stopColor="#f97316" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" />
+                    <XAxis dataKey="date" tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                      tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
+                      interval={Math.max(0, Math.floor((ordersData?.timeline.length??1)/10))} />
+                    <YAxis tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                      tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
+                      axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ background:'rgba(10,10,20,0.95)', border:'1px solid rgba(249,115,22,0.2)', borderRadius:10, fontSize:11 }}
+                      formatter={(v:unknown) => [ARS(Number(v)), 'Ingresos']}
+                      cursor={{ stroke:'rgba(249,115,22,0.3)', strokeWidth:1 }}
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={2}
+                      fill="url(#prodGrad)" dot={false}
+                      activeDot={{ r:3, fill:'#f97316', strokeWidth:0 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+                {/* Ticket promedio */}
+                <div className="mt-3 pt-3 border-t border-white/5 flex justify-between text-[10px] text-white/25">
+                  <span>Ticket promedio</span>
+                  <span className="font-mono text-white/50">{ARS(ordersData?.summary.avgOrderValue ?? 0)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ══ SECCIÓN MÉTODOS DE PAGO ══════════════════════════════ */}
+          <div>
+            <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/30 mb-4">Métodos de pago</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+              {/* Donut */}
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/25 mb-4">
+                  {selectedProduct ? `Filtrado: ${selectedProduct.slice(0,20)}…` : 'Distribución general'}
+                </p>
+                {ordersLoading
+                  ? <div className="text-white/20 text-xs py-16 text-center">Cargando...</div>
+                  : <PaymentDonut data={ordersData?.payments ?? []} />
+                }
+              </div>
+
+              {/* Tabla detalle */}
+              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/25 mb-4">Detalle por método</p>
+                {ordersLoading
+                  ? <div className="text-white/20 text-xs py-8 text-center">Cargando...</div>
+                  : <div className="space-y-1">
+                      {/* Header */}
+                      <div className="grid grid-cols-4 text-[10px] uppercase tracking-widest text-white/20 px-3 pb-2 border-b border-white/5">
+                        <span className="col-span-2">Método</span>
+                        <span className="text-right">Órdenes</span>
+                        <span className="text-right">Total</span>
+                      </div>
+                      {(ordersData?.payments ?? []).map(p => (
+                        <div key={p.label}
+                          className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 hover:bg-white/[0.03] transition-colors group">
+                          <div className="col-span-2 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
+                            <span className="text-[11px] text-white/70 truncate">{p.label}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[11px] font-mono text-white/50">{p.count}</span>
+                            <span className="text-[10px] text-white/25 ml-1">({p.pct}%)</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[11px] font-mono text-white/80">{ARS(p.revenue)}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {/* Total */}
+                      <div className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 border-t border-white/5 mt-1 pt-3">
+                        <div className="col-span-2 text-[11px] text-white/40 font-medium">Total período</div>
+                        <div className="text-right text-[11px] font-mono text-white/50">
+                          {(ordersData?.payments ?? []).reduce((s,p)=>s+p.count,0)}
+                        </div>
+                        <div className="text-right text-[11px] font-mono text-orange-400 font-semibold">
+                          {ARS((ordersData?.payments ?? []).reduce((s,p)=>s+p.revenue,0))}
+                        </div>
+                      </div>
+                    </div>
+                }
               </div>
             </div>
           </div>
