@@ -29,24 +29,30 @@ function last12Months() {
   return months
 }
 
-// ── Meta: gasto mensual en un solo call ──────────────────────────────────────
+// ── Meta: gasto + clicks + reach mensual en un solo call ────────────────────
 async function fetchMetaMonthly(since: string, until: string) {
   const token = process.env.META_ADS_TOKEN
-  if (!token) return {}
+  if (!token) return { spend: {} as Record<string,number>, clicks: {} as Record<string,number>, reach: {} as Record<string,number> }
   try {
     const url = `https://graph.facebook.com/v21.0/${META_ACCOUNT}/insights` +
-      `?fields=spend&time_increment=monthly` +
+      `?fields=spend,clicks,reach&time_increment=monthly` +
       `&time_range={"since":"${since}","until":"${until}"}` +
       `&limit=24&access_token=${token}`
     const res  = await fetch(url)
-    const data = await res.json() as { data?: { date_start: string; spend: string }[] }
-    const map: Record<string, number> = {}
+    const data = await res.json() as { data?: { date_start: string; spend: string; clicks: string; reach: string }[] }
+    const spend: Record<string,number>  = {}
+    const clicks: Record<string,number> = {}
+    const reach: Record<string,number>  = {}
     for (const d of data.data ?? []) {
       const key = d.date_start.slice(0, 7)
-      map[key] = (map[key] ?? 0) + parseFloat(d.spend ?? '0')
+      spend[key]  = (spend[key]  ?? 0) + parseFloat(d.spend  ?? '0')
+      clicks[key] = (clicks[key] ?? 0) + parseInt(d.clicks   ?? '0')
+      reach[key]  = (reach[key]  ?? 0) + parseInt(d.reach    ?? '0')
     }
-    return map
-  } catch { return {} }
+    return { spend, clicks, reach }
+  } catch {
+    return { spend: {} as Record<string,number>, clicks: {} as Record<string,number>, reach: {} as Record<string,number> }
+  }
 }
 
 // ── TN: órdenes paginadas para un rango ──────────────────────────────────────
@@ -88,8 +94,8 @@ export async function GET(_req: NextRequest) {
     const earliest = months[0].since
     const latest   = months[months.length - 1].until
 
-    // ── 1. Meta spend mensual (1 call) ──────────────────────────────────────
-    const metaMap = await fetchMetaMonthly(earliest, latest)
+    // ── 1. Meta spend + clicks + reach mensual (1 call) ─────────────────────
+    const { spend: metaMap, clicks: clicksMap, reach: reachMap } = await fetchMetaMonthly(earliest, latest)
 
     // ── 2. TN órdenes del período completo ──────────────────────────────────
     const tnOrders = await fetchTNOrders(earliest, latest)
@@ -133,7 +139,9 @@ export async function GET(_req: NextRequest) {
     // ── 5. Construir serie mensual ─────────────────────────────────────────
     const series = months.map(m => {
       const tn     = tnByMonth[m.key]
-      const spend  = metaMap[m.key] ?? 0
+      const spend  = metaMap[m.key]  ?? 0
+      const clicks = clicksMap[m.key] ?? 0
+      const reach  = reachMap[m.key]  ?? 0
       const rev    = tn?.revenue ?? 0
       const orders = tn?.orders  ?? 0
       const net    = rev - spend
@@ -141,13 +149,15 @@ export async function GET(_req: NextRequest) {
       const cac    = orders > 0 ? spend / orders : 0
       return {
         key:    m.key,
-        label:  `${m.key.slice(5)} / ${m.key.slice(2, 4)}`, // MM/YY
+        label:  `${m.key.slice(5)} / ${m.key.slice(2, 4)}`,
         month:  m.month,
         year:   m.year,
         revenue: rev,
         spend,
         net,
         orders,
+        clicks,
+        reach,
         roas:   Math.round(roas * 10) / 10,
         cac:    Math.round(cac),
         avgTicket: orders > 0 ? Math.round(rev / orders) : 0,

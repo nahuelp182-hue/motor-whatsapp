@@ -12,6 +12,7 @@ import { CategoryAccordion } from '@/components/CategoryAccordion'
 import { Trend7d } from '@/components/Trend7d'
 import { MonthlyRevenueChart, RoasCacChart, AvgTicketChart } from '@/components/MonthlyChart'
 import { HelpTip } from '@/components/HelpTip'
+import { FunnelViz } from '@/components/FunnelViz'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = { date: string; revenue: number; spend: number; clicks: number; net: number }
@@ -33,7 +34,8 @@ type OrdersData = {
 }
 type MonthStat = {
   key: string; label: string; revenue: number; spend: number
-  net: number; orders: number; roas: number; cac: number; avgTicket: number
+  net: number; orders: number; clicks: number; reach: number
+  roas: number; cac: number; avgTicket: number
 }
 type MoM = { revenue: number; spend: number; net: number; orders: number; roas: number; cac: number; avgTicket: number }
 type MonthlyData = {
@@ -308,6 +310,34 @@ export default function DashboardPage() {
               <Trend7d trend={data.trend7d} />
             </div>
           )}
+
+          {/* ══ EMBUDO DE CONVERSIÓN ═════════════════════════════════ */}
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-5">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 flex items-center">
+                Embudo de conversión
+                <HelpTip text="Muestra cuántas personas pasan por cada etapa del proceso de compra: desde que ven el anuncio hasta que recompran. Las tasas entre etapas indican dónde hay más fricción o pérdida." />
+              </h3>
+              <span className="text-[10px] text-white/25">{since} → {until}</span>
+            </div>
+            {(() => {
+              const prev = monthly?.series[monthly.series.length - 2]
+              return (
+                <FunnelViz
+                  reach={s.reach}
+                  clicks={s.clicks}
+                  orders={tnOrders}
+                  repeats={monthly?.repeatCount ?? 0}
+                  revenue={tnRevenue}
+                  avgTicket={tnAvgOrder}
+                  prevReach={prev?.reach}
+                  prevClicks={prev?.clicks}
+                  prevOrders={prev?.orders}
+                  prevRepeats={undefined}
+                />
+              )
+            })()}
+          </div>
 
           {/* ── Main chart ──────────────────────────────────────────── */}
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-5">
