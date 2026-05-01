@@ -67,16 +67,17 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [since, setSince]         = useState(monthStart)
-  const [until, setUntil]         = useState(today)
-  const [activePreset, setPreset] = useState('Este mes')
-  const [data, setData]           = useState<Analytics | null>(null)
+  const [since, setSince]           = useState(monthStart)
+  const [until, setUntil]           = useState(today)
+  const [activePreset, setPreset]   = useState('Este mes')
+  const [data, setData]             = useState<Analytics | null>(null)
   const [ordersData, setOrdersData] = useState<OrdersData | null>(null)
-  const [loading, setLoading]     = useState(true)
+  const [loading, setLoading]       = useState(true)
   const [ordersLoading, setOrdersLoading] = useState(true)
-  const [error, setError]         = useState<string | null>(null)
-  const [chartView, setChartView] = useState<'revenue'|'spend'|'clicks'|'net'>('revenue')
+  const [error, setError]           = useState<string | null>(null)
+  const [chartView, setChartView]   = useState<'revenue'|'spend'|'clicks'|'net'>('revenue')
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   const load = useCallback(() => {
     setLoading(true); setOrdersLoading(true); setError(null)
@@ -88,12 +89,18 @@ export default function DashboardPage() {
     ]).then(([analytics, orders]) => {
       setData(analytics as Analytics)
       setOrdersData(orders as OrdersData)
+      setLastUpdated(new Date())
       setLoading(false)
       setOrdersLoading(false)
     }).catch((e: Error) => { setError(e.message); setLoading(false); setOrdersLoading(false) })
   }, [since, until])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    // Auto-refresh cada 60 minutos
+    const interval = setInterval(load, 60 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [load])
 
   function applyPreset(p: typeof PRESETS[0]) {
     setPreset(p.label); setSince(p.since); setUntil(p.until); setSelectedProduct(null)
@@ -151,8 +158,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Period label ────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-5">
+      {/* ── Period label + last updated ─────────────────────────────── */}
+      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center gap-3">
         <span className="text-[10px] uppercase tracking-[0.18em] text-white/20">
           {since} → {until}
         </span>
@@ -160,6 +168,19 @@ export default function DashboardPage() {
           <><span className="w-px h-3 bg-white/10" />
           <span className="text-[10px] text-orange-400/50">Meta: {ARS(s.metaSpend)}</span></>
         ) : null}
+      </div>
+      {/* Refresh */}
+      <div className="flex items-center gap-3">
+        {lastUpdated && (
+          <span className="text-[10px] text-white/15">
+            {lastUpdated.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}
+          </span>
+        )}
+        <button onClick={load} disabled={loading}
+          className="flex items-center gap-1.5 text-[10px] text-white/30 hover:text-white/60 border border-white/10 hover:border-white/20 rounded-lg px-2.5 py-1 transition-all disabled:opacity-30">
+          <span className={loading?'animate-spin inline-block':''}>↻</span> Actualizar
+        </button>
+      </div>
       </div>
 
       {loading && (
