@@ -28,7 +28,7 @@ export function Trend7d({ trend }: { trend: Trend }) {
         <div className="flex items-center gap-2 flex-shrink-0">
           <span className={`text-2xl font-bold leading-none ${cfg.clr}`}>{cfg.arrow}</span>
           <div>
-            <p className="text-[10px] uppercase tracking-[0.15em] text-white/25 leading-none mb-0.5">7 días</p>
+            <p className="text-[10px] uppercase tracking-[0.15em] text-white/50 leading-none mb-0.5">7 días</p>
             <p className={`text-lg font-bold font-mono leading-none ${cfg.clr}`}>
               {delta > 0 ? '+' : ''}{delta}%
             </p>
@@ -40,22 +40,22 @@ export function Trend7d({ trend }: { trend: Trend }) {
         {/* Barras comparativas */}
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="text-[9px] text-white/25 w-14 flex-shrink-0">Últ. 7d</span>
+            <span className="text-[9px] text-white/50 w-14 flex-shrink-0">Últ. 7d</span>
             <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
               <div className="h-full rounded-full transition-all duration-500"
                 style={{ width: `${(last7Rev / maxRev) * 100}%`, background: cfg.bar }} />
             </div>
             <span className="text-[10px] font-mono text-white/60 w-24 text-right flex-shrink-0">{ARS(last7Rev)}</span>
-            <span className="text-[9px] text-white/25 w-10 text-right flex-shrink-0">{last7Orders} v.</span>
+            <span className="text-[9px] text-white/50 w-10 text-right flex-shrink-0">{last7Orders} v.</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[9px] text-white/20 w-14 flex-shrink-0">Prev 7d</span>
+            <span className="text-[9px] text-white/50 w-14 flex-shrink-0">Prev 7d</span>
             <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
               <div className="h-full rounded-full bg-white/15 transition-all duration-500"
                 style={{ width: `${(prev7Rev / maxRev) * 100}%` }} />
             </div>
-            <span className="text-[10px] font-mono text-white/30 w-24 text-right flex-shrink-0">{ARS(prev7Rev)}</span>
-            <span className="text-[9px] text-white/20 w-10 text-right flex-shrink-0">{prev7Orders} v.</span>
+            <span className="text-[10px] font-mono text-white/55 w-24 text-right flex-shrink-0">{ARS(prev7Rev)}</span>
+            <span className="text-[9px] text-white/50 w-10 text-right flex-shrink-0">{prev7Orders} v.</span>
           </div>
         </div>
 
@@ -63,7 +63,7 @@ export function Trend7d({ trend }: { trend: Trend }) {
 
         {/* Diferencia */}
         <div className="flex-shrink-0 text-right">
-          <p className="text-[10px] text-white/20 mb-0.5">Diferencia</p>
+          <p className="text-[10px] text-white/50 mb-0.5">Diferencia</p>
           <p className={`text-sm font-mono font-bold ${cfg.clr}`}>
             {last7Rev - prev7Rev >= 0 ? '+' : ''}{ARS(last7Rev - prev7Rev)}
           </p>

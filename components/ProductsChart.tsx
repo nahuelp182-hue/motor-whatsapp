@@ -19,7 +19,7 @@ export function ProductsChart({
   onSelect: (name: string | null) => void
 }) {
   if (!data.length) return (
-    <div className="flex items-center justify-center h-32 text-white/20 text-xs">Sin datos</div>
+    <div className="flex items-center justify-center h-32 text-white/50 text-xs">Sin datos</div>
   )
 
   return (
@@ -44,7 +44,7 @@ export function ProductsChart({
                 {shortName(p.name)}
               </span>
               <div className="flex items-center gap-3 flex-shrink-0">
-                <span className="text-[10px] text-white/30">{p.units} uds · {p.orders} órd.</span>
+                <span className="text-[10px] text-white/55">{p.units} uds · {p.orders} órd.</span>
                 <span className="text-[11px] font-mono font-semibold text-white">{p.pct}%</span>
               </div>
             </div>

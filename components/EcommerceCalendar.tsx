@@ -38,7 +38,7 @@ export function EcommerceCalendar() {
               </div>
               <div className="text-right">
                 {isPast ? (
-                  <span className="text-xs text-white/30">Pasado</span>
+                  <span className="text-xs text-white/55">Pasado</span>
                 ) : shouldActivate ? (
                   <span className="text-xs font-bold text-orange-400 animate-pulse">
                     ¡Activar ahora!
@@ -48,7 +48,7 @@ export function EcommerceCalendar() {
                     en {daysToEvent}d
                   </span>
                 )}
-                <p className="text-xs text-white/30 mt-0.5">{ev.date}</p>
+                <p className="text-xs text-white/55 mt-0.5">{ev.date}</p>
               </div>
             </div>
           )

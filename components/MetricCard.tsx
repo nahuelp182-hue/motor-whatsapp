@@ -44,7 +44,7 @@ export function MetricCard({
           {value}
         </p>
         {sub && (
-          <p className="mt-1.5 text-[10px] text-white/30 leading-snug">{sub}</p>
+          <p className="mt-1.5 text-[10px] text-white/55 leading-snug">{sub}</p>
         )}
       </div>
 

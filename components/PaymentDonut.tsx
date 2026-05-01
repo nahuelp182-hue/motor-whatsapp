@@ -8,7 +8,7 @@ type PaymentItem = { label: string; count: number; revenue: number; pct: number;
 
 export function PaymentDonut({ data }: { data: PaymentItem[] }) {
   if (!data.length) return (
-    <div className="flex items-center justify-center h-full text-white/20 text-xs">Sin datos</div>
+    <div className="flex items-center justify-center h-full text-white/50 text-xs">Sin datos</div>
   )
 
   return (
@@ -39,7 +39,7 @@ export function PaymentDonut({ data }: { data: PaymentItem[] }) {
                 <span className="text-[11px] text-white/60 truncate max-w-[140px]">{d.label}</span>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-[10px] text-white/30">{d.count} órd.</span>
+                <span className="text-[10px] text-white/55">{d.count} órd.</span>
                 <span className="text-[11px] font-mono font-semibold text-white/80">{d.pct}%</span>
               </div>
             </div>
