@@ -9,6 +9,7 @@ import { MetricCard } from '@/components/MetricCard'
 import { EcommerceCalendar } from '@/components/EcommerceCalendar'
 import { PaymentDonut } from '@/components/PaymentDonut'
 import { ProductsChart } from '@/components/ProductsChart'
+import { Trend7d } from '@/components/Trend7d'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = { date: string; revenue: number; spend: number; clicks: number; net: number }
@@ -17,7 +18,8 @@ type Summary = {
   newCustomers: number; cac: number; ltv: number
   clicks: number; impressions: number; reach: number; roas: number
 }
-type Analytics = { period: { since: string; until: string }; summary: Summary; timeline: TimelineDay[] }
+type Trend7d = { last7Rev: number; prev7Rev: number; last7Orders: number; prev7Orders: number; delta: number; direction: 'up'|'down'|'neutral' }
+type Analytics = { period: { since: string; until: string }; summary: Summary; timeline: TimelineDay[]; trend7d?: Trend7d }
 
 type Product = { name: string; units: number; revenue: number; orders: number; pct: number }
 type Payment = { label: string; count: number; revenue: number; pct: number; color: string }
@@ -240,6 +242,13 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* ── Indicador 7 días ────────────────────────────────────── */}
+          {data?.trend7d && (
+            <div className="mb-5">
+              <Trend7d trend={data.trend7d} />
+            </div>
+          )}
 
           {/* ── Main chart ──────────────────────────────────────────── */}
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-5">

@@ -131,6 +131,36 @@ export async function GET(req: NextRequest) {
     const ltv = ltvResult._count.id > 0 ? (ltvResult._sum.total_spent ?? 0) / ltvResult._count.id : 0
     const cac = newCustomers > 0 ? metaTotals.spend / newCustomers : 0
 
+    // ── Comparativa 7 días (siempre vs hoy, independiente del filtro) ──
+    const now    = new Date()
+    const d7ago  = new Date(now); d7ago.setDate(d7ago.getDate() - 7)
+    const d14ago = new Date(now); d14ago.setDate(d14ago.getDate() - 14)
+
+    const [last7, prev7] = await Promise.all([
+      prisma.customer.aggregate({
+        where: { ...whereStore, createdAt: { gte: d7ago,  lte: now   } },
+        _sum: { total_spent: true }, _count: { id: true },
+      }),
+      prisma.customer.aggregate({
+        where: { ...whereStore, createdAt: { gte: d14ago, lte: d7ago } },
+        _sum: { total_spent: true }, _count: { id: true },
+      }),
+    ])
+
+    const last7Rev  = last7._sum.total_spent ?? 0
+    const prev7Rev  = prev7._sum.total_spent ?? 0
+    const delta     = prev7Rev > 0 ? ((last7Rev - prev7Rev) / prev7Rev) * 100
+                    : last7Rev > 0 ? 100 : 0
+
+    const trend7d = {
+      last7Rev,
+      prev7Rev,
+      last7Orders: last7._count.id,
+      prev7Orders: prev7._count.id,
+      delta:       Math.round(delta * 10) / 10,
+      direction:   Math.abs(delta) <= 10 ? 'neutral' : delta > 0 ? 'up' : 'down' as 'up'|'down'|'neutral',
+    }
+
     return NextResponse.json({
       period:  { since, until },
       summary: {
@@ -147,6 +177,7 @@ export async function GET(req: NextRequest) {
       },
       timeline,
       trafficSources,
+      trend7d,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
