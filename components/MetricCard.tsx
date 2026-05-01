@@ -1,18 +1,20 @@
 'use client'
 import { SparklineChart } from './SparklineChart'
+import { HelpTip } from './HelpTip'
 
 interface MetricCardProps {
   label: string
   value: string
   sub?: string
   highlight?: boolean
-  mom?: number           // % change Month-over-Month (positivo = bueno)
-  momInvert?: boolean    // si true, rojo cuando sube (ej: CAC, gasto)
+  mom?: number
+  momInvert?: boolean
   sparkData?: number[]
+  tip?: string           // texto del tooltip de ayuda
 }
 
 export function MetricCard({
-  label, value, sub, highlight, mom, momInvert = false, sparkData,
+  label, value, sub, highlight, mom, momInvert = false, sparkData, tip,
 }: MetricCardProps) {
   const isGood = mom !== undefined
     ? (momInvert ? mom <= 0 : mom >= 0)
@@ -31,8 +33,9 @@ export function MetricCard({
 
       {/* Label + MoM badge */}
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/50 leading-none">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/50 leading-none flex items-center">
           {label}
+          {tip && <HelpTip text={tip} />}
         </p>
         {mom !== undefined && (
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 flex-shrink-0 ${

@@ -11,6 +11,7 @@ import { PaymentDonut } from '@/components/PaymentDonut'
 import { CategoryAccordion } from '@/components/CategoryAccordion'
 import { Trend7d } from '@/components/Trend7d'
 import { MonthlyRevenueChart, RoasCacChart, AvgTicketChart } from '@/components/MonthlyChart'
+import { HelpTip } from '@/components/HelpTip'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = { date: string; revenue: number; spend: number; clicks: number; net: number }
@@ -254,14 +255,22 @@ export default function DashboardPage() {
         <>
           {/* ── KPI row ─────────────────────────────────────────────── */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-5">
-            <MetricCard label="Ingresos brutos"  value={ARS(tnRevenue)}        sub={`${tnOrders} órdenes`}               mom={monthly?.mom.revenue}   sparkData={mergedTimeline.map(d=>d.revenue)} />
-            <MetricCard label="Gasto Meta"        value={ARS(s.metaSpend)}      sub="período seleccionado"               mom={monthly?.mom.spend}     momInvert />
-            <MetricCard label="Ingreso neto"      value={ARS(netRev)}           sub="bruto − gasto ads" highlight={netRev > 0} mom={monthly?.mom.net}  sparkData={mergedTimeline.map(d=>d.net)} />
-            <MetricCard label="ROAS"              value={`${roas.toFixed(1)}x`} sub="revenue / spend"   highlight={roas >= 3}  mom={monthly?.mom.roas} />
-            <MetricCard label="CAC"               value={ARS(s.cac)}            sub={`${s.newCustomers} nuevos clientes`} mom={monthly?.mom.cac}      momInvert />
-            <MetricCard label="Ticket promedio"   value={ARS(tnAvgOrder)}       sub="por orden"                          mom={monthly?.mom.avgTicket} sparkData={mergedTimeline.map(d=>d.revenue)} />
-            <MetricCard label="Clicks Meta"       value={NUM(s.clicks)}         sub={`${NUM(s.impressions)} impresiones`}                              sparkData={mergedTimeline.map(d=>d.clicks)} />
-            <MetricCard label="Alcance Meta"      value={NUM(s.reach)}          sub="personas únicas" />
+            <MetricCard label="Ingresos brutos"  value={ARS(tnRevenue)}        sub={`${tnOrders} órdenes`}               mom={monthly?.mom.revenue}   sparkData={mergedTimeline.map(d=>d.revenue)}
+              tip="Total facturado en el período según órdenes pagadas en Tiendanube. No descuenta costos." />
+            <MetricCard label="Gasto Meta"        value={ARS(s.metaSpend)}      sub="período seleccionado"               mom={monthly?.mom.spend}     momInvert
+              tip="Lo que gastaste en publicidad en Meta Ads (Facebook + Instagram) durante el período seleccionado." />
+            <MetricCard label="Ingreso neto"      value={ARS(netRev)}           sub="bruto − gasto ads" highlight={netRev > 0} mom={monthly?.mom.net}  sparkData={mergedTimeline.map(d=>d.net)}
+              tip="Ingresos brutos menos gasto en Meta Ads. Es lo que te queda en cuenta después de pagar la publicidad. No incluye otros costos operativos." />
+            <MetricCard label="ROAS"              value={`${roas.toFixed(1)}x`} sub="revenue / spend"   highlight={roas >= 3}  mom={monthly?.mom.roas}
+              tip="Return On Ad Spend: por cada peso invertido en Meta, cuántos pesos en ventas generaste. ROAS 3x = $3 vendidos por cada $1 gastado. Saludable: ≥3x." />
+            <MetricCard label="CAC"               value={ARS(s.cac)}            sub={`${s.newCustomers} nuevos clientes`} mom={monthly?.mom.cac}      momInvert
+              tip="Costo de Adquisición de Cliente: cuánto gastaste en Meta para conseguir cada nuevo cliente. Debería ser menor al LTV. Ideal: CAC < LTV / 3." />
+            <MetricCard label="Ticket promedio"   value={ARS(tnAvgOrder)}       sub="por orden"                          mom={monthly?.mom.avgTicket} sparkData={mergedTimeline.map(d=>d.revenue)}
+              tip="Valor promedio de cada orden. Si sube puede indicar upsells o productos más caros. Si baja, más ventas de productos de bajo precio." />
+            <MetricCard label="Clicks Meta"       value={NUM(s.clicks)}         sub={`${NUM(s.impressions)} impresiones`}                              sparkData={mergedTimeline.map(d=>d.clicks)}
+              tip="Clicks al link del anuncio en Meta Ads. Las impresiones son cuántas veces se mostró el anuncio. CTR = clicks / impresiones." />
+            <MetricCard label="Alcance Meta"      value={NUM(s.reach)}          sub="personas únicas"
+              tip="Personas únicas que vieron al menos un anuncio tuyo en el período. A diferencia de impresiones, no cuenta la misma persona dos veces." />
           </div>
 
           {/* ── Net revenue highlight ───────────────────────────────── */}
@@ -636,7 +645,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
               <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-5">ROAS y CAC mensual</h3>
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-5 flex items-center">ROAS y CAC mensual<HelpTip text="ROAS mide el retorno de la inversión publicitaria. CAC es cuánto cuesta adquirir cada cliente nuevo. Si el ROAS baja o el CAC sube mes a mes, los anuncios están perdiendo eficiencia." /></h3>
                 {monthly
                   ? <RoasCacChart data={monthly.series} />
                   : <div className="h-[180px] flex items-center justify-center text-white/20 text-xs">Cargando...</div>
@@ -645,7 +654,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-5">Ticket promedio y volumen de órdenes</h3>
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-5 flex items-center">Ticket y volumen<HelpTip text="Ticket promedio = valor promedio por orden. Órdenes = cantidad de ventas. Si el ticket sube sin más órdenes, estás vendiendo productos más caros. Si suben las órdenes, hay más demanda." /></h3>
                 {monthly
                   ? <AvgTicketChart data={monthly.series} />
                   : <div className="h-[160px] flex items-center justify-center text-white/20 text-xs">Cargando...</div>
@@ -659,7 +668,7 @@ export default function DashboardPage() {
 
               {/* Repeat rate card */}
               <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4">Tasa de recompra</h3>
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4 flex items-center">Tasa de recompra<HelpTip text="% de clientes únicos que compraron en dos o más meses distintos. Un número alto indica fidelidad y reduce la dependencia de publicidad para generar ventas. Saludable: ≥20%." /></h3>
                 {monthly ? (
                   <>
                     <div className="flex items-end gap-2 mb-3">
