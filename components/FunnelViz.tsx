@@ -33,28 +33,32 @@ export function FunnelViz({
     {
       label: 'Alcance',        sub: 'personas que vieron el anuncio',
       value: reach,   display: NUM(reach),
-      color: '#818cf8', colorBg: 'rgba(129,140,248,0.22)', colorBorder: 'rgba(129,140,248,0.7)',
+      color: '#818cf8',
+      colorBg: 'linear-gradient(180deg, rgba(129,140,248,0.65) 0%, rgba(129,140,248,0.30) 100%)',
       topPct: 100,            botPct: wpct(clicks, 8),
       delta: pctDelta(reach, prevReach),
     },
     {
       label: 'Clicks al sitio', sub: 'llegaron desde Meta Ads',
       value: clicks,  display: NUM(clicks),
-      color: '#f97316', colorBg: 'rgba(249,115,22,0.22)',  colorBorder: 'rgba(249,115,22,0.7)',
+      color: '#f97316',
+      colorBg: 'linear-gradient(180deg, rgba(249,115,22,0.65) 0%, rgba(249,115,22,0.30) 100%)',
       topPct: wpct(clicks, 8), botPct: wpct(orders, 5),
       delta: pctDelta(clicks, prevClicks),
     },
     {
       label: 'Compras',         sub: `ticket prom. ${ARS(avgTicket)}`,
       value: orders,  display: `${NUM(orders)} órd.`,
-      color: '#34d399', colorBg: 'rgba(52,211,153,0.22)',  colorBorder: 'rgba(52,211,153,0.7)',
+      color: '#34d399',
+      colorBg: 'linear-gradient(180deg, rgba(52,211,153,0.65) 0%, rgba(52,211,153,0.30) 100%)',
       topPct: wpct(orders, 5), botPct: wpct(repeats, 4),
       delta: pctDelta(orders, prevOrders),
     },
     {
       label: 'Recompras',       sub: 'compraron en 2+ meses',
       value: repeats, display: NUM(repeats),
-      color: '#facc15', colorBg: 'rgba(250,204,21,0.22)',  colorBorder: 'rgba(250,204,21,0.7)',
+      color: '#facc15',
+      colorBg: 'linear-gradient(180deg, rgba(250,204,21,0.65) 0%, rgba(250,204,21,0.30) 100%)',
       topPct: wpct(repeats, 4), botPct: Math.max(3, wpct(repeats, 4) - 5),
       delta: undefined,
     },
@@ -91,7 +95,7 @@ export function FunnelViz({
                   inset:      0,
                   clipPath,
                   background: s.colorBg,
-                  border:     'none',
+                  filter:     `drop-shadow(0 0 6px ${s.color}55)`,
                 }} />
 
                 {/* Borde superior (línea de color) */}
