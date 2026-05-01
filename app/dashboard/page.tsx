@@ -8,7 +8,7 @@ import {
 import { MetricCard } from '@/components/MetricCard'
 import { EcommerceCalendar } from '@/components/EcommerceCalendar'
 import { PaymentDonut } from '@/components/PaymentDonut'
-import { ProductsChart } from '@/components/ProductsChart'
+import { CategoryAccordion } from '@/components/CategoryAccordion'
 import { Trend7d } from '@/components/Trend7d'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -21,10 +21,11 @@ type Summary = {
 type Trend7d = { last7Rev: number; prev7Rev: number; last7Orders: number; prev7Orders: number; delta: number; direction: 'up'|'down'|'neutral' }
 type Analytics = { period: { since: string; until: string }; summary: Summary; timeline: TimelineDay[]; trend7d?: Trend7d }
 
-type Product = { name: string; units: number; revenue: number; orders: number; pct: number }
-type Payment = { label: string; count: number; revenue: number; pct: number; color: string }
+type Product  = { name: string; units: number; revenue: number; orders: number; pct: number }
+type Category = { name: string; color: string; revenue: number; orders: number; units: number; pct: number; products: Product[] }
+type Payment  = { label: string; count: number; revenue: number; pct: number; color: string }
 type OrdersData = {
-  products: Product[]; payments: Payment[]
+  products: Product[]; categories: Category[]; payments: Payment[]
   timeline: { date: string; revenue: number }[]
   summary: { totalOrders: number; totalRevenue: number; avgOrderValue: number }
 }
@@ -457,17 +458,26 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-              {/* Lista de productos — filtro clickeable */}
+              {/* Categorías con acordeón */}
               <div className="lg:col-span-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 mb-4">
-                  {ordersData?.summary.totalOrders ?? 0} órdenes · {ARS(ordersData?.summary.totalRevenue ?? 0)}
-                </p>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-white/55">
+                    Por categoría
+                  </p>
+                  {selectedProduct && (
+                    <button onClick={() => setSelectedProduct(null)}
+                      className="text-[10px] text-orange-400/70 border border-orange-500/20 rounded-lg px-2 py-0.5 hover:border-orange-500/40 transition-colors">
+                      ✕ limpiar
+                    </button>
+                  )}
+                </div>
                 {ordersLoading
                   ? <div className="text-white/50 text-xs py-8 text-center">Cargando...</div>
-                  : <ProductsChart
-                      data={ordersData?.products ?? []}
-                      selected={selectedProduct}
-                      onSelect={setSelectedProduct}
+                  : <CategoryAccordion
+                      categories={ordersData?.categories ?? []}
+                      totalRevenue={ordersData?.summary.totalRevenue ?? 0}
+                      selectedProduct={selectedProduct}
+                      onSelectProduct={setSelectedProduct}
                     />
                 }
               </div>

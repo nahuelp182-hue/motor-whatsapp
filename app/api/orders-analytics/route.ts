@@ -39,6 +39,21 @@ function productName(p: TNProduct): string {
   return p.name?.es ?? 'Producto'
 }
 
+// ── Categorías por palabras clave ─────────────────────────────────────────────
+const CATEGORIES: { name: string; color: string; keywords: RegExp }[] = [
+  { name: 'Incubadoras',  color: '#f97316', keywords: /incubadora|inc101/i },
+  { name: 'Tabletas',     color: '#818cf8', keywords: /tableta|pc400/i },
+  { name: 'Accesorios',   color: '#34d399', keywords: /kit|recipiente|accesorio|soporte/i },
+  { name: 'Digitales',    color: '#facc15', keywords: /ebook|guía|guia|pdf|gratis|digital/i },
+]
+
+function classifyProduct(name: string): string {
+  for (const cat of CATEGORIES) {
+    if (cat.keywords.test(name)) return cat.name
+  }
+  return 'Otros'
+}
+
 function classifyPayment(o: TNOrder): string {
   const gw   = o.gateway ?? ''
   const met  = o.payment_details?.method ?? ''
@@ -99,10 +114,36 @@ export async function GET(req: NextRequest) {
     const products = Object.entries(productMap)
       .map(([name, v]) => ({
         name,
-        units:   v.units,
-        revenue: v.revenue,
-        orders:  v.orders,
-        pct:     totalRevenue > 0 ? Math.round((v.revenue / totalRevenue) * 100) : 0,
+        category: classifyProduct(name),
+        units:    v.units,
+        revenue:  v.revenue,
+        orders:   v.orders,
+        pct:      totalRevenue > 0 ? Math.round((v.revenue / totalRevenue) * 100) : 0,
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+
+    // ── Categorías agrupadas ──────────────────────────────────────
+    const catMap: Record<string, { revenue: number; orders: number; units: number; products: typeof products }> = {}
+    for (const prod of products) {
+      const cat = prod.category
+      if (!catMap[cat]) catMap[cat] = { revenue: 0, orders: 0, units: 0, products: [] }
+      catMap[cat].revenue  += prod.revenue
+      catMap[cat].orders   += prod.orders
+      catMap[cat].units    += prod.units
+      catMap[cat].products.push(prod)
+    }
+    const allCatColors: Record<string, string> = Object.fromEntries(CATEGORIES.map(c => [c.name, c.color]))
+    allCatColors['Otros'] = '#6b7280'
+
+    const categories = Object.entries(catMap)
+      .map(([name, v]) => ({
+        name,
+        color:    allCatColors[name] ?? '#6b7280',
+        revenue:  v.revenue,
+        orders:   v.orders,
+        units:    v.units,
+        pct:      totalRevenue > 0 ? Math.round((v.revenue / totalRevenue) * 100) : 0,
+        products: v.products,
       }))
       .sort((a, b) => b.revenue - a.revenue)
 
@@ -149,7 +190,7 @@ export async function GET(req: NextRequest) {
       avgOrderValue: filteredOrders.length > 0 ? filteredRevenue / filteredOrders.length : 0,
     }
 
-    return NextResponse.json({ since, until, products, payments, timeline, summary })
+    return NextResponse.json({ since, until, products, categories, payments, timeline, summary })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ error: msg }, { status: 500 })
