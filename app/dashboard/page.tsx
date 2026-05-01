@@ -188,7 +188,7 @@ export default function DashboardPage() {
               onChange={e => { setSince(e.target.value); setPreset('') }}
               className={inputCls} />
             <span className="text-white/50 text-xs">→</span>
-            <input type="date" value={until} min={since} max={today}
+            <input type="date" value={until} min={since} max={localDate()}
               onChange={e => { setUntil(e.target.value); setPreset('') }}
               className={inputCls} />
           </div>
