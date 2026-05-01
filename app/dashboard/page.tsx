@@ -35,19 +35,30 @@ const ARS = (n: number) =>
 const NUM = (n: number) =>
   new Intl.NumberFormat('es-AR').format(n)
 
-const today  = new Date().toISOString().slice(0, 10)
-const y = new Date().getFullYear()
-const m = new Date().getMonth() + 1
+// Fechas en timezone local (Argentina, no UTC)
 const pad = (n: number) => String(n).padStart(2, '0')
-const monthStart = `${y}-${pad(m)}-01`
+function localDate(d = new Date()) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+}
+function localMonthStart(d = new Date()) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-01`
+}
+function localPrevMonthStart(d = new Date()) {
+  const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1)
+  return localMonthStart(prev)
+}
+function localMonthEnd(d = new Date()) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-01`
+}
 
+// Se evalúa en el browser con timezone local
 const PRESETS = [
-  { label: 'Este mes',   since: monthStart, until: today },
-  { label: 'Mes ant.',   since: `${m === 1 ? y-1 : y}-${pad(m===1?12:m-1)}-01`, until: `${y}-${pad(m)}-01` },
-  { label: '2026',       since: '2026-01-01', until: '2026-12-31' },
-  { label: '2025',       since: '2025-01-01', until: '2025-12-31' },
-  { label: '2024',       since: '2024-01-01', until: '2024-12-31' },
-  { label: 'Todo',       since: '2022-01-01', until: today },
+  { label: 'Este mes', getSince: localMonthStart,     getUntil: localDate },
+  { label: 'Mes ant.', getSince: localPrevMonthStart,  getUntil: localMonthEnd },
+  { label: '2026',     getSince: () => '2026-01-01',   getUntil: () => '2026-12-31' },
+  { label: '2025',     getSince: () => '2025-01-01',   getUntil: () => '2025-12-31' },
+  { label: '2024',     getSince: () => '2024-01-01',   getUntil: () => '2024-12-31' },
+  { label: 'Todo',     getSince: () => '2022-01-01',   getUntil: localDate },
 ]
 
 // ── Tooltip personalizado ─────────────────────────────────────────────────────
@@ -69,8 +80,8 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [since, setSince]           = useState(monthStart)
-  const [until, setUntil]           = useState(today)
+  const [since, setSince]           = useState(() => localMonthStart())
+  const [until, setUntil]           = useState(() => localDate())
   const [activePreset, setPreset]   = useState('Este mes')
   const [data, setData]             = useState<Analytics | null>(null)
   const [ordersData, setOrdersData] = useState<OrdersData | null>(null)
@@ -105,7 +116,10 @@ export default function DashboardPage() {
   }, [load])
 
   function applyPreset(p: typeof PRESETS[0]) {
-    setPreset(p.label); setSince(p.since); setUntil(p.until); setSelectedProduct(null)
+    setPreset(p.label)
+    setSince(p.getSince())
+    setUntil(p.getUntil())
+    setSelectedProduct(null)
   }
 
   const s = data?.summary
