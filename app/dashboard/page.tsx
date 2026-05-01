@@ -10,6 +10,7 @@ import { EcommerceCalendar } from '@/components/EcommerceCalendar'
 import { PaymentDonut } from '@/components/PaymentDonut'
 import { CategoryAccordion } from '@/components/CategoryAccordion'
 import { Trend7d } from '@/components/Trend7d'
+import { MonthlyRevenueChart, RoasCacChart, AvgTicketChart } from '@/components/MonthlyChart'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = { date: string; revenue: number; spend: number; clicks: number; net: number }
@@ -28,6 +29,15 @@ type OrdersData = {
   products: Product[]; categories: Category[]; payments: Payment[]
   timeline: { date: string; revenue: number }[]
   summary: { totalOrders: number; totalRevenue: number; avgOrderValue: number }
+}
+type MonthStat = {
+  key: string; label: string; revenue: number; spend: number
+  net: number; orders: number; roas: number; cac: number; avgTicket: number
+}
+type MoM = { revenue: number; spend: number; net: number; orders: number; roas: number; cac: number; avgTicket: number }
+type MonthlyData = {
+  series: MonthStat[]; mom: MoM
+  repeatRate: number; repeatCount: number; totalUnique: number; totalCustomers: number
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -81,20 +91,24 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [since, setSince]           = useState(() => localMonthStart())
-  const [until, setUntil]           = useState(() => localDate())
-  const [activePreset, setPreset]   = useState('Este mes')
-  const [data, setData]             = useState<Analytics | null>(null)
-  const [ordersData, setOrdersData] = useState<OrdersData | null>(null)
-  const [loading, setLoading]       = useState(true)
+  const [since, setSince]             = useState(() => localMonthStart())
+  const [until, setUntil]             = useState(() => localDate())
+  const [activePreset, setPreset]     = useState('Este mes')
+  const [data, setData]               = useState<Analytics | null>(null)
+  const [ordersData, setOrdersData]   = useState<OrdersData | null>(null)
+  const [monthly, setMonthly]         = useState<MonthlyData | null>(null)
+  const [loading, setLoading]         = useState(true)
   const [ordersLoading, setOrdersLoading] = useState(true)
-  const [error, setError]           = useState<string | null>(null)
-  const [chartView, setChartView]   = useState<'revenue'|'spend'|'clicks'|'net'>('revenue')
+  const [monthlyLoading, setMonthlyLoading] = useState(true)
+  const [error, setError]             = useState<string | null>(null)
+  const [chartView, setChartView]     = useState<'revenue'|'spend'|'clicks'|'net'>('revenue')
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   const load = useCallback(() => {
-    setLoading(true); setOrdersLoading(true); setError(null)
+    setLoading(true); setOrdersLoading(true); setMonthlyLoading(true); setError(null)
+
+    // Carga periódica (depende del rango seleccionado)
     Promise.all([
       fetch(`/api/analytics?since=${since}&until=${until}`)
         .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json() }),
@@ -107,6 +121,12 @@ export default function DashboardPage() {
       setLoading(false)
       setOrdersLoading(false)
     }).catch((e: Error) => { setError(e.message); setLoading(false); setOrdersLoading(false) })
+
+    // Stats mensuales: siempre los últimos 12 meses (independiente del filtro)
+    fetch('/api/monthly-stats')
+      .then(async r => r.json())
+      .then((d: MonthlyData) => { setMonthly(d); setMonthlyLoading(false) })
+      .catch(() => setMonthlyLoading(false))
   }, [since, until])
 
   useEffect(() => {
@@ -234,14 +254,14 @@ export default function DashboardPage() {
         <>
           {/* ── KPI row ─────────────────────────────────────────────── */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-5">
-            <MetricCard label="Ingresos brutos"  value={ARS(tnRevenue)}          sub={`${tnOrders} órdenes`}              sparkData={mergedTimeline.map(d=>d.revenue)} />
-            <MetricCard label="Gasto Meta"        value={ARS(s.metaSpend)}        sub="período seleccionado" />
-            <MetricCard label="Ingreso neto"      value={ARS(netRev)}             sub="bruto − gasto ads"   highlight={netRev > 0} sparkData={mergedTimeline.map(d=>d.net)} />
-            <MetricCard label="ROAS"              value={`${roas.toFixed(1)}x`}   sub="revenue / spend"     highlight={roas >= 3} />
-            <MetricCard label="CAC"               value={ARS(s.cac)}              sub={`${s.newCustomers} nuevos clientes`} />
-            <MetricCard label="Ticket promedio"   value={ARS(tnAvgOrder)}         sub="por orden"           sparkData={mergedTimeline.map(d=>d.revenue)} />
-            <MetricCard label="Clicks Meta"       value={NUM(s.clicks)}           sub={`${NUM(s.impressions)} impresiones`} sparkData={mergedTimeline.map(d=>d.clicks)} />
-            <MetricCard label="Alcance Meta"      value={NUM(s.reach)}            sub="personas únicas" />
+            <MetricCard label="Ingresos brutos"  value={ARS(tnRevenue)}        sub={`${tnOrders} órdenes`}               mom={monthly?.mom.revenue}   sparkData={mergedTimeline.map(d=>d.revenue)} />
+            <MetricCard label="Gasto Meta"        value={ARS(s.metaSpend)}      sub="período seleccionado"               mom={monthly?.mom.spend}     momInvert />
+            <MetricCard label="Ingreso neto"      value={ARS(netRev)}           sub="bruto − gasto ads" highlight={netRev > 0} mom={monthly?.mom.net}  sparkData={mergedTimeline.map(d=>d.net)} />
+            <MetricCard label="ROAS"              value={`${roas.toFixed(1)}x`} sub="revenue / spend"   highlight={roas >= 3}  mom={monthly?.mom.roas} />
+            <MetricCard label="CAC"               value={ARS(s.cac)}            sub={`${s.newCustomers} nuevos clientes`} mom={monthly?.mom.cac}      momInvert />
+            <MetricCard label="Ticket promedio"   value={ARS(tnAvgOrder)}       sub="por orden"                          mom={monthly?.mom.avgTicket} sparkData={mergedTimeline.map(d=>d.revenue)} />
+            <MetricCard label="Clicks Meta"       value={NUM(s.clicks)}         sub={`${NUM(s.impressions)} impresiones`}                              sparkData={mergedTimeline.map(d=>d.clicks)} />
+            <MetricCard label="Alcance Meta"      value={NUM(s.reach)}          sub="personas únicas" />
           </div>
 
           {/* ── Net revenue highlight ───────────────────────────────── */}
@@ -585,6 +605,135 @@ export default function DashboardPage() {
                       </div>
                     </div>
                 }
+              </div>
+            </div>
+          </div>
+
+          {/* ══ SECCIÓN HISTÓRICO MENSUAL ════════════════════════════ */}
+          <div className="mt-8">
+            <div className="flex items-center gap-3 mb-5">
+              <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/50">Análisis histórico — últimos 12 meses</h2>
+              {monthlyLoading && <span className="text-[10px] text-white/25 animate-pulse">cargando...</span>}
+            </div>
+
+            {/* ── Gráfico 12 meses Revenue / Spend / Neto ── */}
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-4">
+              <div className="flex items-baseline justify-between mb-5">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55">Ingresos · Gasto Meta · Neto mensual</h3>
+                {monthly && (
+                  <span className="text-[10px] font-mono text-white/35">
+                    acum. {ARS(monthly.series.reduce((s,m)=>s+m.revenue,0))}
+                  </span>
+                )}
+              </div>
+              {monthly
+                ? <MonthlyRevenueChart data={monthly.series} />
+                : <div className="h-[220px] flex items-center justify-center text-white/20 text-xs">Cargando...</div>
+              }
+            </div>
+
+            {/* ── ROAS + CAC trend | Ticket + Órdenes ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-5">ROAS y CAC mensual</h3>
+                {monthly
+                  ? <RoasCacChart data={monthly.series} />
+                  : <div className="h-[180px] flex items-center justify-center text-white/20 text-xs">Cargando...</div>
+                }
+                <p className="text-[9px] text-white/25 mt-2">ROAS baja = Meta se encarece · CAC sube = cuesta más adquirir cada cliente</p>
+              </div>
+
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-5">Ticket promedio y volumen de órdenes</h3>
+                {monthly
+                  ? <AvgTicketChart data={monthly.series} />
+                  : <div className="h-[160px] flex items-center justify-center text-white/20 text-xs">Cargando...</div>
+                }
+                <p className="text-[9px] text-white/25 mt-2">Ticket baja + órdenes suben = ventas más accesibles · Ticket sube = clientes de mayor valor</p>
+              </div>
+            </div>
+
+            {/* ── Repeat rate + Resumen mensual tabla ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+              {/* Repeat rate card */}
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4">Tasa de recompra</h3>
+                {monthly ? (
+                  <>
+                    <div className="flex items-end gap-2 mb-3">
+                      <p className={`text-3xl font-bold font-mono ${monthly.repeatRate >= 20 ? 'text-emerald-400' : monthly.repeatRate >= 10 ? 'text-orange-400' : 'text-red-400'}`}>
+                        {monthly.repeatRate}%
+                      </p>
+                      <p className="text-[10px] text-white/35 mb-1">de clientes únicos</p>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-white/5 overflow-hidden mb-3">
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${Math.min(100, monthly.repeatRate * 2)}%`,
+                          background: monthly.repeatRate >= 20 ? 'linear-gradient(90deg,#34d399,#10b981)'
+                                    : monthly.repeatRate >= 10 ? 'linear-gradient(90deg,#f97316,#fb923c)'
+                                    : 'linear-gradient(90deg,#f43f5e,#fb7185)',
+                        }} />
+                    </div>
+                    <div className="space-y-1.5 text-[11px]">
+                      <div className="flex justify-between">
+                        <span className="text-white/45">Compraron 2+ meses</span>
+                        <span className="font-mono text-white/70">{monthly.repeatCount}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/45">Clientes únicos totales</span>
+                        <span className="font-mono text-white/70">{monthly.totalUnique}</span>
+                      </div>
+                      <div className="flex justify-between pt-1 border-t border-white/5">
+                        <span className="text-white/30 text-[9px]">Objetivo saludable</span>
+                        <span className="text-white/30 text-[9px]">≥ 20%</span>
+                      </div>
+                    </div>
+                  </>
+                ) : <div className="h-24 flex items-center justify-center text-white/20 text-xs">Cargando...</div>}
+              </div>
+
+              {/* Tabla mensual resumen */}
+              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 overflow-x-auto">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4">Resumen por mes</h3>
+                {monthly ? (
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr className="text-[9px] uppercase tracking-widest text-white/30 border-b border-white/5">
+                        <th className="text-left pb-2 font-medium">Mes</th>
+                        <th className="text-right pb-2 font-medium">Ingresos</th>
+                        <th className="text-right pb-2 font-medium">Meta</th>
+                        <th className="text-right pb-2 font-medium">Neto</th>
+                        <th className="text-right pb-2 font-medium">ROAS</th>
+                        <th className="text-right pb-2 font-medium">Órd.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...monthly.series].reverse().map((m, i) => {
+                        const isCurrent = i === 0
+                        return (
+                          <tr key={m.key}
+                            className={`border-b border-white/[0.04] ${isCurrent ? 'bg-orange-500/5' : 'hover:bg-white/[0.02]'}`}>
+                            <td className={`py-2 font-mono ${isCurrent ? 'text-orange-400' : 'text-white/60'}`}>
+                              {m.label} {isCurrent && <span className="text-[9px] text-orange-400/60">← actual</span>}
+                            </td>
+                            <td className="py-2 text-right font-mono text-white/80">{ARS(m.revenue)}</td>
+                            <td className="py-2 text-right font-mono text-white/45">{ARS(m.spend)}</td>
+                            <td className={`py-2 text-right font-mono font-semibold ${m.net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {ARS(m.net)}
+                            </td>
+                            <td className={`py-2 text-right font-mono ${m.roas >= 3 ? 'text-emerald-400' : m.roas > 0 ? 'text-orange-400' : 'text-white/20'}`}>
+                              {m.roas > 0 ? `${m.roas}x` : '—'}
+                            </td>
+                            <td className="py-2 text-right font-mono text-white/55">{m.orders || '—'}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                ) : <div className="h-40 flex items-center justify-center text-white/20 text-xs">Cargando...</div>}
               </div>
             </div>
           </div>

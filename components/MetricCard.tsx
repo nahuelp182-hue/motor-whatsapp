@@ -6,15 +6,17 @@ interface MetricCardProps {
   value: string
   sub?: string
   highlight?: boolean
-  trend?: number        // % change vs prev period
-  sparkData?: number[]  // mini chart data
-  accentColor?: string  // e.g. '#f97316'
+  mom?: number           // % change Month-over-Month (positivo = bueno)
+  momInvert?: boolean    // si true, rojo cuando sube (ej: CAC, gasto)
+  sparkData?: number[]
 }
 
 export function MetricCard({
-  label, value, sub, highlight, trend, sparkData, accentColor = '#f97316'
+  label, value, sub, highlight, mom, momInvert = false, sparkData,
 }: MetricCardProps) {
-  const trendUp = trend !== undefined && trend >= 0
+  const isGood = mom !== undefined
+    ? (momInvert ? mom <= 0 : mom >= 0)
+    : null
 
   return (
     <div className={`relative overflow-hidden rounded-2xl p-5 flex flex-col justify-between min-h-[130px] transition-all duration-300 group
@@ -23,22 +25,27 @@ export function MetricCard({
         : 'bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.07]'
       }`}
     >
-      {/* Glow spot */}
       {highlight && (
         <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-orange-500/10 blur-2xl pointer-events-none" />
       )}
 
+      {/* Label + MoM badge */}
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/35 leading-none">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/50 leading-none">
           {label}
         </p>
-        {trend !== undefined && (
-          <span className={`text-[10px] font-bold flex items-center gap-0.5 ${trendUp ? 'text-emerald-400' : 'text-red-400'}`}>
-            {trendUp ? '↑' : '↓'} {Math.abs(trend).toFixed(0)}%
+        {mom !== undefined && (
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 flex-shrink-0 ${
+            isGood
+              ? 'text-emerald-400 bg-emerald-500/10'
+              : 'text-red-400 bg-red-500/10'
+          }`}>
+            {mom >= 0 ? '↑' : '↓'} {Math.abs(mom).toFixed(0)}%
           </span>
         )}
       </div>
 
+      {/* Value */}
       <div>
         <p className={`text-2xl font-bold tracking-tight leading-none font-mono ${highlight ? 'text-orange-300' : 'text-white'}`}>
           {value}
@@ -48,8 +55,14 @@ export function MetricCard({
         )}
       </div>
 
+      {/* MoM label */}
+      {mom !== undefined && (
+        <p className="text-[9px] text-white/25 mt-1">vs mes anterior</p>
+      )}
+
+      {/* Sparkline */}
       {sparkData && sparkData.length > 1 && (
-        <div className="absolute bottom-0 left-0 right-0 h-10 opacity-50 group-hover:opacity-80 transition-opacity">
+        <div className="absolute bottom-0 left-0 right-0 h-10 opacity-40 group-hover:opacity-70 transition-opacity">
           <SparklineChart data={sparkData} color={highlight ? '#f97316' : '#ffffff'} />
         </div>
       )}
