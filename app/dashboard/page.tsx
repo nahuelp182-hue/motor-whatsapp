@@ -186,7 +186,8 @@ export default function DashboardPage() {
   }
   const cc = chartConfig[chartView]
 
-  const isLight   = theme.light ?? false
+  const isLight     = theme.light     ?? false
+  const isGrayscale = theme.grayscale ?? false
 
   const inputCls  = 'rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70 focus:outline-none focus:border-white/20 transition-colors'
   const btnBase   = 'px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all border'
@@ -205,8 +206,14 @@ export default function DashboardPage() {
     <main
       className="min-h-screen p-5 md:p-8 font-sans"
       data-light={isLight ? '' : undefined}
+      data-grayscale={isGrayscale ? '' : undefined}
       style={{
-        '--ac': theme.ac,
+        '--ac':       theme.ac,
+        '--t-text':   isLight ? '#0f172a'               : '#ffffff',
+        '--t-muted':  isLight ? 'rgba(15,23,42,0.60)'   : 'rgba(255,255,255,0.60)',
+        '--t-dim':    isLight ? 'rgba(15,23,42,0.38)'   : 'rgba(255,255,255,0.38)',
+        '--t-border': isLight ? 'rgba(15,23,42,0.10)'   : 'rgba(255,255,255,0.08)',
+        '--t-card-bg':isLight ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.03)',
         color: isLight ? '#0f172a' : 'white',
         background: isLight
           ? theme.bg
@@ -369,6 +376,7 @@ export default function DashboardPage() {
                   prevReach={prev?.reach}
                   prevClicks={prev?.clicks}
                   prevOrders={prev?.orders}
+                  grayscale={isGrayscale}
                 />
               )
             })()}
@@ -794,7 +802,7 @@ export default function DashboardPage() {
                             className="border-b border-white/[0.04]"
                             style={isCurrent ? { background: 'rgb(var(--ac) / 0.05)' } : undefined}>
                             <td className="py-2 font-mono"
-                              style={{ color: isCurrent ? 'rgb(var(--ac))' : 'rgba(255,255,255,0.6)' }}>
+                              style={{ color: isCurrent ? 'rgb(var(--ac))' : 'var(--t-muted)' }}>
                               {m.label} {isCurrent && <span className="text-[9px]" style={{ color: 'rgb(var(--ac) / 0.6)' }}>← actual</span>}
                             </td>
                             <td className="py-2 text-right font-mono text-white/80">{ARS(m.revenue)}</td>

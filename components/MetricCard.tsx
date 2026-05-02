@@ -61,7 +61,7 @@ export function MetricCard({
       <div>
         <p
           className="text-2xl font-bold tracking-tight leading-none font-mono"
-          style={{ color: highlight ? 'rgb(var(--ac))' : 'white' }}
+          style={{ color: highlight ? 'rgb(var(--ac))' : 'var(--t-text)' }}
         >
           {value}
         </p>

@@ -12,11 +12,12 @@ export const THEMES = [
   { id: 'amber',    name: 'Ámbar',    ac: '251 191 36',  acHex: '#fbbf24', bg: '#0d0901' },
   { id: 'violet',   name: 'Violeta',  ac: '167 139 250', acHex: '#a78bfa', bg: '#0a0812' },
   { id: 'sky',      name: 'Cielo',    ac: '56 189 248',  acHex: '#38bdf8', bg: '#04090f' },
-  // ── Tema claro ─────────────────────────────────────────────────────────────
-  { id: 'blanco',   name: 'Blanco',   ac: '55 65 81',    acHex: '#374151', bg: '#f2f3f7', light: true },
+  // ── Temas B&N ──────────────────────────────────────────────────────────────
+  { id: 'blanco',   name: 'Blanco',   ac: '55 65 81',    acHex: '#374151', bg: '#f2f3f7', light: true,  grayscale: true },
+  { id: 'negro',    name: 'Negro',    ac: '229 231 235',  acHex: '#e5e7eb', bg: '#0c0c0e', grayscale: true },
 ]
 
-export type Theme = (typeof THEMES)[0] & { light?: boolean }
+export type Theme = (typeof THEMES)[0] & { light?: boolean; grayscale?: boolean }
 
 export function ThemePicker({ current, onChange }: {
   current: string
@@ -90,11 +91,11 @@ export function ThemePicker({ current, onChange }: {
               ))}
             </div>
 
-            {/* Temas claros */}
-            <div className="border-t mt-1 mb-2 pt-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-              <p className="text-[8px] mb-2" style={{ color: 'rgba(255,255,255,0.2)' }}>Claro</p>
+            {/* Temas B&N */}
+            <div className="border-t mt-1 mb-1 pt-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+              <p className="text-[8px] mb-2" style={{ color: 'rgba(255,255,255,0.2)' }}>Blanco & Negro</p>
               <div className="flex gap-2.5">
-                {THEMES.filter(t => t.light).map(t => (
+                {THEMES.filter(t => t.grayscale).map(t => (
                   <button
                     key={t.id}
                     title={t.name}
@@ -105,7 +106,7 @@ export function ThemePicker({ current, onChange }: {
                       className="w-7 h-7 rounded-full block transition-all duration-150"
                       style={{
                         background:    t.bg,
-                        border:        '2px solid rgba(255,255,255,0.2)',
+                        border:        '2px solid rgba(255,255,255,0.25)',
                         outline:       current === t.id ? '2px solid white' : 'none',
                         outlineOffset: 2,
                         transform:     current === t.id ? 'scale(1.15)' : undefined,
