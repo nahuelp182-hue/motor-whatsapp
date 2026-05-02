@@ -67,7 +67,7 @@ export function FunnelViz({
   ]
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8">
+    <div data-funnel="" className="flex flex-col lg:flex-row gap-8">
 
       {/* ── Embudo SVG ───────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col items-center gap-0">

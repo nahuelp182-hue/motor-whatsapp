@@ -137,6 +137,24 @@ main[data-light] .rounded-xl[class*="border-white"] {
   background: rgba(255, 255, 255, 0.9) !important;
 }
 
+/* ── Desaturar gráficos en tema Blanco ───────────────────────── */
+/* Recharts: cubre todos los gráficos de barras, líneas y áreas   */
+main[data-light] .recharts-wrapper {
+  filter: saturate(0) contrast(1.08);
+}
+/* FunnelViz: desatura los trapecios SVG y los badges de color    */
+main[data-light] [data-funnel] {
+  filter: saturate(0) contrast(1.08);
+}
+/* Sparklines en MetricCard */
+main[data-light] .recharts-responsive-container {
+  filter: saturate(0) contrast(1.05);
+}
+/* Evitar doble filtro (recharts-responsive-container ya cubre recharts-wrapper) */
+main[data-light] .recharts-responsive-container .recharts-wrapper {
+  filter: none;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
