@@ -311,7 +311,7 @@ export default function DashboardPage() {
               ↕ comparando <span className="text-white/40 font-mono">{monthly.mom.curMonth}</span> vs <span className="text-white/40 font-mono">{monthly.mom.prevMonth}</span>
             </p>
           )}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-9 gap-3 mb-5">
             <MetricCard label="Ingresos brutos"  value={ARS(tnRevenue)}        sub={`${tnOrders} órdenes`}               mom={monthly?.mom.revenue}   sparkData={mergedTimeline.map(d=>d.revenue)}
               tip="Total facturado en el período según órdenes pagadas en Tiendanube. No descuenta costos." />
             <MetricCard label="Gasto Meta"        value={ARS(s.metaSpend)}      sub="período seleccionado"               mom={monthly?.mom.spend}     momInvert
@@ -322,6 +322,8 @@ export default function DashboardPage() {
               tip="Return On Ad Spend: por cada peso invertido en Meta, cuántos pesos en ventas generaste. ROAS 3x = $3 vendidos por cada $1 gastado. Saludable: ≥3x." />
             <MetricCard label="CAC"               value={ARS(s.cac)}            sub={`${s.newCustomers} nuevos clientes`} mom={monthly?.mom.cac}      momInvert
               tip="Costo de Adquisición de Cliente: cuánto gastaste en Meta para conseguir cada nuevo cliente. Debería ser menor al LTV. Ideal: CAC < LTV / 3." />
+            <MetricCard label="LTV"               value={ARS(s.ltv)}            sub="por cliente histórico"
+              tip="Lifetime Value: ingreso total promedio que generó cada cliente durante toda su historia de compras. Se calcula sobre todos los clientes registrados, no solo el período. Saludable: LTV ≥ 3× el CAC." />
             <MetricCard label="Ticket promedio"   value={ARS(tnAvgOrder)}       sub="por orden"                          mom={monthly?.mom.avgTicket} sparkData={mergedTimeline.map(d=>d.revenue)}
               tip="Valor promedio de cada orden. Si sube puede indicar upsells o productos más caros. Si baja, más ventas de productos de bajo precio." />
             <MetricCard label="Clicks Meta"       value={NUM(s.clicks)}         sub={`${NUM(s.impressions)} impresiones`}                              sparkData={mergedTimeline.map(d=>d.clicks)}
@@ -543,20 +545,59 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 mb-3">LTV / CAC ratio</p>
-              <div className="flex items-end gap-2 mb-3">
-                <p className={`text-2xl font-bold font-mono ${(s.ltv/s.cac)>=3?'text-emerald-400':'text-orange-400'}`}>
-                  {s.cac>0?(s.ltv/s.cac).toFixed(1):'-'}x
-                </p>
-                <p className="text-[10px] text-white/55 mb-0.5">objetivo ≥3x</p>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-700"
-                  style={{ width:`${Math.min(100,(s.ltv/s.cac/5)*100)}%`, background:(s.ltv/s.cac)>=3?'linear-gradient(90deg,#34d399,#10b981)':'linear-gradient(90deg,#f97316,#fb923c)' }} />
-              </div>
-              <div className="mt-2 flex justify-between text-[10px] text-white/50">
-                <span>LTV {ARS(s.ltv)}</span><span>CAC {ARS(s.cac)}</span>
-              </div>
+              {/* Título con tooltip */}
+              <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 mb-4 flex items-center">
+                LTV / CAC ratio
+                <HelpTip text="Mide cuántas veces el valor de vida de un cliente supera lo que costó conseguirlo. Objetivo ≥3x: si gastás $10.000 en ads por cliente, ese cliente debería generar al menos $30.000 en total. Por debajo de 1x estás perdiendo dinero en publicidad." />
+              </p>
+
+              {/* Ratio principal */}
+              {(() => {
+                const ratio = s.cac > 0 ? s.ltv / s.cac : 0
+                const pct   = Math.min(100, (ratio / 5) * 100)
+                const good  = ratio >= 3
+                return (
+                  <>
+                    <div className="flex items-end gap-2 mb-3">
+                      <p className={`text-3xl font-bold font-mono ${good ? 'text-emerald-400' : ratio > 0 ? 'text-orange-400' : 'text-white/30'}`}>
+                        {s.cac > 0 ? `${ratio.toFixed(1)}x` : '—'}
+                      </p>
+                      <p className="text-[10px] text-white/40 mb-1">objetivo ≥3x</p>
+                    </div>
+
+                    {/* Barra de progreso */}
+                    <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden mb-3">
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${pct}%`,
+                          background: good
+                            ? 'linear-gradient(90deg,#34d399,#10b981)'
+                            : ratio > 1
+                              ? 'linear-gradient(90deg,#f97316,#fb923c)'
+                              : 'linear-gradient(90deg,#f87171,#ef4444)',
+                        }} />
+                    </div>
+
+                    {/* LTV y CAC como valores separados */}
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                      <div>
+                        <p className="text-[9px] text-white/35 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                          LTV
+                          <HelpTip text="Ingreso total histórico promedio por cliente. Calculado sobre todos los clientes registrados desde siempre (no solo el período seleccionado)." />
+                        </p>
+                        <p className="text-sm font-mono font-bold text-white/80">{ARS(s.ltv)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-white/35 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                          CAC
+                          <HelpTip text="Costo de Adquisición de Cliente: gasto total en Meta Ads del período dividido por los nuevos clientes conseguidos." />
+                        </p>
+                        <p className="text-sm font-mono font-bold text-white/80">{s.cac > 0 ? ARS(s.cac) : '—'}</p>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </div>
 
