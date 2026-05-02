@@ -186,18 +186,31 @@ export default function DashboardPage() {
   }
   const cc = chartConfig[chartView]
 
+  const isLight   = theme.light ?? false
+
   const inputCls  = 'rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70 focus:outline-none focus:border-white/20 transition-colors'
   const btnBase   = 'px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all border'
   const btnSty    = (active: boolean): React.CSSProperties => active
     ? { background: 'rgb(var(--ac) / 0.15)', color: 'rgb(var(--ac) / 0.9)', borderColor: 'rgb(var(--ac) / 0.3)' }
-    : { color: 'rgba(255,255,255,0.5)', borderColor: 'transparent' }
+    : { color: isLight ? 'rgba(15,23,42,0.5)' : 'rgba(255,255,255,0.5)', borderColor: 'transparent' }
   const acStr     = (alpha: number) => `rgb(var(--ac) / ${alpha})`
 
+  // ── Colores de charts (dependen del modo claro/oscuro) ──────────────────────
+  const cTick  = { fill: isLight ? 'rgba(15,23,42,0.45)'  : 'rgba(255,255,255,0.5)',  fontSize: 10 }
+  const cTick2 = { fill: isLight ? 'rgba(15,23,42,0.45)'  : 'rgba(255,255,255,0.55)', fontSize: 10 }
+  const cGrid  = isLight ? 'rgba(15,23,42,0.06)' : 'rgba(255,255,255,0.05)'
+  const cGrid2 = isLight ? 'rgba(15,23,42,0.04)' : 'rgba(255,255,255,0.03)'
+
   return (
-    <main className="min-h-screen text-white p-5 md:p-8 font-sans"
+    <main
+      className="min-h-screen p-5 md:p-8 font-sans"
+      data-light={isLight ? '' : undefined}
       style={{
         '--ac': theme.ac,
-        background: `radial-gradient(ellipse 90% 40% at 50% -5%, rgb(${theme.ac} / 0.07) 0%, transparent 60%), ${theme.bg}`,
+        color: isLight ? '#0f172a' : 'white',
+        background: isLight
+          ? theme.bg
+          : `radial-gradient(ellipse 90% 40% at 50% -5%, rgb(${theme.ac} / 0.07) 0%, transparent 60%), ${theme.bg}`,
       } as React.CSSProperties}
     >
 
@@ -385,11 +398,11 @@ export default function DashboardPage() {
                     <stop offset="100%" stopColor={cc.color} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="date" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
+                <CartesianGrid vertical={false} stroke={cGrid} />
+                <XAxis dataKey="date" tick={cTick}
                   tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
                   interval={Math.max(0, Math.floor(mergedTimeline.length / 12))} />
-                <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
+                <YAxis tick={cTick}
                   tickFormatter={(v:number) => v>999?`$${(v/1000).toFixed(0)}k`:String(v)}
                   axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: `${cc.color}40`, strokeWidth: 1 }} />
@@ -409,11 +422,11 @@ export default function DashboardPage() {
               <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/60 mb-5">Ingresos TN vs Gasto Meta · {since} → {until}</h3>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barGap={2}>
-                  <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="date" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
+                  <CartesianGrid vertical={false} stroke={cGrid} />
+                  <XAxis dataKey="date" tick={cTick}
                     tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
                     interval={Math.max(0, Math.floor(mergedTimeline.length / 10))} />
-                  <YAxis tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
+                  <YAxis tick={cTick}
                     tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
                     axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
@@ -437,11 +450,11 @@ export default function DashboardPage() {
               </div>
               <ResponsiveContainer width="100%" height={150}>
                 <LineChart data={tl} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" />
-                  <XAxis dataKey="date" tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 10 }}
+                  <CartesianGrid vertical={false} stroke={cGrid2} />
+                  <XAxis dataKey="date" tick={cTick2}
                     tickFormatter={(v:string)=>v.slice(5)} axisLine={false} tickLine={false}
                     interval={Math.max(0, Math.floor(tl.length/8))} />
-                  <YAxis tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 10 }}
+                  <YAxis tick={cTick2}
                     axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(52,211,153,0.3)', strokeWidth: 1 }} />
                   <Line type="monotone" dataKey="clicks" name="Clicks"
@@ -586,11 +599,11 @@ export default function DashboardPage() {
                         <stop offset="100%" stopColor={theme.acHex} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" />
-                    <XAxis dataKey="date" tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 10 }}
+                    <CartesianGrid vertical={false} stroke={cGrid2} />
+                    <XAxis dataKey="date" tick={cTick2}
                       tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
                       interval={Math.max(0, Math.floor((ordersData?.timeline.length??1)/10))} />
-                    <YAxis tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 10 }}
+                    <YAxis tick={cTick2}
                       tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
                       axisLine={false} tickLine={false} />
                     <Tooltip

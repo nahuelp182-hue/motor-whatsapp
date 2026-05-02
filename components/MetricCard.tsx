@@ -22,6 +22,7 @@ export function MetricCard({
 
   return (
     <div
+      data-highlight={highlight ? 'true' : undefined}
       className={`relative rounded-2xl p-5 flex flex-col justify-between min-h-[130px] transition-all duration-300 group hover:z-[100] border ${
         highlight
           ? ''

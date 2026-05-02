@@ -12,9 +12,11 @@ export const THEMES = [
   { id: 'amber',    name: 'Ámbar',    ac: '251 191 36',  acHex: '#fbbf24', bg: '#0d0901' },
   { id: 'violet',   name: 'Violeta',  ac: '167 139 250', acHex: '#a78bfa', bg: '#0a0812' },
   { id: 'sky',      name: 'Cielo',    ac: '56 189 248',  acHex: '#38bdf8', bg: '#04090f' },
+  // ── Tema claro ─────────────────────────────────────────────────────────────
+  { id: 'blanco',   name: 'Blanco',   ac: '55 65 81',    acHex: '#374151', bg: '#f2f3f7', light: true },
 ]
 
-export type Theme = (typeof THEMES)[0]
+export type Theme = (typeof THEMES)[0] & { light?: boolean }
 
 export function ThemePicker({ current, onChange }: {
   current: string
@@ -25,25 +27,43 @@ export function ThemePicker({ current, onChange }: {
 
   return (
     <div className="relative">
+      {/* Trigger */}
       <button
         onClick={() => setOpen(o => !o)}
         title="Cambiar tema de colores"
         className="flex items-center gap-1.5 rounded-xl border border-white/10 hover:border-white/20 px-2.5 py-1.5 text-[10px] text-white/50 hover:text-white/70 transition-all"
       >
-        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: active.acHex }} />
+        <span
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+          style={{
+            background: active.acHex,
+            boxShadow: active.light ? '0 0 0 1.5px rgba(255,255,255,0.3)' : 'none',
+          }}
+        />
         <span>Tema</span>
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+
+          {/* Dropdown — data-isolated evita que los overrides de light mode afecten este panel */}
           <div
-            className="absolute right-0 top-[calc(100%+6px)] z-50 rounded-2xl border border-white/[0.12] p-4 shadow-2xl w-[196px]"
-            style={{ background: '#0c0c1e' }}
+            data-isolated=""
+            className="absolute right-0 top-[calc(100%+6px)] z-50 rounded-2xl border p-4 shadow-2xl w-[220px]"
+            style={{ background: '#0c0c1e', borderColor: 'rgba(255,255,255,0.12)' }}
           >
-            <p className="text-[9px] uppercase tracking-[0.18em] text-white/30 mb-3">Colores del panel</p>
-            <div className="grid grid-cols-5 gap-2.5">
-              {THEMES.map(t => (
+            <p
+              className="text-[9px] uppercase tracking-[0.18em] mb-3"
+              style={{ color: 'rgba(255,255,255,0.35)' }}
+            >
+              Colores del panel
+            </p>
+
+            {/* Temas oscuros */}
+            <p className="text-[8px] mb-2" style={{ color: 'rgba(255,255,255,0.2)' }}>Oscuro</p>
+            <div className="grid grid-cols-5 gap-2.5 mb-3">
+              {THEMES.filter(t => !t.light).map(t => (
                 <button
                   key={t.id}
                   title={t.name}
@@ -60,9 +80,46 @@ export function ThemePicker({ current, onChange }: {
                       opacity:       current === t.id ? 1 : 0.65,
                     }}
                   />
-                  <span className="text-[8px] text-white/30 group-hover:text-white/60 leading-none">{t.name}</span>
+                  <span
+                    className="text-[8px] leading-none"
+                    style={{ color: current === t.id ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)' }}
+                  >
+                    {t.name}
+                  </span>
                 </button>
               ))}
+            </div>
+
+            {/* Temas claros */}
+            <div className="border-t mt-1 mb-2 pt-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+              <p className="text-[8px] mb-2" style={{ color: 'rgba(255,255,255,0.2)' }}>Claro</p>
+              <div className="flex gap-2.5">
+                {THEMES.filter(t => t.light).map(t => (
+                  <button
+                    key={t.id}
+                    title={t.name}
+                    onClick={() => { onChange(t); setOpen(false) }}
+                    className="flex flex-col items-center gap-1 group"
+                  >
+                    <span
+                      className="w-7 h-7 rounded-full block transition-all duration-150"
+                      style={{
+                        background:    t.bg,
+                        border:        '2px solid rgba(255,255,255,0.2)',
+                        outline:       current === t.id ? '2px solid white' : 'none',
+                        outlineOffset: 2,
+                        transform:     current === t.id ? 'scale(1.15)' : undefined,
+                      }}
+                    />
+                    <span
+                      className="text-[8px] leading-none"
+                      style={{ color: current === t.id ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)' }}
+                    >
+                      {t.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </>

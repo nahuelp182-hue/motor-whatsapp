@@ -28,6 +28,114 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   opacity: 0.55;
   cursor: pointer;
 }
+/* En light mode no invertir el calendar picker */
+main[data-light] input[type="date"]::-webkit-calendar-picker-indicator,
+main[data-light] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.5;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TEMA BLANCO — light mode overrides
+   data-isolated excluye elementos que deben mantenerse oscuros
+   (dropdown ThemePicker, tooltips del portal, etc.)
+   ═══════════════════════════════════════════════════════════════ */
+
+main[data-light] {
+  color-scheme: light;
+}
+
+/* ── Texto: variantes "text-white" → oscuro ──────────────────── */
+main[data-light] [class*="text-white"] {
+  color: rgba(15, 23, 42, 0.50);
+}
+main[data-light] .text-white {
+  color: #0f172a;
+}
+/* Excepciones: elementos con data-isolated no se ven afectados
+   (ThemePicker dropdown y sus hijos usan inline styles) */
+main[data-light] [data-isolated] [class*="text-white"],
+main[data-light] [data-isolated].text-white {
+  color: inherit;
+}
+
+/* ── Bordes ──────────────────────────────────────────────────── */
+main[data-light] [class*="border-white"] {
+  border-color: rgba(15, 23, 42, 0.10) !important;
+}
+
+/* ── Cards y secciones ───────────────────────────────────────── */
+main[data-light] .rounded-2xl:not([data-isolated]) {
+  background: rgba(255, 255, 255, 0.88) !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.07), 0 0 0 1px rgba(15, 23, 42, 0.05) !important;
+  backdrop-filter: none !important;
+}
+/* Cards de highlight: fondo con tinte de acento */
+main[data-light] .rounded-2xl[data-highlight="true"]:not([data-isolated]) {
+  background: rgb(var(--ac) / 0.07) !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08), 0 0 0 1px rgb(var(--ac) / 0.15) !important;
+}
+/* Rounded-xl (FunnelViz panels, payment items, etc.) */
+main[data-light] .rounded-xl:not([data-isolated]) {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* ── Inputs ──────────────────────────────────────────────────── */
+main[data-light] input[type="date"] {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+}
+
+/* ── Recharts SVG — ejes y grilla ───────────────────────────── */
+main[data-light] .recharts-cartesian-axis-tick text {
+  fill: rgba(15, 23, 42, 0.45) !important;
+}
+main[data-light] .recharts-cartesian-grid line,
+main[data-light] .recharts-cartesian-grid-horizontal line,
+main[data-light] .recharts-cartesian-grid-vertical line {
+  stroke: rgba(15, 23, 42, 0.07) !important;
+}
+main[data-light] .recharts-legend-wrapper {
+  color: rgba(15, 23, 42, 0.55) !important;
+}
+/* Cursor / crosshair */
+main[data-light] .recharts-tooltip-cursor {
+  stroke: rgba(15, 23, 42, 0.15) !important;
+  fill: rgba(15, 23, 42, 0.02) !important;
+}
+
+/* ── Tooltip Recharts ────────────────────────────────────────── */
+main[data-light] .recharts-tooltip-wrapper .rounded-xl {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(15, 23, 42, 0.10) !important;
+  color: #0f172a !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12) !important;
+  backdrop-filter: none !important;
+}
+
+/* ── Variantes de bg-white/* (gradient stops, etc.) ─────────── */
+main[data-light] [class*="bg-gradient"][class*="from-white"] {
+  background: white !important;
+}
+/* El panel de resultado del período (from-orange-950) */
+main[data-light] .bg-gradient-to-r {
+  background: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* ── Texto emerald/red/orange funcional — preservar ─────────── */
+/* (emerald, red, orange = funcionales → no se tocan)           */
+
+/* ── Separadores / lines ─────────────────────────────────────── */
+main[data-light] [class*="bg-white\/"] {
+  /* No tocar — puede ser una barra de progreso o sparkline */
+}
+
+/* ── FunnelViz benchmarks panel ─────────────────────────────── */
+main[data-light] .rounded-xl[class*="border-white"] {
+  background: rgba(255, 255, 255, 0.9) !important;
+}
 
 @custom-variant dark (&:is(.dark *));
 
