@@ -10,7 +10,7 @@ interface MetricCardProps {
   mom?: number
   momInvert?: boolean
   sparkData?: number[]
-  tip?: string           // texto del tooltip de ayuda
+  tip?: string
 }
 
 export function MetricCard({
@@ -21,14 +21,22 @@ export function MetricCard({
     : null
 
   return (
-    <div className={`relative rounded-2xl p-5 flex flex-col justify-between min-h-[130px] transition-all duration-300 group hover:z-[100]
-      ${highlight
-        ? 'bg-gradient-to-br from-orange-950/60 to-orange-900/20 border border-orange-500/20'
-        : 'bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.07]'
+    <div
+      className={`relative rounded-2xl p-5 flex flex-col justify-between min-h-[130px] transition-all duration-300 group hover:z-[100] border ${
+        highlight
+          ? ''
+          : 'bg-gradient-to-br from-white/[0.04] to-white/[0.01] border-white/[0.07]'
       }`}
+      style={highlight ? {
+        background:   'linear-gradient(to bottom right, rgb(var(--ac) / 0.12) 0%, rgb(var(--ac) / 0.04) 100%)',
+        borderColor:  'rgb(var(--ac) / 0.2)',
+      } : undefined}
     >
       {highlight && (
-        <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-orange-500/10 blur-2xl pointer-events-none" />
+        <div
+          className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-2xl pointer-events-none"
+          style={{ background: 'rgb(var(--ac) / 0.1)' }}
+        />
       )}
 
       {/* Label + MoM badge */}
@@ -50,7 +58,10 @@ export function MetricCard({
 
       {/* Value */}
       <div>
-        <p className={`text-2xl font-bold tracking-tight leading-none font-mono ${highlight ? 'text-orange-300' : 'text-white'}`}>
+        <p
+          className="text-2xl font-bold tracking-tight leading-none font-mono"
+          style={{ color: highlight ? 'rgb(var(--ac))' : 'white' }}
+        >
           {value}
         </p>
         {sub && (
@@ -63,10 +74,13 @@ export function MetricCard({
         <p className="text-[9px] text-white/25 mt-1">vs mes anterior</p>
       )}
 
-      {/* Sparkline — overflow-hidden solo en este wrapper para no bloquear tooltips */}
+      {/* Sparkline */}
       {sparkData && sparkData.length > 1 && (
         <div className="absolute bottom-0 left-0 right-0 h-10 overflow-hidden rounded-b-2xl opacity-40 group-hover:opacity-70 transition-opacity pointer-events-none">
-          <SparklineChart data={sparkData} color={highlight ? '#f97316' : '#ffffff'} />
+          <SparklineChart
+            data={sparkData}
+            color={highlight ? undefined : 'rgba(255,255,255,0.7)'}
+          />
         </div>
       )}
     </div>

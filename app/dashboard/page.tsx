@@ -13,6 +13,7 @@ import { Trend7d } from '@/components/Trend7d'
 import { MonthlyRevenueChart, RoasCacChart, AvgTicketChart } from '@/components/MonthlyChart'
 import { HelpTip } from '@/components/HelpTip'
 import { FunnelViz } from '@/components/FunnelViz'
+import { ThemePicker, THEMES, type Theme } from '@/components/ThemePicker'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = { date: string; revenue: number; spend: number; clicks: number; net: number }
@@ -107,6 +108,11 @@ export default function DashboardPage() {
   const [chartView, setChartView]     = useState<'revenue'|'spend'|'clicks'|'net'>('revenue')
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return THEMES[0]
+    return THEMES.find(t => t.id === (localStorage.getItem('dash-theme') ?? '')) ?? THEMES[0]
+  })
+  function applyTheme(t: Theme) { setTheme(t); localStorage.setItem('dash-theme', t.id) }
 
   const load = useCallback(() => {
     setLoading(true); setOrdersLoading(true); setMonthlyLoading(true); setError(null)
@@ -173,25 +179,32 @@ export default function DashboardPage() {
 
   // ── chart view config
   const chartConfig = {
-    revenue: { key: 'revenue', label: 'Ingresos',   color: '#f97316' },
+    revenue: { key: 'revenue', label: 'Ingresos',   color: theme.acHex },
     spend:   { key: 'spend',   label: 'Gasto Meta', color: '#818cf8' },
     clicks:  { key: 'clicks',  label: 'Clicks',     color: '#34d399' },
     net:     { key: 'net',     label: 'Neto',        color: '#facc15' },
   }
   const cc = chartConfig[chartView]
 
-  const inputCls = 'rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70 focus:outline-none focus:border-orange-500/40 transition-colors'
-  const btnCls   = (active: boolean) => `px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all ${active ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30' : 'text-white/50 hover:text-white/80 border border-transparent'}`
+  const inputCls  = 'rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70 focus:outline-none focus:border-white/20 transition-colors'
+  const btnBase   = 'px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all border'
+  const btnSty    = (active: boolean): React.CSSProperties => active
+    ? { background: 'rgb(var(--ac) / 0.15)', color: 'rgb(var(--ac) / 0.9)', borderColor: 'rgb(var(--ac) / 0.3)' }
+    : { color: 'rgba(255,255,255,0.5)', borderColor: 'transparent' }
+  const acStr     = (alpha: number) => `rgb(var(--ac) / ${alpha})`
 
   return (
     <main className="min-h-screen text-white p-5 md:p-8 font-sans"
-      style={{ background: 'radial-gradient(ellipse 90% 40% at 50% -5%, rgba(249,115,22,0.07) 0%, transparent 60%), #07070f' }}
+      style={{
+        '--ac': theme.ac,
+        background: `radial-gradient(ellipse 90% 40% at 50% -5%, rgb(${theme.ac} / 0.07) 0%, transparent 60%), ${theme.bg}`,
+      } as React.CSSProperties}
     >
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 mb-7 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-orange-400/60 mb-1">Motor WhatsApp</p>
+          <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: acStr(0.65) }}>Motor WhatsApp</p>
           <h1 className="text-lg font-bold tracking-tight">Panel de métricas</h1>
         </div>
 
@@ -200,7 +213,8 @@ export default function DashboardPage() {
           {/* Presets */}
           <div className="flex gap-1 flex-wrap">
             {PRESETS.map(p => (
-              <button key={p.label} onClick={() => applyPreset(p)} className={btnCls(activePreset === p.label)}>
+              <button key={p.label} onClick={() => applyPreset(p)}
+                className={btnBase} style={btnSty(activePreset === p.label)}>
                 {p.label}
               </button>
             ))}
@@ -216,6 +230,9 @@ export default function DashboardPage() {
               onChange={e => { setUntil(e.target.value); setPreset('') }}
               className={inputCls} />
           </div>
+
+          {/* Theme picker */}
+          <ThemePicker current={theme.id} onChange={applyTheme} />
         </div>
       </div>
 
@@ -227,7 +244,7 @@ export default function DashboardPage() {
         </span>
         {s?.metaSpend ? (
           <><span className="w-px h-3 bg-white/10" />
-          <span className="text-[10px] text-orange-400/50">Meta: {ARS(s.metaSpend)}</span></>
+          <span className="text-[10px]" style={{ color: acStr(0.5) }}>Meta: {ARS(s.metaSpend)}</span></>
         ) : null}
       </div>
       {/* Refresh */}
@@ -247,7 +264,7 @@ export default function DashboardPage() {
       {loading && (
         <div className="flex items-center justify-center py-32 gap-2">
           {[0,150,300].map(d=>(
-            <span key={d} className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-bounce" style={{animationDelay:`${d}ms`}} />
+            <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: 'rgb(var(--ac))', animationDelay:`${d}ms` }} />
           ))}
         </div>
       )}
@@ -281,10 +298,11 @@ export default function DashboardPage() {
           </div>
 
           {/* ── Net revenue highlight ───────────────────────────────── */}
-          <div className="rounded-2xl border border-orange-500/15 bg-gradient-to-r from-orange-950/30 to-transparent p-5 mb-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="rounded-2xl border p-5 mb-5 flex flex-col sm:flex-row sm:items-center gap-4"
+            style={{ borderColor: acStr(0.15), background: `linear-gradient(to right, rgb(var(--ac) / 0.08), transparent)` }}>
             <div className="flex-1">
               <p className="text-[10px] uppercase tracking-[0.18em] text-white/60 mb-1">Resultado del período</p>
-              <p className="text-3xl font-bold font-mono" style={{ color: netRev >= 0 ? '#fb923c' : '#f87171' }}>
+              <p className="text-3xl font-bold font-mono" style={{ color: netRev >= 0 ? 'rgb(var(--ac))' : '#f87171' }}>
                 {ARS(netRev)}
               </p>
               <p className="text-xs text-white/50 mt-1">
@@ -352,7 +370,7 @@ export default function DashboardPage() {
               <div className="flex gap-1">
                 {(Object.keys(chartConfig) as (keyof typeof chartConfig)[]).map(k => (
                   <button key={k} onClick={() => setChartView(k)}
-                    className={btnCls(chartView === k)}>
+                    className={btnBase} style={btnSty(chartView === k)}>
                     {chartConfig[k].label}
                   </button>
                 ))}
@@ -399,7 +417,7 @@ export default function DashboardPage() {
                     tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
                     axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
-                  <Bar dataKey="revenue" name="Ingresos TN" fill="#f97316" opacity={0.85} radius={[2,2,0,0]} />
+                  <Bar dataKey="revenue" name="Ingresos TN" fill={theme.acHex} opacity={0.85} radius={[2,2,0,0]} />
                   <Bar dataKey="spend"   name="Gasto Meta"  fill="#818cf8" opacity={0.7}  radius={[2,2,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -445,12 +463,12 @@ export default function DashboardPage() {
                 <div>
                   <div className="flex justify-between text-xs mb-1.5">
                     <span className="text-white/60 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />Meta Ads (pago)
+                      <span className="w-2 h-2 rounded-full inline-block" style={{ background: 'rgb(var(--ac))' }} />Meta Ads (pago)
                     </span>
                     <span className="text-white/80 font-semibold">{NUM(s.clicks)} clicks</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                    <div className="h-full rounded-full bg-orange-400/60" style={{ width: '100%' }} />
+                    <div className="h-full rounded-full" style={{ width: '100%', background: 'rgb(var(--ac) / 0.6)' }} />
                   </div>
                 </div>
                 {/* Orgánico - requiere GA4 */}
@@ -514,7 +532,8 @@ export default function DashboardPage() {
               <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/55">Ventas por producto</h2>
               {selectedProduct && (
                 <button onClick={() => setSelectedProduct(null)}
-                  className="text-[10px] text-orange-400/70 border border-orange-500/20 rounded-lg px-2 py-0.5 hover:border-orange-500/40 transition-colors">
+                  className="text-[10px] rounded-lg px-2 py-0.5 transition-colors border"
+                  style={{ color: acStr(0.7), borderColor: acStr(0.2) }}>
                   ✕ limpiar filtro
                 </button>
               )}
@@ -529,7 +548,8 @@ export default function DashboardPage() {
                   </p>
                   {selectedProduct && (
                     <button onClick={() => setSelectedProduct(null)}
-                      className="text-[10px] text-orange-400/70 border border-orange-500/20 rounded-lg px-2 py-0.5 hover:border-orange-500/40 transition-colors">
+                      className="text-[10px] rounded-lg px-2 py-0.5 transition-colors border"
+                  style={{ color: acStr(0.7), borderColor: acStr(0.2) }}>
                       ✕ limpiar
                     </button>
                   )}
@@ -551,7 +571,7 @@ export default function DashboardPage() {
                   <p className="text-[10px] uppercase tracking-[0.18em] text-white/50">
                     {selectedProduct ? `Ingresos — ${selectedProduct.slice(0,30)}…` : 'Ingresos totales por día'}
                   </p>
-                  <span className="text-xs font-mono font-bold text-orange-400">
+                  <span className="text-xs font-mono font-bold" style={{ color: 'rgb(var(--ac))' }}>
                     {ARS(ordersData?.summary.totalRevenue ?? 0)}
                   </span>
                 </div>
@@ -562,8 +582,8 @@ export default function DashboardPage() {
                   >
                     <defs>
                       <linearGradient id="prodGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%"   stopColor="#f97316" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+                        <stop offset="0%"   stopColor={theme.acHex} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={theme.acHex} stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" />
@@ -574,11 +594,11 @@ export default function DashboardPage() {
                       tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
                       axisLine={false} tickLine={false} />
                     <Tooltip
-                      contentStyle={{ background:'rgba(10,10,20,0.95)', border:'1px solid rgba(249,115,22,0.2)', borderRadius:10, fontSize:11 }}
+                      contentStyle={{ background:'rgba(10,10,20,0.95)', border:`1px solid ${theme.acHex}33`, borderRadius:10, fontSize:11 }}
                       formatter={(v:unknown) => [ARS(Number(v)), 'Ingresos']}
-                      cursor={{ stroke:'rgba(249,115,22,0.3)', strokeWidth:1 }}
+                      cursor={{ stroke:`${theme.acHex}4d`, strokeWidth:1 }}
                     />
-                    <Area type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={2}
+                    <Area type="monotone" dataKey="revenue" stroke={theme.acHex} strokeWidth={2}
                       fill="url(#prodGrad)" dot={false}
                       activeDot={{ r:3, fill:'#f97316', strokeWidth:0 }} />
                   </AreaChart>
@@ -642,7 +662,7 @@ export default function DashboardPage() {
                         <div className="text-right text-[11px] font-mono text-white/50">
                           {(ordersData?.payments ?? []).reduce((s,p)=>s+p.count,0)}
                         </div>
-                        <div className="text-right text-[11px] font-mono text-orange-400 font-semibold">
+                        <div className="text-right text-[11px] font-mono font-semibold" style={{ color: 'rgb(var(--ac))' }}>
                           {ARS((ordersData?.payments ?? []).reduce((s,p)=>s+p.revenue,0))}
                         </div>
                       </div>
@@ -758,9 +778,11 @@ export default function DashboardPage() {
                         const isCurrent = i === 0
                         return (
                           <tr key={m.key}
-                            className={`border-b border-white/[0.04] ${isCurrent ? 'bg-orange-500/5' : 'hover:bg-white/[0.02]'}`}>
-                            <td className={`py-2 font-mono ${isCurrent ? 'text-orange-400' : 'text-white/60'}`}>
-                              {m.label} {isCurrent && <span className="text-[9px] text-orange-400/60">← actual</span>}
+                            className="border-b border-white/[0.04]"
+                            style={isCurrent ? { background: 'rgb(var(--ac) / 0.05)' } : undefined}>
+                            <td className="py-2 font-mono"
+                              style={{ color: isCurrent ? 'rgb(var(--ac))' : 'rgba(255,255,255,0.6)' }}>
+                              {m.label} {isCurrent && <span className="text-[9px]" style={{ color: 'rgb(var(--ac) / 0.6)' }}>← actual</span>}
                             </td>
                             <td className="py-2 text-right font-mono text-white/80">{ARS(m.revenue)}</td>
                             <td className="py-2 text-right font-mono text-white/45">{ARS(m.spend)}</td>
