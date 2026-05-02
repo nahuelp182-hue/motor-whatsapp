@@ -281,6 +281,16 @@ export default function DashboardPage() {
           className="flex items-center gap-1.5 text-[10px] text-white/55 hover:text-white/60 border border-white/10 hover:border-white/20 rounded-lg px-2.5 py-1 transition-all disabled:opacity-30">
           <span className={loading?'animate-spin inline-block':''}>↻</span> Actualizar
         </button>
+        <button
+          onClick={async () => {
+            await fetch('/api/auth/logout', { method: 'POST' })
+            window.location.href = '/login'
+          }}
+          className="text-[10px] text-white/25 hover:text-white/50 transition-colors px-1"
+          title="Cerrar sesión"
+        >
+          ⎋ Salir
+        </button>
       </div>
       </div>
 
