@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const secret = process.env.AUTH_SECRET
+  const password = process.env.DASHBOARD_PASSWORD
 
-  // Si no hay secreto configurado (dev local sin .env.local) → pasar
-  if (!secret) return NextResponse.next()
+  // Sin contraseña configurada → acceso libre (dev local o sin configurar)
+  if (!password) return NextResponse.next()
 
   // Rutas siempre permitidas
   if (pathname.startsWith('/api/auth'))     return NextResponse.next()
@@ -15,9 +15,9 @@ export function middleware(request: NextRequest) {
 
   // Verificar cookie
   const authCookie = request.cookies.get('dash-auth')?.value
-  if (authCookie === secret) return NextResponse.next()
+  if (authCookie === password) return NextResponse.next()
 
-  // API routes → 401 JSON (no redirect, para no romper fetch desde el dashboard)
+  // APIs → 401 JSON
   if (pathname.startsWith('/api/')) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
@@ -30,7 +30,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Protege todo excepto archivos estáticos y _next interno
     '/((?!_next/static|_next/image|favicon\\.ico|.*\\.png|.*\\.svg|.*\\.ico).*)',
   ],
 }
