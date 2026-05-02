@@ -256,6 +256,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Wrapper de contenido — filtro grayscale para temas B&N ─── */}
+      <div style={isGrayscale ? { filter: 'saturate(0) contrast(1.05)' } : undefined}>
+
       {/* ── Period label + last updated ─────────────────────────────── */}
       <div className="flex items-center justify-between mb-5">
       <div className="flex items-center gap-3">
@@ -825,6 +828,7 @@ export default function DashboardPage() {
           </div>
         </>
       )}
+      </div>{/* fin wrapper grayscale */}
     </main>
   )
 }

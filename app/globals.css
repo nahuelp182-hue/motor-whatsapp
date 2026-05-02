@@ -137,16 +137,10 @@ main[data-light] .rounded-xl[class*="border-white"] {
   background: rgba(255, 255, 255, 0.9) !important;
 }
 
-/* ── Desaturar gráficos en temas B&N (Blanco y Negro) ───────── */
-/* data-grayscale se aplica cuando isGrayscale=true en page.tsx   */
-/* FunnelViz maneja sus propios colores vía prop grayscale         */
-main[data-grayscale] .recharts-responsive-container {
-  filter: saturate(0) contrast(1.08);
-}
-/* Evitar doble filtro */
-main[data-grayscale] .recharts-responsive-container .recharts-wrapper {
-  filter: none;
-}
+/* ── Temas B&N: el filtro grayscale se aplica via inline style   */
+/* en un wrapper div en page.tsx (cubre TODOS los elementos,       */
+/* no solo Recharts: barras, badges, categorías, calendario, etc.) */
+/* No se necesita CSS aquí — el inline filter lo maneja todo.     */
 
 @custom-variant dark (&:is(.dark *));
 
