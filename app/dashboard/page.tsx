@@ -14,6 +14,7 @@ import { MonthlyRevenueChart, RoasCacChart, AvgTicketChart } from '@/components/
 import { HelpTip } from '@/components/HelpTip'
 import { FunnelViz } from '@/components/FunnelViz'
 import { ThemePicker, THEMES, type Theme } from '@/components/ThemePicker'
+import { SalesCadence } from '@/components/SalesCadence'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = { date: string; revenue: number; spend: number; clicks: number; net: number }
@@ -68,9 +69,10 @@ function localMonthEnd(d = new Date()) {
 
 // Se evalúa en el browser con timezone local
 const PRESETS = [
-  { label: 'Este mes', getSince: localMonthStart,     getUntil: localDate },
-  { label: 'Mes ant.', getSince: localPrevMonthStart,  getUntil: localMonthEnd },
-  { label: '2026',     getSince: () => '2026-01-01',   getUntil: () => '2026-12-31' },
+  { label: 'Este mes',  getSince: localMonthStart,                                             getUntil: localDate },
+  { label: 'Mes ant.',  getSince: localPrevMonthStart,                                         getUntil: localMonthEnd },
+  { label: 'Últ. 14d', getSince: () => { const d = new Date(); d.setDate(d.getDate()-13); return localDate(d) }, getUntil: localDate },
+  { label: '2026',      getSince: () => '2026-01-01',                                          getUntil: () => '2026-12-31' },
   { label: '2025',     getSince: () => '2025-01-01',   getUntil: () => '2025-12-31' },
   { label: '2024',     getSince: () => '2024-01-01',   getUntil: () => '2024-12-31' },
   { label: 'Todo',     getSince: () => '2022-01-01',   getUntil: localDate },
@@ -368,6 +370,11 @@ export default function DashboardPage() {
               <Trend7d trend={data.trend7d} />
             </div>
           )}
+
+          {/* ── Cadencia de ventas ──────────────────────────────────── */}
+          <div className="mb-5">
+            <SalesCadence />
+          </div>
 
           {/* ══ EMBUDO DE CONVERSIÓN ═════════════════════════════════ */}
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-5">
