@@ -373,7 +373,7 @@ export default function DashboardPage() {
 
           {/* ── Cadencia de ventas ──────────────────────────────────── */}
           <div className="mb-5">
-            <SalesCadence />
+            <SalesCadence key={`${since}-${until}`} since={since} until={until} acHex={theme.acHex} />
           </div>
 
           {/* ══ EMBUDO DE CONVERSIÓN ═════════════════════════════════ */}
