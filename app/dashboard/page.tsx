@@ -178,6 +178,8 @@ export default function DashboardPage() {
   const tnAvgOrder = ordersData?.summary.avgOrderValue ?? 0
   const netRev     = tnRevenue - (s?.metaSpend ?? 0)
   const roas       = (s?.metaSpend ?? 0) > 0 ? tnRevenue / (s?.metaSpend ?? 1) : 0
+  // CAC usando órdenes reales de TN (no Prisma, que solo tiene clientes del webhook)
+  const cac        = tnOrders > 0 && s ? s.metaSpend / tnOrders : 0
 
   // ── chart view config
   const chartConfig = {
@@ -322,7 +324,7 @@ export default function DashboardPage() {
               tip="Ingresos brutos menos gasto en Meta Ads. Es lo que te queda en cuenta después de pagar la publicidad. No incluye otros costos operativos." />
             <MetricCard label="ROAS"              value={`${roas.toFixed(1)}x`} sub="revenue / spend"   highlight={roas >= 3}  mom={monthly?.mom.roas}
               tip="Return On Ad Spend: por cada peso invertido en Meta, cuántos pesos en ventas generaste. ROAS 3x = $3 vendidos por cada $1 gastado. Saludable: ≥3x." />
-            <MetricCard label="CAC"               value={ARS(s.cac)}            sub={`${s.newCustomers} nuevos clientes`} mom={monthly?.mom.cac}      momInvert
+            <MetricCard label="CAC"               value={ARS(cac)}              sub={`${tnOrders} órdenes`}               mom={monthly?.mom.cac}      momInvert
               tip="Costo de Adquisición de Cliente: cuánto gastaste en Meta para conseguir cada nuevo cliente. Debería ser menor al LTV. Ideal: CAC < LTV / 3." />
             <MetricCard label="LTV"               value={ARS(s.ltv)}            sub="por cliente histórico"
               tip="Lifetime Value: ingreso total promedio que generó cada cliente durante toda su historia de compras. Se calcula sobre todos los clientes registrados, no solo el período. Saludable: LTV ≥ 3× el CAC." />
@@ -352,12 +354,12 @@ export default function DashboardPage() {
                 <p className="text-[10px] text-white/50">ROAS</p>
               </div>
               <div>
-                <p className="text-lg font-bold font-mono text-white">{ARS(s.cac)}</p>
+                <p className="text-lg font-bold font-mono text-white">{ARS(cac)}</p>
                 <p className="text-[10px] text-white/50">CAC</p>
               </div>
               <div>
-                <p className={`text-lg font-bold font-mono ${(s.ltv/s.cac)>=3?'text-emerald-400':'text-orange-400'}`}>
-                  {s.cac>0?(s.ltv/s.cac).toFixed(1):'-'}x
+                <p className={`text-lg font-bold font-mono ${(s.ltv/cac)>=3?'text-emerald-400':'text-orange-400'}`}>
+                  {cac>0?(s.ltv/cac).toFixed(1):'-'}x
                 </p>
                 <p className="text-[10px] text-white/50">LTV/CAC</p>
               </div>
@@ -560,14 +562,14 @@ export default function DashboardPage() {
 
               {/* Ratio principal */}
               {(() => {
-                const ratio = s.cac > 0 ? s.ltv / s.cac : 0
+                const ratio = cac > 0 ? s.ltv / cac : 0
                 const pct   = Math.min(100, (ratio / 5) * 100)
                 const good  = ratio >= 3
                 return (
                   <>
                     <div className="flex items-end gap-2 mb-3">
                       <p className={`text-3xl font-bold font-mono ${good ? 'text-emerald-400' : ratio > 0 ? 'text-orange-400' : 'text-white/30'}`}>
-                        {s.cac > 0 ? `${ratio.toFixed(1)}x` : '—'}
+                        {cac > 0 ? `${ratio.toFixed(1)}x` : '—'}
                       </p>
                       <p className="text-[10px] text-white/40 mb-1">objetivo ≥3x</p>
                     </div>
@@ -599,7 +601,7 @@ export default function DashboardPage() {
                           CAC
                           <HelpTip text="Costo de Adquisición de Cliente: gasto total en Meta Ads del período dividido por los nuevos clientes conseguidos." />
                         </p>
-                        <p className="text-sm font-mono font-bold text-white/80">{s.cac > 0 ? ARS(s.cac) : '—'}</p>
+                        <p className="text-sm font-mono font-bold text-white/80">{cac > 0 ? ARS(cac) : '—'}</p>
                       </div>
                     </div>
                   </>
