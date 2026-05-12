@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
 
   try { body = await req.json() } catch { return NextResponse.json({ ok: true }) }
 
-  if (body.object !== 'instagram') return NextResponse.json({ ok: true })
+  if (body.object !== 'instagram' && body.object !== 'page') return NextResponse.json({ ok: true })
 
   for (const entry of body.entry ?? []) {
     for (const event of entry.messaging ?? []) {
