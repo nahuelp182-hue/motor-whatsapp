@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const IG_ID   = process.env.IG_ACCOUNT_ID ?? '17841475593696785'
-const PAGE_TOKEN = process.env.FB_PAGE_TOKEN ?? ''
+const IG_ID      = process.env.IG_ACCOUNT_ID ?? '17841475593696785'
+const PAGE_TOKEN = process.env.FB_PAGE_TOKEN  ?? ''
+const PAGE_ID    = process.env.FB_PAGE_ID     ?? '239953909199103'
+
+// Respuestas a postbacks (botones del menú / ice breakers)
+const POSTBACK_RESPONSES: Record<string, string> = {
+  GET_STARTED:  '👋 ¡Hola! Somos Micelium Argentina 🍄\n\nFabricamos incubadoras automáticas para cultivo de hongos. ¿En qué te podemos ayudar?\n\nUsá el menú de abajo o escribinos tu consulta.',
+  PRECIO:       '💰 *INC101 V2* — nuestra incubadora automática\n\nControla temperatura, humedad y ventilación de forma automática. 20W de consumo. 1 año de garantía.\n\n👉 Precio y modelos en: infomicelium.com.ar\n\nSi querés que te enviemos info por acá, escribinos "precio" 🍄',
+  ENVIOS:       '🚚 Sí, enviamos a *todo el país* por Andreani.\n\nEl plazo depende de tu zona:\n• AMBA: 1-2 días hábiles\n• Interior: 3-5 días hábiles\n\nEl costo de envío se calcula al finalizar la compra en infomicelium.com.ar',
+  GARANTIA:     '🛡️ La INC101 tiene:\n\n✅ 1 año de garantía por defectos de fabricación\n✅ 30 días de devolución sin preguntas\n✅ Soporte técnico directo por WhatsApp\n\n¿Alguna otra duda?',
+  COMO_FUNCIONA:'🤖 La INC101 es una incubadora automática que:\n\n🌡️ Controla temperatura con precisión de ±0.5°C\n💧 Regula humedad automáticamente\n🌬️ Ventila el aire según el ciclo de cultivo\n⚡ Solo consume 20W (muy económica)\n\nVos solo ponés el sustrato adentro y la máquina hace todo. Es 100% a prueba de principiantes 🍄\n\n👉 Ver más en infomicelium.com.ar',
+  HUMANO:       '👤 Entendido, te conecto con alguien del equipo.\n\nTe respondemos en breve. Si es urgente podés escribirnos por WhatsApp: wa.me/5493522412228 📱',
+}
 
 // Preguntas frecuentes que la IA puede responder sola
 const CONTEXTO_MICELIUM = `
@@ -125,30 +136,32 @@ export async function POST(req: NextRequest) {
 
   for (const entry of body.entry ?? []) {
     for (const event of entry.messaging ?? []) {
-      // Ignorar mensajes propios
       if (event.message?.is_echo) continue
-      if (event.sender.id === IG_ID) continue
-      const texto = event.message?.text?.trim()
-      if (!texto) continue
-
       const senderId = event.sender.id
+      if (senderId === IG_ID || senderId === PAGE_ID) continue
 
       try {
+        // Postback (botón del menú o ice breaker)
+        const postback = (event as { postback?: { payload?: string } }).postback
+        if (postback?.payload) {
+          const respuesta = POSTBACK_RESPONSES[postback.payload]
+          if (respuesta) await enviarMensajeIG(senderId, respuesta)
+          continue
+        }
+
+        // Mensaje de texto
+        const texto = event.message?.text?.trim()
+        if (!texto) continue
+
         if (esFAQ(texto)) {
-          // IA responde directamente
           const respuesta = await generarRespuestaIA(texto)
           if (respuesta) await enviarMensajeIG(senderId, respuesta)
         } else {
-          // Mensaje complejo: respuesta genérica + notificación a Nahuel
-          await enviarMensajeIG(
-            senderId,
-            '¡Hola! 👋 Gracias por escribirnos. En breve te respondemos personalmente 🍄'
-          )
+          await enviarMensajeIG(senderId, '¡Hola! 👋 Gracias por escribirnos. En breve te respondemos personalmente 🍄')
           await notificarNahuel(senderId, texto)
         }
       } catch (err) {
         console.error('IG webhook error:', err)
-        // Fallback silencioso para no romper el 200
       }
     }
   }
