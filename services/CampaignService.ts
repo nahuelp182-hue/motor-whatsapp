@@ -1,5 +1,6 @@
 import { Store, CampaignType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { uploadClickConversion } from './GoogleAdsConversionService'
 
 // ── Tipos Tiendanube ──────────────────────────────────────────────────────────
 type TNProduct = { product_id: number; name: string }
@@ -110,6 +111,9 @@ export class CampaignService {
     // Registrar cliente y gasto en DB para TODOS los pedidos pagos
     const customer = await this.upsertCustomer(data, totalAmount)
 
+    // Google Ads server-side conversion upload
+    await this.tryUploadGadsConversion(customer.telefono, data.id, totalAmount)
+
     // REFERRAL: solo si supera el umbral y hay campaña activa
     if (totalAmount < 200000) return
 
@@ -153,6 +157,40 @@ export class CampaignService {
       campaignId: campaign.id,
       tipoEvento: 'order/paid',
     })
+  }
+
+  // Busca el GCLID más reciente del comprador y sube la conversión a Google Ads
+  private async tryUploadGadsConversion(phone: string, orderId: number, total: number) {
+    try {
+      const session = await prisma.gclidSession.findFirst({
+        where: {
+          store_id: this.store.id,
+          phone,
+          uploaded: false,
+          expires_at: { gt: new Date() },
+        },
+        orderBy: { created_at: 'desc' },
+      })
+      if (!session) return // no hubo clic de Google Ads — nada que subir
+
+      const result = await uploadClickConversion({
+        gclid: session.gclid,
+        orderTotal: total,
+        conversionDateTime: new Date(),
+        orderId: String(orderId),
+      })
+
+      await prisma.gclidSession.update({
+        where: { id: session.id },
+        data: {
+          uploaded: result.ok,
+          phone,
+          order_id: String(orderId),
+        },
+      })
+    } catch {
+      // silencioso — no romper el flujo de WA si Google Ads falla
+    }
   }
 
   // ── Privados ─────────────────────────────────────────────────────────────────

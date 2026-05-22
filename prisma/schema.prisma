@@ -16,10 +16,11 @@ model Store {
   marketing_spend         Float    @default(0)
   createdAt               DateTime @default(now())
 
-  customers   Customer[]
-  campaigns   Campaign[]
-  coupons     Coupon[]
-  messageLogs MessageLog[]
+  customers     Customer[]
+  campaigns     Campaign[]
+  coupons       Coupon[]
+  messageLogs   MessageLog[]
+  gclidSessions GclidSession[]
 }
 
 model Customer {
@@ -91,4 +92,20 @@ enum MessageState {
   PENDING
   SENT
   FAILED
+}
+
+model GclidSession {
+  id         String   @id @default(cuid())
+  store_id   String
+  gclid      String
+  phone      String?  // normalizado 549..., se rellena cuando el usuario compra
+  order_id   String?  // TN order ID, se rellena al hacer match
+  uploaded   Boolean  @default(false)
+  created_at DateTime @default(now())
+  expires_at DateTime // 90 días desde la llegada (ventana de conversión de Google Ads)
+
+  store Store @relation(fields: [store_id], references: [id])
+
+  @@index([store_id, phone])
+  @@index([store_id, gclid])
 }
