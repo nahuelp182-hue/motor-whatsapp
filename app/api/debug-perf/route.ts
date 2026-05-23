@@ -1,8 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const since = req.nextUrl.searchParams.get('since') ?? '2026-05-01'
+  const until = req.nextUrl.searchParams.get('until') ?? '2026-05-23'
   const envCheck = {
     GOOGLE_CLIENT_ID:           !!process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET:       !!process.env.GOOGLE_CLIENT_SECRET,
@@ -55,20 +57,47 @@ export async function GET() {
     }
   } catch (e) { tokenError = String(e) }
 
-  // Test Clarity
+  // Test Clarity - replicate EXACT fetchClarity logic from /api/performance
+  let claritySteps: Record<string, unknown> = {}
   try {
+    const clarityToken = process.env.CLARITY_TOKEN
+    claritySteps.hasToken = !!clarityToken
     const params = new URLSearchParams({
       projectId: process.env.CLARITY_PROJECT_ID ?? '',
-      startDate: '2026-05-16',
-      endDate: '2026-05-23',
+      startDate: since,
+      endDate: until,
     })
     const cRes = await fetch(
       `https://www.clarity.ms/export-data/api/v1/project-insights?${params}`,
-      { headers: { Authorization: `Bearer ${process.env.CLARITY_TOKEN ?? ''}` } },
+      { headers: { Authorization: `Bearer ${clarityToken ?? ''}` } },
     )
-    const cText = await cRes.text()
-    clarityRaw = { status: cRes.status, preview: cText.slice(0, 200) }
-  } catch (e) { clarityRaw = { error: String(e) } }
+    claritySteps.httpStatus = cRes.status
+    claritySteps.ok = cRes.ok
+    if (!cRes.ok) {
+      clarityRaw = { ...claritySteps, error: 'not ok → returns null' }
+    } else {
+      const text = await cRes.text()
+      claritySteps.responseLength = text.length
+      claritySteps.preview = text.slice(0, 300)
+      const data = JSON.parse(text) as { MetricName?: string; metricName?: string; Information?: unknown[] }[]
+      claritySteps.isArray = Array.isArray(data)
+      claritySteps.itemCount = data.length
+      claritySteps.firstItemKeys = data[0] ? Object.keys(data[0]) : []
+      claritySteps.firstMetricName = data[0]?.MetricName ?? data[0]?.metricName ?? 'MISSING'
+      // Try both cases
+      const byNameLower: Record<string, unknown> = {}
+      const byNamePascal: Record<string, unknown> = {}
+      for (const m of data) {
+        if ((m as Record<string, unknown>).metricName) byNameLower[(m as Record<string, unknown>).metricName as string] = true
+        if ((m as Record<string, unknown>).MetricName) byNamePascal[(m as Record<string, unknown>).MetricName as string] = true
+      }
+      claritySteps.foundKeysLower  = Object.keys(byNameLower)
+      claritySteps.foundKeysPascal = Object.keys(byNamePascal)
+      const traffic = data.find(m => m.MetricName === 'Traffic' || m.metricName === 'Traffic')
+      claritySteps.trafficInfo = traffic?.Information ?? (traffic as Record<string, unknown>)?.information ?? 'NOT FOUND'
+      clarityRaw = claritySteps
+    }
+  } catch (e) { clarityRaw = { ...claritySteps, error: String(e) } }
 
   return NextResponse.json({ envCheck, tokenOk, tokenError, clarityRaw, ga4Raw })
 }
