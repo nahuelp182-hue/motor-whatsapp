@@ -109,8 +109,11 @@ export function PerformanceSection({
   useEffect(() => {
     setLoading(true); setError(null)
     fetch(`/api/performance?since=${since}&until=${until}`)
-      .then(r => r.json())
-      .then((d: PerformanceData) => { setData(d); setLoading(false) })
+      .then(async r => {
+        const d = await r.json() as PerformanceData & { error?: string }
+        if (d.error) { setError(d.error); setLoading(false); return }
+        setData(d); setLoading(false)
+      })
       .catch(() => { setError('Error al cargar datos de rendimiento'); setLoading(false) })
   }, [since, until])
 
@@ -213,9 +216,14 @@ export function PerformanceSection({
             </div>
           </div>
         ) : (
-          <div className="rounded-xl bg-white/[0.02] border border-white/[0.04] p-4 text-center">
-            <p className="text-[11px] text-white/40 mb-2">Configurá las credenciales de Google Ads en Vercel</p>
-            <p className="text-[10px] text-white/25 font-mono">GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET · GOOGLE_REFRESH_TOKEN · GOOGLE_ADS_DEVELOPER_TOKEN</p>
+          <div className="rounded-xl bg-white/[0.02] border border-white/[0.04] p-4 text-center space-y-2">
+            <p className="text-[11px] text-white/50">Google Ads API solo funciona via gRPC (Python)</p>
+            <p className="text-[10px] text-white/30 leading-relaxed">
+              Ejecutá el script de sincronización para cargar datos en la DB:
+            </p>
+            <p className="text-[10px] font-mono text-white/25 bg-white/[0.03] rounded px-3 py-1.5">
+              python ~/.claude/gads_sync_db.py
+            </p>
           </div>
         )}
       </div>

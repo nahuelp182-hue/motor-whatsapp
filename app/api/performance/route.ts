@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const GADS_CUSTOMER_ID  = process.env.GOOGLE_ADS_CUSTOMER_ID  ?? '5307718423'
-const GADS_DEV_TOKEN    = process.env.GOOGLE_ADS_DEVELOPER_TOKEN ?? ''
-const CLARITY_PROJECT   = process.env.CLARITY_PROJECT_ID ?? 'uhup54dj4f'
-const GA4_PROPERTY_ID   = process.env.GA4_PROPERTY_ID ?? ''
+const GADS_CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID ?? '5307718423'
+const CLARITY_PROJECT  = process.env.CLARITY_PROJECT_ID ?? 'uhup54dj4f'
+const GA4_PROPERTY_ID  = process.env.GA4_PROPERTY_ID ?? ''
 
 // ── OAuth helper ────────────────────────────────────────────────────────────
 async function getGoogleAccessToken(): Promise<string | null> {
@@ -18,10 +17,8 @@ async function getGoogleAccessToken(): Promise<string | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id:     clientId,
-        client_secret: clientSecret,
-        refresh_token: refreshToken,
-        grant_type:    'refresh_token',
+        client_id: clientId, client_secret: clientSecret,
+        refresh_token: refreshToken, grant_type: 'refresh_token',
       }),
     })
     const data = await res.json() as { access_token?: string }
@@ -29,100 +26,83 @@ async function getGoogleAccessToken(): Promise<string | null> {
   } catch { return null }
 }
 
-// ── Google Ads ──────────────────────────────────────────────────────────────
-interface GadsRow {
-  campaign?: { id: string; name: string; status: string; advertisingChannelType: string }
-  metrics?: {
-    impressions: string; clicks: string; costMicros: string
-    conversions: number; conversionsValue: number; ctr: number; averageCpc: string
-  }
-}
-
-async function fetchGoogleAds(token: string, since: string, until: string) {
-  if (!GADS_DEV_TOKEN) return null
-  const query = `
-    SELECT
-      campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type,
-      metrics.impressions, metrics.clicks, metrics.cost_micros,
-      metrics.conversions, metrics.conversions_value, metrics.ctr, metrics.average_cpc
-    FROM campaign
-    WHERE campaign.status = 'ENABLED'
-      AND segments.date BETWEEN '${since}' AND '${until}'
-    ORDER BY metrics.cost_micros DESC
-    LIMIT 10
-  `
+// ── Google Ads — reads from cache table (populated by Python cron) ──────────
+async function fetchGoogleAdsCache(since: string, until: string) {
+  // Google Ads API only supports gRPC (no REST interface).
+  // Data is populated via the local Python script: ~/.claude/gads.py
+  // The script writes to the gads_cache table in Supabase daily.
+  // For now we check the DB; if empty, return null.
   try {
-    const res = await fetch(
-      `https://googleads.googleapis.com/v18/customers/${GADS_CUSTOMER_ID}/googleAds:search`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization:    `Bearer ${token}`,
-          'developer-token': GADS_DEV_TOKEN,
-          'login-customer-id': GADS_CUSTOMER_ID,
-          'Content-Type':   'application/json',
-        },
-        body: JSON.stringify({ query }),
+    const { prisma } = await import('@/lib/prisma')
+    const rows = await (prisma as unknown as {
+      gadsCache?: { findMany: (args: object) => Promise<{
+        date: string; campaign_name: string; campaign_id: string; campaign_status: string; campaign_type: string;
+        impressions: number; clicks: number; cost_ars: number;
+        conversions: number; conv_value: number; ctr: number; avg_cpc: number;
+      }[]> }
+    }).gadsCache?.findMany({
+      where: {
+        date: { gte: since, lte: until },
       },
-    )
-    if (!res.ok) {
-      const err = await res.text()
-      console.error('Google Ads error:', err)
-      return null
-    }
-    const data = await res.json() as { results?: GadsRow[] }
-    const rows = data.results ?? []
-
-    let impressions = 0, clicks = 0, costMicros = 0, conversions = 0, convValue = 0
-    const campaigns = rows.map(r => {
-      const m = r.metrics!
-      const imp   = parseInt(m.impressions  ?? '0')
-      const clk   = parseInt(m.clicks       ?? '0')
-      const cost  = parseInt(m.costMicros   ?? '0')
-      const conv  = m.conversions  ?? 0
-      const convv = m.conversionsValue ?? 0
-      impressions += imp
-      clicks      += clk
-      costMicros  += cost
-      conversions += conv
-      convValue   += convv
-      return {
-        id:     r.campaign?.id ?? '',
-        name:   r.campaign?.name ?? '',
-        status: r.campaign?.status ?? '',
-        type:   r.campaign?.advertisingChannelType ?? '',
-        impressions: imp,
-        clicks:      clk,
-        costARS:     cost / 1_000_000,
-        conversions: conv,
-        convValue:   convv,
-        ctr:         m.ctr ?? 0,
-        avgCpc:      parseInt(m.averageCpc ?? '0') / 1_000_000,
-      }
+      orderBy: { cost_ars: 'desc' },
     })
 
-    const totalCostARS = costMicros / 1_000_000
+    if (!rows || rows.length === 0) return null
+
+    let impressions = 0, clicks = 0, costARS = 0, conversions = 0, convValue = 0
+    const campaigns: Record<string, {
+      id: string; name: string; status: string; type: string;
+      impressions: number; clicks: number; costARS: number;
+      conversions: number; convValue: number; ctr: number; avgCpc: number;
+    }> = {}
+
+    for (const r of rows) {
+      impressions += r.impressions; clicks += r.clicks; costARS += r.cost_ars
+      conversions += r.conversions; convValue += r.conv_value
+      const key = r.campaign_id
+      if (!campaigns[key]) {
+        campaigns[key] = {
+          id: r.campaign_id, name: r.campaign_name,
+          status: r.campaign_status, type: r.campaign_type,
+          impressions: 0, clicks: 0, costARS: 0,
+          conversions: 0, convValue: 0, ctr: 0, avgCpc: 0,
+        }
+      }
+      campaigns[key].impressions += r.impressions
+      campaigns[key].clicks      += r.clicks
+      campaigns[key].costARS     += r.cost_ars
+      campaigns[key].conversions += r.conversions
+      campaigns[key].convValue   += r.conv_value
+    }
+
+    const campaignList = Object.values(campaigns).map(c => ({
+      ...c,
+      ctr:    c.impressions > 0 ? c.clicks / c.impressions : 0,
+      avgCpc: c.clicks > 0 ? c.costARS / c.clicks : 0,
+    }))
+
     return {
       totalImpressions: impressions,
       totalClicks:      clicks,
-      totalCostARS,
+      totalCostARS:     costARS,
       totalConversions: conversions,
       totalConvValue:   convValue,
-      ctr:              clicks > 0 ? clicks / impressions : 0,
-      avgCpc:           clicks > 0 ? totalCostARS / clicks : 0,
-      roas:             totalCostARS > 0 ? convValue / totalCostARS : 0,
-      campaigns,
+      ctr:              impressions > 0 ? clicks / impressions : 0,
+      avgCpc:           clicks > 0 ? costARS / clicks : 0,
+      roas:             costARS > 0 ? convValue / costARS : 0,
+      campaigns:        campaignList,
+      fromCache:        true,
     }
-  } catch (e) {
-    console.error('Google Ads fetch error:', e)
+  } catch {
     return null
   }
 }
 
 // ── Clarity ─────────────────────────────────────────────────────────────────
+// API returns PascalCase: MetricName, Information
 interface ClarityMetric {
-  metricName: string
-  information: Record<string, unknown>[]
+  MetricName: string
+  Information: Record<string, unknown>[]
 }
 
 async function fetchClarity(since: string, until: string) {
@@ -135,21 +115,22 @@ async function fetchClarity(since: string, until: string) {
       { headers: { Authorization: `Bearer ${token}` } },
     )
     if (!res.ok) return null
+
     const data = await res.json() as ClarityMetric[]
     const byName: Record<string, Record<string, unknown>[]> = {}
-    for (const m of data) byName[m.metricName] = m.information
+    for (const m of data) byName[m.MetricName] = m.Information
 
-    const traffic    = (byName['Traffic']       ?? [{}])[0] as Record<string, unknown>
-    const engagement = (byName['EngagementTime'] ?? [{}])[0] as Record<string, unknown>
-    const scroll     = (byName['ScrollDepth']    ?? [{}])[0] as Record<string, unknown>
-    const devices    = (byName['Device']         ?? []) as Record<string, unknown>[]
-    const quickback  = (byName['QuickbackClick'] ?? [{}])[0] as Record<string, unknown>
-    const rageClicks = (byName['RageClickCount'] ?? [{}])[0] as Record<string, unknown>
-    const deadClicks = (byName['DeadClickCount'] ?? [{}])[0] as Record<string, unknown>
-    const pages      = (byName['PopularPages']   ?? []) as Record<string, unknown>[]
+    const traffic    = (byName['Traffic']       ?? [{}])[0]
+    const engagement = (byName['EngagementTime'] ?? [{}])[0]
+    const scroll     = (byName['ScrollDepth']    ?? [{}])[0]
+    const devices    = (byName['Device']         ?? [])
+    const quickback  = (byName['QuickbackClick'] ?? [{}])[0]
+    const rageClicks = (byName['RageClickCount'] ?? [{}])[0]
+    const deadClicks = (byName['DeadClickCount'] ?? [{}])[0]
+    const pages      = (byName['PopularPages']   ?? [])
 
-    const mobile = devices.find(d => String(d.deviceType ?? d.device ?? '').toLowerCase() === 'mobile')
-    const desktop= devices.find(d => String(d.deviceType ?? d.device ?? '').toLowerCase() === 'desktop')
+    const mobile  = devices.find(d => String(d.deviceType ?? d.device ?? d.Device ?? '').toLowerCase() === 'mobile')
+    const desktop = devices.find(d => String(d.deviceType ?? d.device ?? d.Device ?? '').toLowerCase() === 'desktop')
 
     return {
       sessions:       Number(traffic.totalSessionCount ?? 0),
@@ -158,18 +139,21 @@ async function fetchClarity(since: string, until: string) {
       activeTime:     Number(engagement.activeTime  ?? 0),
       totalTime:      Number(engagement.totalTime   ?? 0),
       scrollDepth:    Number(scroll.averageScrollDepth ?? 0),
-      mobilePct:      Number(mobile?.sessionsWithMetricPercentage  ?? 0),
-      desktopPct:     Number(desktop?.sessionsWithMetricPercentage ?? 0),
-      quickbackPct:   Number(quickback.sessionsWithMetricPercentage ?? 0),
-      rageClickPct:   Number(rageClicks.sessionsWithMetricPercentage ?? 0),
-      deadClickPct:   Number(deadClicks.sessionsWithMetricPercentage ?? 0),
+      mobilePct:      Number(mobile?.sessionsWithMetricPercentage  ?? mobile?.SessionsWithMetricPercentage  ?? 0),
+      desktopPct:     Number(desktop?.sessionsWithMetricPercentage ?? desktop?.SessionsWithMetricPercentage ?? 0),
+      quickbackPct:   Number(quickback.sessionsWithMetricPercentage ?? quickback.SessionsWithMetricPercentage ?? 0),
+      rageClickPct:   Number(rageClicks.sessionsWithMetricPercentage ?? rageClicks.SessionsWithMetricPercentage ?? 0),
+      deadClickPct:   Number(deadClicks.sessionsWithMetricPercentage ?? deadClicks.SessionsWithMetricPercentage ?? 0),
       topPages: pages
-        .sort((a, b) => Number(b.pageViews ?? b.pagesViews ?? 0) - Number(a.pageViews ?? a.pagesViews ?? 0))
+        .sort((a, b) => Number(b.pageViews ?? b.pagesViews ?? b.PageViews ?? 0) - Number(a.pageViews ?? a.pagesViews ?? a.PageViews ?? 0))
         .slice(0, 5)
-        .map(p => ({ url: String(p.url ?? p.pageTitle ?? ''), views: Number(p.pageViews ?? p.pagesViews ?? 0) })),
+        .map(p => ({
+          url:   String(p.url ?? p.pageTitle ?? p.Url ?? p.PageTitle ?? ''),
+          views: Number(p.pageViews ?? p.pagesViews ?? p.PageViews ?? 0),
+        })),
     }
   } catch (e) {
-    console.error('Clarity fetch error:', e)
+    console.error('[performance] Clarity error:', e)
     return null
   }
 }
@@ -181,10 +165,8 @@ async function fetchGA4(token: string, since: string, until: string) {
     const body = {
       dateRanges: [{ startDate: since, endDate: until }],
       metrics: [
-        { name: 'sessions' },
-        { name: 'totalUsers' },
-        { name: 'screenPageViews' },
-        { name: 'bounceRate' },
+        { name: 'sessions' }, { name: 'totalUsers' },
+        { name: 'screenPageViews' }, { name: 'bounceRate' },
         { name: 'averageSessionDuration' },
       ],
       dimensions: [{ name: 'sessionDefaultChannelGroup' }],
@@ -198,25 +180,31 @@ async function fetchGA4(token: string, since: string, until: string) {
         body: JSON.stringify(body),
       },
     )
-    if (!res.ok) return null
-    type GA4Row = { dimensionValues: { value: string }[]; metricValues: { value: string }[] }
-    const data = await res.json() as { rows?: GA4Row[]; totals?: { metricValues: { value: string }[] }[] }
+    if (!res.ok) {
+      console.error('[performance] GA4 error:', res.status, await res.text())
+      return null
+    }
+    type GA4Row = {
+      dimensionValues?: { value: string }[]
+      metricValues: { value: string }[]
+    }
+    const data = await res.json() as { rows?: GA4Row[] }
     const rows = data.rows ?? []
 
     let sessions = 0, users = 0, pageviews = 0, bounceSum = 0, durationSum = 0
 
     const sources = rows.map(r => {
-      const channel = r.dimensionValues[0].value
-      const sess    = parseInt(r.metricValues[0].value)
-      const usr     = parseInt(r.metricValues[1].value)
-      const pv      = parseInt(r.metricValues[2].value)
-      const bounce  = parseFloat(r.metricValues[3].value)
-      const dur     = parseFloat(r.metricValues[4].value)
-      sessions   += sess
-      users      += usr
-      pageviews  += pv
-      bounceSum  += bounce * sess
-      durationSum+= dur * sess
+      const channel = r.dimensionValues?.[0]?.value ?? 'Unknown'
+      const sess    = parseInt(r.metricValues[0]?.value ?? '0')
+      const usr     = parseInt(r.metricValues[1]?.value ?? '0')
+      const pv      = parseInt(r.metricValues[2]?.value ?? '0')
+      const bounce  = parseFloat(r.metricValues[3]?.value ?? '0')
+      const dur     = parseFloat(r.metricValues[4]?.value ?? '0')
+      sessions    += sess
+      users       += usr
+      pageviews   += pv
+      bounceSum   += bounce * sess
+      durationSum += dur * sess
       return { channel, sessions: sess, users: usr }
     })
 
@@ -224,12 +212,12 @@ async function fetchGA4(token: string, since: string, until: string) {
       sessions,
       users,
       pageviews,
-      bounceRate:      sessions > 0 ? bounceSum  / sessions : 0,
-      avgSessionDur:   sessions > 0 ? durationSum/ sessions : 0,
+      bounceRate:    sessions > 0 ? bounceSum   / sessions : 0,
+      avgSessionDur: sessions > 0 ? durationSum / sessions : 0,
       sources: sources.sort((a, b) => b.sessions - a.sessions),
     }
   } catch (e) {
-    console.error('GA4 fetch error:', e)
+    console.error('[performance] GA4 error:', e)
     return null
   }
 }
@@ -241,19 +229,18 @@ export async function GET(req: NextRequest) {
     const since = p.get('since') ?? (() => { const d = new Date(); d.setDate(d.getDate()-29); return d.toISOString().slice(0,10) })()
     const until = p.get('until') ?? new Date().toISOString().slice(0,10)
 
-    const [token, clarity] = await Promise.all([
+    const [token, clarity, gads] = await Promise.all([
       getGoogleAccessToken(),
       fetchClarity(since, until),
+      fetchGoogleAdsCache(since, until),
     ])
 
-    const [gads, ga4] = await Promise.all([
-      token ? fetchGoogleAds(token, since, until) : Promise.resolve(null),
-      token ? fetchGA4(token, since, until)       : Promise.resolve(null),
-    ])
+    const ga4 = token ? await fetchGA4(token, since, until) : null
 
     return NextResponse.json({ since, until, gads, clarity, ga4 })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    console.error('[performance] outer error:', msg)
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
