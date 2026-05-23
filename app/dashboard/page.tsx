@@ -15,6 +15,7 @@ import { HelpTip } from '@/components/HelpTip'
 import { FunnelViz } from '@/components/FunnelViz'
 import { ThemePicker, THEMES, type Theme } from '@/components/ThemePicker'
 import { SalesCadence } from '@/components/SalesCadence'
+import { PerformanceSection } from '@/components/PerformanceSection'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = { date: string; revenue: number; spend: number; clicks: number; net: number }
@@ -754,6 +755,14 @@ export default function DashboardPage() {
                 }
               </div>
             </div>
+          </div>
+
+          {/* ══ RENDIMIENTO DE CANALES ══════════════════════════════ */}
+          <div className="mt-8 mb-8">
+            <div className="flex items-center gap-3 mb-5">
+              <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/50">Rendimiento de canales digitales</h2>
+            </div>
+            <PerformanceSection since={since} until={until} acHex={theme.acHex} isLight={isLight} />
           </div>
 
           {/* ══ SECCIÓN HISTÓRICO MENSUAL ════════════════════════════ */}
