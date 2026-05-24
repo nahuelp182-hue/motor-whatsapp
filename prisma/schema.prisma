@@ -94,6 +94,26 @@ enum MessageState {
   FAILED
 }
 
+model GadsCache {
+  id              String   @id @default(cuid())
+  date            String
+  campaign_id     String
+  campaign_name   String
+  campaign_status String
+  campaign_type   String
+  impressions     Int      @default(0)
+  clicks          Int      @default(0)
+  cost_ars        Float    @default(0)
+  conversions     Float    @default(0)
+  conv_value      Float    @default(0)
+  ctr             Float    @default(0)
+  avg_cpc         Float    @default(0)
+  synced_at       DateTime @default(now())
+
+  @@unique([date, campaign_id])
+  @@map("gads_cache")
+}
+
 model GclidSession {
   id         String   @id @default(cuid())
   store_id   String

@@ -1,4 +1,4 @@
-﻿CREATE TABLE "GclidSession" (
+CREATE TABLE "GclidSession" (
     "id"         TEXT NOT NULL,
     "store_id"   TEXT NOT NULL,
     "gclid"      TEXT NOT NULL,
