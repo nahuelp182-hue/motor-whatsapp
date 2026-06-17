@@ -8,6 +8,7 @@ export function middleware(request: NextRequest) {
   if (!password) return NextResponse.next()
 
   // Rutas siempre permitidas
+  if (pathname === '/mvtrk.js')             return NextResponse.next()  // tracker video GA4 (storefront)
   if (pathname.startsWith('/api/auth'))     return NextResponse.next()
   if (pathname.startsWith('/api/cron'))     return NextResponse.next()
   if (pathname.startsWith('/api/webhooks')) return NextResponse.next()
