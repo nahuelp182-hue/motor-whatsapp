@@ -10,6 +10,7 @@ export function middleware(request: NextRequest) {
   // Rutas siempre permitidas
   if (pathname === '/mvtrk.js')             return NextResponse.next()  // tracker video GA4 (storefront)
   if (pathname === '/cnc.js')               return NextResponse.next()  // widget "¿cómo nos conociste?" (storefront)
+  if (pathname === '/geogate.js')           return NextResponse.next()  // geo-bloqueo storefront por radio
   if (pathname.startsWith('/api/cnc'))      return NextResponse.next()  // endpoint atribución post-compra
   if (pathname.startsWith('/api/auth'))     return NextResponse.next()
   if (pathname.startsWith('/api/cron'))     return NextResponse.next()
