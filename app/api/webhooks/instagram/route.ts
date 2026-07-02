@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
+import { diag } from '@/lib/diag'
 
 export const runtime = 'nodejs'
+export const maxDuration = 60
 
 const IG_ID      = process.env.IG_ACCOUNT_ID ?? '17841475593696785'
 const PAGE_TOKEN = process.env.FB_PAGE_TOKEN  ?? ''
@@ -132,11 +134,19 @@ async function pensar(mensaje: string, precios: string): Promise<Salida> {
 
 // ─────────── IG send ───────────
 async function enviarMensajeIG(recipientId: string, texto: string) {
-  await fetch(`https://graph.facebook.com/v21.0/${IG_ID}/messages`, {
+  const res = await fetch(`https://graph.facebook.com/v21.0/${IG_ID}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${PAGE_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ recipient: { id: recipientId }, message: { text: texto }, messaging_type: 'RESPONSE' }),
   })
+  const bodyText = await res.text().catch(() => '')
+  if (!res.ok) {
+    console.error(`IG send FALLO ${res.status}:`, bodyText)
+    await diag('send_fail', recipientId, { status: res.status, body: bodyText.slice(0, 1500), texto: texto.slice(0, 200) })
+  } else {
+    await diag('send_ok', recipientId, { status: res.status })
+  }
+  return res.ok
 }
 
 // GET — verificación del webhook por Meta
@@ -188,9 +198,12 @@ export async function POST(req: NextRequest) {
         const texto = event.message?.text?.trim()
         if (!texto) continue
 
+        await diag('recibido', senderId, { texto: texto.slice(0, 300) })
+
         // Cerebro de Ariel: precios en vivo + KB + derivación
         const precios = await bloquePreciosEnVivo()
         const { respuesta, derivar, motivo } = await pensar(texto, precios)
+        await diag('pensado', senderId, { derivar, motivo, respuesta: respuesta.slice(0, 300) })
 
         // Al derivar, mandamos al cliente a WhatsApp de la empresa (link agregado por código, no por la IA)
         let salidaCliente = respuesta
@@ -209,6 +222,7 @@ export async function POST(req: NextRequest) {
         }
       } catch (err) {
         console.error('IG webhook error:', err)
+        await diag('error', senderId, { error: String(err).slice(0, 1000) })
         // fallback humano para no dejar al cliente en visto
         try { await enviarMensajeIG(event.sender.id, '¡Hola! 👋 Gracias por escribirnos, en un ratito te respondemos 🍄') } catch {}
       }
