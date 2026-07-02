@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
-import { diag } from '@/lib/diag'
+import { diag, getHistorial, type Turno } from '@/lib/diag'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -116,8 +116,12 @@ function parseSalida(raw: string): Salida {
   return { respuesta, derivar, motivo }
 }
 
-async function pensar(mensaje: string, precios: string): Promise<Salida> {
+async function pensar(mensaje: string, precios: string, historial: Turno[]): Promise<Salida> {
   const client = new Anthropic()
+  const messages = [
+    ...historial.map((t) => ({ role: t.role, content: t.content })),
+    { role: 'user' as const, content: `Mensaje del cliente por Instagram: "${mensaje}"\n\nRespondé usando el formato de etiquetas.` },
+  ]
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 500,
@@ -125,7 +129,7 @@ async function pensar(mensaje: string, precios: string): Promise<Salida> {
       { type: 'text', text: PREAMBULO, cache_control: { type: 'ephemeral' } },
       { type: 'text', text: precios },
     ],
-    messages: [{ role: 'user', content: `Mensaje del cliente por Instagram: "${mensaje}"\n\nRespondé usando el formato de etiquetas.` }],
+    messages,
   })
   const block = response.content[0]
   const raw = block && block.type === 'text' ? block.text : ''
@@ -201,9 +205,9 @@ export async function POST(req: NextRequest) {
 
         await diag('recibido', senderId, { texto: texto.slice(0, 300) })
 
-        // Cerebro de Ariel: precios en vivo + KB + derivación
-        const precios = await bloquePreciosEnVivo()
-        const { respuesta, derivar, motivo } = await pensar(texto, precios)
+        // Cerebro de Ariel: precios en vivo + KB + derivación, con memoria del hilo (evita re-presentarse)
+        const [precios, historial] = await Promise.all([bloquePreciosEnVivo(), getHistorial(senderId)])
+        const { respuesta, derivar, motivo } = await pensar(texto, precios, historial)
         await diag('pensado', senderId, { derivar, motivo, respuesta: respuesta.slice(0, 300) })
 
         // Al derivar, mandamos al cliente a WhatsApp de la empresa (link agregado por código, no por la IA)
