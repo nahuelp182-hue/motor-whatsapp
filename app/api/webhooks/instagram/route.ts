@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
-import { diag, getHistorial, type Turno } from '@/lib/diag'
+import { diag, getHistorial, logClaudeUsage, type Turno } from '@/lib/diag'
+
+const MODELO = 'claude-haiku-4-5-20251001'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -123,7 +125,7 @@ async function pensar(mensaje: string, precios: string, historial: Turno[]): Pro
     { role: 'user' as const, content: `Mensaje del cliente por Instagram: "${mensaje}"\n\nRespondé usando el formato de etiquetas.` },
   ]
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: MODELO,
     max_tokens: 500,
     system: [
       { type: 'text', text: PREAMBULO, cache_control: { type: 'ephemeral' } },
@@ -131,6 +133,7 @@ async function pensar(mensaje: string, precios: string, historial: Turno[]): Pro
     ],
     messages,
   })
+  await logClaudeUsage('instagram', MODELO, response.usage)
   const block = response.content[0]
   const raw = block && block.type === 'text' ? block.text : ''
   return parseSalida(raw)

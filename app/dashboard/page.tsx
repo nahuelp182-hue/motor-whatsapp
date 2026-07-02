@@ -11,6 +11,7 @@ import { PaymentDonut } from '@/components/PaymentDonut'
 import { CategoryAccordion } from '@/components/CategoryAccordion'
 import { Trend7d } from '@/components/Trend7d'
 import { MonthlyRevenueChart, RoasCacChart, AvgTicketChart } from '@/components/MonthlyChart'
+import { ClaudeUsageChart, type UsageDay } from '@/components/ClaudeUsageChart'
 import { HelpTip } from '@/components/HelpTip'
 import { FunnelViz } from '@/components/FunnelViz'
 import { ThemePicker, THEMES, type Theme } from '@/components/ThemePicker'
@@ -111,6 +112,7 @@ export default function DashboardPage() {
   const [chartView, setChartView]     = useState<'revenue'|'spend'|'clicks'|'net'>('revenue')
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [usage, setUsage] = useState<{ series: UsageDay[]; totalCost: number; totalCalls: number } | null>(null)
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') return THEMES[0]
     return THEMES.find(t => t.id === (localStorage.getItem('dash-theme') ?? '')) ?? THEMES[0]
@@ -139,6 +141,12 @@ export default function DashboardPage() {
       .then(async r => r.json())
       .then((d: MonthlyData) => { setMonthly(d); setMonthlyLoading(false) })
       .catch(() => setMonthlyLoading(false))
+
+    // Gasto Claude (IG + WhatsApp): últimos 30 días
+    fetch('/api/claude-usage?days=30')
+      .then(async r => r.json())
+      .then((d) => setUsage(d))
+      .catch(() => {})
   }, [since, until])
 
   useEffect(() => {
@@ -763,6 +771,34 @@ export default function DashboardPage() {
               <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/50">Rendimiento de canales digitales</h2>
             </div>
             <PerformanceSection since={since} until={until} acHex={theme.acHex} isLight={isLight} />
+          </div>
+
+          {/* ══ GASTO CLAUDE (bots IG + WhatsApp) ════════════════════ */}
+          <div className="mt-8">
+            <div className="flex items-center gap-3 mb-5">
+              <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/50">Gasto de los bots (Claude API)</h2>
+            </div>
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+              <div className="flex items-baseline justify-between mb-5 flex-wrap gap-2">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 flex items-center">
+                  Costo diario por canal · últimos 30 días
+                  <HelpTip text="Tokens consumidos por los asistentes de Instagram y WhatsApp, convertidos a USD (Haiku 4.5). Se registra en cada respuesta del bot. WhatsApp aparece cuando el bridge esté reconectado." />
+                </h3>
+                {usage && (
+                  <span className="text-[10px] font-mono text-white/45">
+                    total 30d <span className="text-emerald-400 font-semibold">${usage.totalCost?.toFixed(2) ?? '0.00'}</span>
+                    <span className="text-white/25"> · {usage.totalCalls ?? 0} respuestas</span>
+                  </span>
+                )}
+              </div>
+              {usage && usage.series?.length
+                ? <ClaudeUsageChart data={usage.series} />
+                : <div className="h-[200px] flex items-center justify-center text-white/20 text-xs">
+                    {usage ? 'Sin consumo registrado todavía' : 'Cargando...'}
+                  </div>
+              }
+              <p className="text-[9px] text-white/25 mt-2">Prompt caching activo: la base de conocimiento se cachea (~$0.10/M vs $1/M) → costo real muy bajo por respuesta.</p>
+            </div>
           </div>
 
           {/* ══ SECCIÓN HISTÓRICO MENSUAL ════════════════════════════ */}
