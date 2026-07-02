@@ -134,7 +134,8 @@ async function pensar(mensaje: string, precios: string): Promise<Salida> {
 
 // ─────────── IG send ───────────
 async function enviarMensajeIG(recipientId: string, texto: string) {
-  const res = await fetch(`https://graph.facebook.com/v21.0/${IG_ID}/messages`, {
+  // OJO: el envío va por el ID de la PÁGINA de Facebook (no el del usuario IG) — con IG_ID Meta devuelve "(#3) no capability"
+  const res = await fetch(`https://graph.facebook.com/v21.0/${PAGE_ID}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${PAGE_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ recipient: { id: recipientId }, message: { text: texto }, messaging_type: 'RESPONSE' }),
