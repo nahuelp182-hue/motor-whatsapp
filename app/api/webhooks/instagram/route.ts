@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
-import { diag, getHistorial, logClaudeUsage, type Turno } from '@/lib/diag'
+import { diag, getHistorial, logClaudeUsage, comentarioYaRespondido, type Turno } from '@/lib/diag'
 
 const MODELO = 'claude-haiku-4-5-20251001'
 
@@ -183,6 +183,94 @@ async function enviarMensajeIG(recipientId: string, texto: string) {
   return res.ok
 }
 
+// ─────────── Comentarios en publicaciones ───────────
+// Reemplaza la automatización nativa de Meta (que Nahuel apagó). Enfoque elegido: respuesta PÚBLICA
+// breve que invita al DM + DM PRIVADO con la respuesta completa del cerebro de Ariel (donde precio/
+// specs/derivaciones se resuelven bien y en privado).
+const PUBLIC_ACKS = [
+  '¡Hola! 🍄 Te escribimos por privado con toda la info 🙌',
+  '¡Gracias por escribir! Te pasamos los detalles por DM 🙌',
+  '¡Buenísimo! Te respondemos por privado 🍄',
+  '¡Hola! Te mandamos la info por mensaje directo 🙌',
+]
+function hashIdx(s: string, n: number): number {
+  let h = 0
+  for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return h % n
+}
+// Comentario trivial (solo emoji/mención/muy corto) → no spamear con público+DM.
+function comentarioTrivial(text: string): boolean {
+  const limpio = text
+    .replace(/@[\w.]+/g, '')
+    .replace(/[\p{Extended_Pictographic}]/gu, '')
+    .replace(/[^\p{L}\p{N}]/gu, '')
+    .trim()
+  return limpio.length < 4
+}
+
+async function responderComentarioPublico(commentId: string, texto: string): Promise<boolean> {
+  const res = await fetch(`https://graph.facebook.com/v21.0/${commentId}/replies`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${PAGE_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: sanitizeIGText(texto) }),
+  })
+  const b = await res.text().catch(() => '')
+  if (!res.ok) { console.error('IG coment público FALLO', res.status, b); await diag('coment_pub_fail', commentId, { status: res.status, body: b.slice(0, 800) }) }
+  return res.ok
+}
+
+// Respuesta privada a un comentario = DM al autor referenciando su comentario (recipient.comment_id).
+// Permitida 1 vez por comentario y dentro de los 7 días.
+async function enviarPrivateReply(commentId: string, texto: string): Promise<boolean> {
+  const res = await fetch(`https://graph.facebook.com/v21.0/${PAGE_ID}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${PAGE_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recipient: { comment_id: commentId }, message: { text: sanitizeIGText(texto) } }),
+  })
+  const b = await res.text().catch(() => '')
+  if (!res.ok) { console.error('IG private reply FALLO', res.status, b); await diag('coment_dm_fail', commentId, { status: res.status, body: b.slice(0, 800) }) }
+  return res.ok
+}
+
+type ComentValue = { id?: string; text?: string; from?: { id?: string; username?: string } }
+async function manejarComentario(value: ComentValue) {
+  const commentId = value?.id
+  const text = (value?.text ?? '').trim()
+  const fromId = value?.from?.id
+  const username = value?.from?.username ?? ''
+  if (!commentId || !fromId) return
+  if (fromId === IG_ID || fromId === PAGE_ID) return   // nuestro propio comentario/respuesta
+  if (!text || comentarioTrivial(text)) return         // reacción/emoji/tag → no responder
+  if (await comentarioYaRespondido(commentId)) return  // dedup (Meta reenvía a veces)
+
+  await diag('coment_recibido', String(fromId), { comment_id: commentId, username, texto: text.slice(0, 300) })
+
+  // DM: respuesta completa del cerebro (precio en escalera, derivación, etc.)
+  let dm = ''
+  let derivar = false
+  let motivo = ''
+  try {
+    const precios = await bloquePreciosEnVivo()
+    const s = await pensar(text, precios, [])
+    dm = s.respuesta; derivar = s.derivar; motivo = s.motivo
+  } catch {
+    dm = '¡Hola! 🍄 Soy el asistente virtual de Micelium. Contame qué necesitás y te ayudo 🙌'
+  }
+  if (derivar) dm += (dm ? '\n\n' : '') + `👉 ${WA_PLAIN}`
+
+  const pub = PUBLIC_ACKS[hashIdx(commentId, PUBLIC_ACKS.length)]
+  await responderComentarioPublico(commentId, pub)
+  await enviarPrivateReply(commentId, dm)
+  await diag('coment_ok', String(fromId), { comment_id: commentId, derivar, publico: pub, dm: dm.slice(0, 300) })
+
+  if (derivar) {
+    await notifyNahuel(
+      '🔔 Instagram: comentario derivado',
+      `Comentario de @${username}: "${text}"\nMotivo: ${motivo || '(sin especificar)'}\nSe le respondió por DM invitando a WhatsApp de la empresa.`,
+    )
+  }
+}
+
 // GET — verificación del webhook por Meta
 export async function GET(req: NextRequest) {
   const mode      = req.nextUrl.searchParams.get('hub.mode')
@@ -208,6 +296,10 @@ export async function POST(req: NextRequest) {
         postback?: { payload?: string }
         timestamp?: number
       }>
+      changes?: Array<{
+        field?: string
+        value?: { id?: string; text?: string; from?: { id?: string; username?: string } }
+      }>
     }>
   }
 
@@ -215,6 +307,13 @@ export async function POST(req: NextRequest) {
   if (body.object !== 'instagram' && body.object !== 'page') return NextResponse.json({ ok: true })
 
   for (const entry of body.entry ?? []) {
+    // Comentarios en publicaciones (reemplaza la automatización nativa de Meta)
+    for (const change of entry.changes ?? []) {
+      if (change.field !== 'comments' || !change.value) continue
+      try { await manejarComentario(change.value) }
+      catch (err) { console.error('IG comment error:', err); await diag('coment_error', 'sys', { error: String(err).slice(0, 500) }) }
+    }
+
     for (const event of entry.messaging ?? []) {
       if (event.message?.is_echo) continue
       const senderId = event.sender.id

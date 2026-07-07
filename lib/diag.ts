@@ -69,6 +69,23 @@ export async function logClaudeUsage(channel: string, model: string, usage: Usag
   }
 }
 
+/** Evita responder dos veces el mismo comentario (Meta puede reenviar el webhook). Nunca lanza. */
+export async function comentarioYaRespondido(commentId: string): Promise<boolean> {
+  try {
+    const p = getPool()
+    if (!p) return false
+    const r = await p.query(
+      `SELECT 1 FROM ig_diag WHERE kind = 'coment_ok' AND detail->>'comment_id' = $1
+         AND ts > now() - interval '7 days' LIMIT 1`,
+      [commentId],
+    )
+    return (r.rowCount ?? 0) > 0
+  } catch (e) {
+    console.error('comentarioYaRespondido error:', e)
+    return false
+  }
+}
+
 export type Turno = { role: 'user' | 'assistant'; content: string }
 
 /**
