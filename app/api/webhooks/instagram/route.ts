@@ -22,6 +22,9 @@ const TRANSFER_DISCOUNT = 0.13
 // WhatsApp de la empresa (a donde se deriva a los clientes de Instagram). Configurable por env.
 const EMPRESA_WA = process.env.WA_EMPRESA ?? '5493525623546'
 const WA_LINK = `https://wa.me/${EMPRESA_WA}?text=${encodeURIComponent('Hola! Escribo desde Instagram 🍄')}`
+// IG bloquea los links wa.me en DMs → al cliente se le da el WhatsApp en TEXTO PLANO.
+// Si cambia EMPRESA_WA, actualizar este display. (WA_LINK se sigue usando en el aviso interno a Nahuel.)
+const WA_PLAIN = 'Escribinos por WhatsApp al +54 9 3525 62-3546 🍄'
 
 // Respuestas a postbacks (botones del menú / ice breakers) — se mantienen
 const POSTBACK_RESPONSES: Record<string, string> = {
@@ -139,8 +142,31 @@ async function pensar(mensaje: string, precios: string, historial: Turno[]): Pro
   return parseSalida(raw)
 }
 
+// Instagram RECHAZA los DMs con enlaces (error 508/2534122 "Link can't be shared") en conexiones
+// de mensajería nuevas. La KB comparte links (producto, wa.me, correos) que en WhatsApp SÍ sirven,
+// así que acá los neutralizamos SOLO para el envío por IG. Si no, el mensaje entero no se entrega
+// y el cliente cree que el bot dejó de responder.
+function sanitizeIGText(t: string): string {
+  if (!t) return t
+  // markdown [texto](url) -> texto
+  t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+  // tienda propia (con o sin http) -> CTA plano
+  t = t.replace(/(https?:\/\/)?(www\.)?infomicelium\.com\.ar\S*/gi, 'el link de nuestra bio 🛒')
+  // seguimiento de correos -> texto plano
+  t = t.replace(/(https?:\/\/)?(www\.)?andreani\.com\S*/gi, 'la web de Andreani')
+  t = t.replace(/(https?:\/\/)?(www\.)?correoargentino\.com\.ar\S*/gi, 'la web de Correo Argentino')
+  // wa.me -> mención plana
+  t = t.replace(/(https?:\/\/)?wa\.me\/\S+/gi, 'nuestro WhatsApp')
+  // cualquier URL restante -> fuera
+  t = t.replace(/https?:\/\/\S+/gi, '')
+  // limpiar espacios dobles y espacios antes de puntuación
+  t = t.replace(/[ \t]{2,}/g, ' ').replace(/ +([.,!?])/g, '$1').trim()
+  return t
+}
+
 // ─────────── IG send ───────────
 async function enviarMensajeIG(recipientId: string, texto: string) {
+  texto = sanitizeIGText(texto)
   // OJO: el envío va por el ID de la PÁGINA de Facebook (no el del usuario IG) — con IG_ID Meta devuelve "(#3) no capability"
   const res = await fetch(`https://graph.facebook.com/v21.0/${PAGE_ID}/messages`, {
     method: 'POST',
@@ -215,7 +241,7 @@ export async function POST(req: NextRequest) {
 
         // Al derivar, mandamos al cliente a WhatsApp de la empresa (link agregado por código, no por la IA)
         let salidaCliente = respuesta
-        if (derivar) salidaCliente += (respuesta ? '\n\n' : '') + `👉 ${WA_LINK}`
+        if (derivar) salidaCliente += (respuesta ? '\n\n' : '') + `👉 ${WA_PLAIN}`
         if (salidaCliente) await enviarMensajeIG(senderId, salidaCliente)
 
         if (derivar) {
