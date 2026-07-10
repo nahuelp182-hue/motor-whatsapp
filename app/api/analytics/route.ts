@@ -31,6 +31,19 @@ async function fetchMetaByDay(since: string, until: string) {
   } catch { return [] }
 }
 
+// ── Google Ads: gasto del período desde gads_cache (poblada por ~/.claude/gads.py) ──
+async function fetchGoogleSpend(since: string, until: string): Promise<number> {
+  try {
+    const rows = await prisma.gadsCache.aggregate({
+      where: { date: { gte: since, lte: until } },
+      _sum: { cost_ars: true },
+    })
+    return rows._sum.cost_ars ?? 0
+  } catch {
+    return 0
+  }
+}
+
 async function fetchMetaTotals(since: string, until: string) {
   const token = process.env.META_ADS_TOKEN
   if (!token) return { spend: 0, clicks: 0, impressions: 0, reach: 0 }
@@ -97,10 +110,11 @@ export async function GET(req: NextRequest) {
     const totalRevenue = classifiedOrders.reduce((s, o) => s + o.total, 0)
     const newCustomers = classifiedOrders.length
 
-    // ── Meta Ads por día ─────────────────────────────────────────
-    const [metaDays, metaTotals] = await Promise.all([
+    // ── Meta Ads por día + gasto Google (para el ROAS Global) ─────
+    const [metaDays, metaTotals, googleSpend] = await Promise.all([
       fetchMetaByDay(since, until),
       fetchMetaTotals(since, until),
+      fetchGoogleSpend(since, until),
     ])
 
     const metaByDay = metaDays.reduce<Record<string, { spend: number; clicks: number; impressions: number }>>((acc, d) => {
@@ -151,6 +165,15 @@ export async function GET(req: NextRequest) {
     const roasMetaReal = metaTotals.spend > 0 ? metaChannel.revenue / metaTotals.spend : 0
     const cacMetaReal  = metaChannel.orders > 0 ? metaTotals.spend / metaChannel.orders : 0
 
+    // ── ROAS GLOBAL: todo lo gastado en ads pago (Meta + Google) vs el revenue
+    // confirmado como originado en esos dos canales. Es el indicador de "cómo va
+    // el negocio en pauta" de un vistazo -- NO incluye orgánico en ningún lado,
+    // ni arriba ni abajo, para no repetir el error del ROAS blended viejo.
+    const googleChannel = byChannel.google_ads
+    const totalAdSpend    = metaTotals.spend + googleSpend
+    const totalAdRevenue  = metaChannel.revenue + googleChannel.revenue
+    const roasGlobal      = totalAdSpend > 0 ? totalAdRevenue / totalAdSpend : 0
+
     // ── Comparativa 7 días (siempre vs hoy, independiente del filtro) ──
     const now    = new Date()
     const d7ago  = new Date(now); d7ago.setDate(d7ago.getDate() - 7)
@@ -196,6 +219,9 @@ export async function GET(req: NextRequest) {
         reach:       metaTotals.reach,
         roasBlended: metaTotals.spend > 0 ? totalRevenue / metaTotals.spend : 0, // legado: TN total / gasto Meta, mezcla orgánico. NO usar para decisiones.
         roasMetaReal,
+        googleSpend,
+        totalAdSpend,
+        roasGlobal,
       },
       channels,
       timeline,

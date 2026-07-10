@@ -18,6 +18,7 @@ import { ThemePicker, THEMES, type Theme } from '@/components/ThemePicker'
 import { SalesCadence } from '@/components/SalesCadence'
 import { PerformanceSection } from '@/components/PerformanceSection'
 import { AttributionSection } from '@/components/AttributionSection'
+import { GlobalRoasGauge } from '@/components/GlobalRoasGauge'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = {
@@ -29,6 +30,7 @@ type Summary = {
   newCustomers: number; cac: number; cacMetaReal: number; ltv: number
   clicks: number; impressions: number; reach: number
   roasBlended: number; roasMetaReal: number
+  googleSpend: number; totalAdSpend: number; roasGlobal: number
 }
 type Channel = { key: string; label: string; color: string; orders: number; revenue: number }
 type Trend7d = { last7Rev: number; prev7Rev: number; last7Orders: number; prev7Orders: number; delta: number; direction: 'up'|'down'|'neutral' }
@@ -328,6 +330,17 @@ export default function DashboardPage() {
 
       {!loading && s && (
         <>
+          {/* ── ROAS Global (Meta + Google) — lo primero, de un vistazo ── */}
+          <div className="mb-5">
+            <GlobalRoasGauge
+              roasGlobal={s.roasGlobal}
+              metaSpend={s.metaSpend}
+              googleSpend={s.googleSpend}
+              metaRevenue={(data?.channels ?? []).find(c => c.key === 'meta_ads')?.revenue ?? 0}
+              googleRevenue={(data?.channels ?? []).find(c => c.key === 'google_ads')?.revenue ?? 0}
+            />
+          </div>
+
           {/* ── KPI row ─────────────────────────────────────────────── */}
           {monthly?.mom && (
             <p className="text-[10px] text-white/25 mb-3">
