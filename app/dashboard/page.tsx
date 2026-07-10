@@ -6,7 +6,6 @@ import {
   ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from 'recharts'
 import { MetricCard } from '@/components/MetricCard'
-import { EcommerceCalendar } from '@/components/EcommerceCalendar'
 import { PaymentDonut } from '@/components/PaymentDonut'
 import { CategoryAccordion } from '@/components/CategoryAccordion'
 import { Trend7d } from '@/components/Trend7d'
@@ -48,7 +47,7 @@ type MonthStat = {
   key: string; label: string; revenue: number; spend: number
   net: number; orders: number; clicks: number; reach: number
   roas: number; roasBlended: number; cac: number; cacMetaReal: number
-  metaRevenue: number; metaOrders: number; avgTicket: number
+  metaRevenue: number; metaOrders: number; orgCiegoRevenue: number; avgTicket: number
 }
 type MoM = { revenue: number; spend: number; net: number; orders: number; clicks: number; reach: number; roas: number; cac: number; avgTicket: number; curMonth: string; prevMonth: string }
 type MonthlyData = {
@@ -478,11 +477,9 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           </div>
 
-          {/* ── Revenue vs Spend + Calendar ─────────────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-
-            {/* Combo chart Revenue vs Spend — usa mergedTimeline (TN directo + Meta) */}
-            <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+          {/* ── Revenue vs Spend ─────────────────────────────────────── */}
+          <div className="mb-5">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
               <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/60 mb-5">Ingresos TN vs Gasto Meta · {since} → {until}</h3>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barGap={2}>
@@ -499,8 +496,6 @@ export default function DashboardPage() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-
-            <EcommerceCalendar />
           </div>
 
           {/* ── Tráfico Meta ─────────────────────────────────────────── */}
@@ -921,6 +916,9 @@ export default function DashboardPage() {
                         <th className="text-right pb-2 font-medium">Meta</th>
                         <th className="text-right pb-2 font-medium">Neto</th>
                         <th className="text-right pb-2 font-medium">ROAS Meta</th>
+                        <th className="text-right pb-2 font-medium">ROAS Negocio</th>
+                        <th className="text-right pb-2 font-medium">Rev. Meta</th>
+                        <th className="text-right pb-2 font-medium">Rev. Org.+Ciego</th>
                         <th className="text-right pb-2 font-medium">Órd.</th>
                       </tr>
                     </thead>
@@ -941,9 +939,15 @@ export default function DashboardPage() {
                               {ARS(m.net)}
                             </td>
                             <td className={`py-2 text-right font-mono ${m.roas >= 3 ? 'text-emerald-400' : m.roas > 0 ? 'text-orange-400' : 'text-white/20'}`}
-                              title={`Blended legado (sin segmentar canal): ${m.roasBlended}x`}>
+                              title="Revenue confirmado Meta (utm/fbclid) / gasto Meta -- ver lib/attribution.ts">
                               {m.roas > 0 ? `${m.roas}x` : '—'}
                             </td>
+                            <td className={`py-2 text-right font-mono ${m.roasBlended >= 3 ? 'text-emerald-400' : m.roasBlended > 0 ? 'text-orange-400' : 'text-white/20'}`}
+                              title="Ingresos totales TN / gasto Meta -- mezcla venta orgánica, sirve para ver salud general del negocio, NO para decidir presupuesto de ads.">
+                              {m.roasBlended > 0 ? `${m.roasBlended}x` : '—'}
+                            </td>
+                            <td className="py-2 text-right font-mono text-orange-400/80">{ARS(m.metaRevenue)}</td>
+                            <td className="py-2 text-right font-mono text-emerald-400/70">{ARS(m.orgCiegoRevenue)}</td>
                             <td className="py-2 text-right font-mono text-white/55">{m.orders || '—'}</td>
                           </tr>
                         )

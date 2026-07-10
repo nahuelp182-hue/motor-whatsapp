@@ -102,10 +102,10 @@ export async function GET(_req: NextRequest) {
     const tnOrders = await fetchTNOrders(earliest, latest)
 
     // Agrupar por mes (+ desglose por canal real: ver lib/attribution.ts)
-    const tnByMonth: Record<string, { revenue: number; orders: number; phones: Set<string>; metaRevenue: number; metaOrders: number }> = {}
+    const tnByMonth: Record<string, { revenue: number; orders: number; phones: Set<string>; metaRevenue: number; metaOrders: number; orgCiegoRevenue: number }> = {}
     for (const o of tnOrders) {
       const key = o.created_at.slice(0, 7)
-      if (!tnByMonth[key]) tnByMonth[key] = { revenue: 0, orders: 0, phones: new Set(), metaRevenue: 0, metaOrders: 0 }
+      if (!tnByMonth[key]) tnByMonth[key] = { revenue: 0, orders: 0, phones: new Set(), metaRevenue: 0, metaOrders: 0, orgCiegoRevenue: 0 }
       const total = parseFloat(o.total ?? '0')
       tnByMonth[key].revenue += total
       tnByMonth[key].orders  += 1
@@ -113,6 +113,9 @@ export async function GET(_req: NextRequest) {
       if (classifyOrder(o) === 'meta_ads') {
         tnByMonth[key].metaRevenue += total
         tnByMonth[key].metaOrders  += 1
+      } else {
+        // Orgánico/directo + sin dato de visita (ciego) + otro utm marginal. Ver lib/attribution.ts.
+        tnByMonth[key].orgCiegoRevenue += total
       }
     }
 
@@ -152,6 +155,7 @@ export async function GET(_req: NextRequest) {
       const orders = tn?.orders  ?? 0
       const metaRev    = tn?.metaRevenue ?? 0
       const metaOrders = tn?.metaOrders  ?? 0
+      const orgCiegoRev = tn?.orgCiegoRevenue ?? 0
       const net    = rev - spend
       const roasBlended = spend > 0 ? rev / spend  : 0       // legado: mezcla ventas orgánicas, NO usar para decisiones
       const roas   = spend > 0 ? metaRev / spend : 0          // ROAS real: solo revenue confirmado como Meta Ads
@@ -165,6 +169,7 @@ export async function GET(_req: NextRequest) {
         revenue: rev,
         metaRevenue: metaRev,
         metaOrders,
+        orgCiegoRevenue: orgCiegoRev,
         spend,
         net,
         orders,
