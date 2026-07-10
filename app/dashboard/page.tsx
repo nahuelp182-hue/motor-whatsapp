@@ -329,14 +329,13 @@ export default function DashboardPage() {
 
       {!loading && s && (
         <>
-          {/* ── ROAS Global (Meta + Google) — lo primero, de un vistazo ── */}
+          {/* ── ROAS Global del negocio — pulso rápido del período ─────── */}
           <div className="mb-5">
             <GlobalRoasGauge
               roasGlobal={s.roasGlobal}
+              totalRevenue={s.totalRevenue}
               metaSpend={s.metaSpend}
               googleSpend={s.googleSpend}
-              metaRevenue={(data?.channels ?? []).find(c => c.key === 'meta_ads')?.revenue ?? 0}
-              googleRevenue={(data?.channels ?? []).find(c => c.key === 'google_ads')?.revenue ?? 0}
             />
           </div>
 

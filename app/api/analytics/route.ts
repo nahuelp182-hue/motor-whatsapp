@@ -165,14 +165,16 @@ export async function GET(req: NextRequest) {
     const roasMetaReal = metaTotals.spend > 0 ? metaChannel.revenue / metaTotals.spend : 0
     const cacMetaReal  = metaChannel.orders > 0 ? metaTotals.spend / metaChannel.orders : 0
 
-    // ── ROAS GLOBAL: todo lo gastado en ads pago (Meta + Google) vs el revenue
-    // confirmado como originado en esos dos canales. Es el indicador de "cómo va
-    // el negocio en pauta" de un vistazo -- NO incluye orgánico en ningún lado,
-    // ni arriba ni abajo, para no repetir el error del ROAS blended viejo.
-    const googleChannel = byChannel.google_ads
-    const totalAdSpend    = metaTotals.spend + googleSpend
-    const totalAdRevenue  = metaChannel.revenue + googleChannel.revenue
-    const roasGlobal      = totalAdSpend > 0 ? totalAdRevenue / totalAdSpend : 0
+    // ── ROAS GLOBAL: pulso del negocio, no atribución por canal. TODO lo que
+    // ingresó por TN en el período / TODO lo gastado en ads (Meta + Google).
+    // A diferencia de roasMetaReal (que es channel-attributed y sirve para
+    // decidir presupuesto por canal), este SÍ incluye venta orgánica en el
+    // numerador a propósito -- es la foto rápida de "cómo vino el período",
+    // captura también el halo (Meta empuja venta que después aparece
+    // orgánica/directa, ver sesión de correlación). No usar para comparar
+    // Meta vs Google entre sí -- para eso está roasMetaReal / channels[].
+    const totalAdSpend = metaTotals.spend + googleSpend
+    const roasGlobal    = totalAdSpend > 0 ? totalRevenue / totalAdSpend : 0
 
     // ── Comparativa 7 días (siempre vs hoy, independiente del filtro) ──
     const now    = new Date()

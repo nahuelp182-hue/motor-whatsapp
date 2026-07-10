@@ -8,13 +8,11 @@ const ARS = (n: number) =>
 const GAUGE_MAX = 8 // tope visual del arco; ROAS por encima de esto satura el gauge
 
 export function GlobalRoasGauge({
-  roasGlobal, metaSpend, googleSpend, metaRevenue, googleRevenue,
+  roasGlobal, totalRevenue, metaSpend, googleSpend,
 }: {
-  roasGlobal: number; metaSpend: number; googleSpend: number
-  metaRevenue: number; googleRevenue: number
+  roasGlobal: number; totalRevenue: number; metaSpend: number; googleSpend: number
 }) {
-  const totalSpend   = metaSpend + googleSpend
-  const totalRevenue = metaRevenue + googleRevenue
+  const totalSpend = metaSpend + googleSpend
   const clamped = Math.max(0, Math.min(roasGlobal, GAUGE_MAX))
   const color = roasGlobal >= 3 ? '#34d399' : roasGlobal >= 1 ? '#facc15' : '#f87171'
   const data = [{ name: 'roas', value: clamped, fill: color }]
@@ -42,29 +40,29 @@ export function GlobalRoasGauge({
 
       <div className="flex-1 w-full">
         <div className="flex items-center gap-1.5 mb-2">
-          <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55">ROAS Global — Meta + Google</h3>
-          <HelpTip text="Todo lo gastado en pauta paga (Meta Ads + Google Ads) contra el revenue confirmado como originado en esos dos canales. No incluye venta orgánica en ningún lado -- es el número de un vistazo para saber si la pauta en conjunto está siendo rentable." />
+          <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55">ROAS Global del negocio</h3>
+          <HelpTip text="Pulso rápido del período: TODO lo que ingresó en Tiendanube (incluida venta orgánica) / TODO lo gastado en ads (Meta + Google). A propósito incluye lo orgánico arriba -- captura también el halo (gente que ve un ad de Meta y compra después sin click). Para decidir presupuesto por canal usá el ROAS Meta real y el desglose de 'De dónde viene la gente' más abajo, no este número." />
         </div>
         <div className="grid grid-cols-2 gap-3 text-[11px]">
+          <div>
+            <p className="text-white/40">Ingresos totales TN</p>
+            <p className="font-mono text-white/80 font-semibold">{ARS(totalRevenue)}</p>
+          </div>
           <div>
             <p className="text-white/40">Gastado (Meta + Google)</p>
             <p className="font-mono text-white/80 font-semibold">{ARS(totalSpend)}</p>
           </div>
           <div>
-            <p className="text-white/40">Revenue confirmado ads</p>
-            <p className="font-mono text-white/80 font-semibold">{ARS(totalRevenue)}</p>
+            <p className="text-white/40 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full inline-block bg-orange-400" /> Gasto Meta
+            </p>
+            <p className="font-mono text-white/60">{ARS(metaSpend)}</p>
           </div>
           <div>
             <p className="text-white/40 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full inline-block bg-orange-400" /> Meta
+              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: '#4285F4' }} /> Gasto Google
             </p>
-            <p className="font-mono text-white/60">{ARS(metaSpend)} → {ARS(metaRevenue)}</p>
-          </div>
-          <div>
-            <p className="text-white/40 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: '#4285F4' }} /> Google
-            </p>
-            <p className="font-mono text-white/60">{ARS(googleSpend)} → {ARS(googleRevenue)}</p>
+            <p className="font-mono text-white/60">{ARS(googleSpend)}</p>
           </div>
         </div>
       </div>
