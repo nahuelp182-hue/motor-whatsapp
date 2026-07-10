@@ -462,6 +462,42 @@ La INC200 sí **refrigera** (tiene compresor/ventiladores, sistema tipo aire aco
 
 ---
 
+### productos-linea-calor.md
+# Línea de calor: INC101 · PC400 · HALO — diferenciación (para NO confundir productos)
+
+> Regla madre: los tres productos NO compiten. Cada uno resuelve algo distinto según la escala/etapa del cultivador. Nunca presentar uno como reemplazo del otro. Frase guía: "no es cuál es mejor, es cuál se adapta a tu forma y escala de cultivo".
+> IMPORTANTE: para PRECIOS/promos/cuotas NO cotizar números → mandar el link de la ficha en la tienda (la escalera de precios se ve mejor ahí).
+
+## INC101 — Incubadora Automática (pack completo)
+- Es un **recinto cerrado** que controla **temperatura Y humedad** de forma automática. Solución "todo en uno" para arrancar de cero y también para avanzados.
+- Para quien quiere **todo resuelto en un equipo**. No refrigera, pero se cultiva sin problema hasta 30 °C ambiente (enseñamos el método con las guías incluidas).
+- Controla humedad (hasta 85% HR). Primera cosecha ~21 días.
+
+## PC400 — Tableta Térmica (placa de contacto)
+- Es una **placa que calienta por CONTACTO desde la base** (60×40 cm). Encima se coloca un **tupper de hasta 90 L o bolsas de cultivo**.
+- Para quien **ya cultiva en tupper/bolsa y solo le falta calor**, sin cambiar de sistema. Es una forma de escalar barato / segunda línea.
+- NO controla humedad ni es un recinto cerrado. Es un accesorio de calor por contacto, no reemplaza a la incubadora para arrancar.
+- (Este es el producto que va DEBAJO del cultivo. HALO NO va debajo del cultivo.)
+
+## HALO — Calentador de Cultivos (climatiza un recinto por aire)
+- **NO es una placa ni va debajo de los cultivos.** Hace **circular y calentar el AIRE de un recinto cerrado** (armario, carpa, estantería) por convección forzada → temperatura pareja y uniforme en todo el ambiente, sin importar la forma del recipiente (frasco, bolsa, caja, bandeja).
+- Ideal para **climatizar un armario/carpa/estantería** entero. Muy bajo consumo: solo enciende cuando el aire baja de temperatura (los calentadores baratos son radiantes y nunca cortan).
+- **NO sirve solo para hongos.** Sirve para cualquier cultivo que necesite un recinto a temperatura estable: **kombucha, masa madre, probióticos, koji/tempeh, germinación, esquejes e indoor de plantas**. Si preguntan por esquejes/germinación/plantas → SÍ, HALO es justamente para eso.
+- Qué NO hace: no aporta humedad ni ventilación, no reemplaza a la incubadora para INICIAR el cultivo, no climatiza salas grandes abiertas.
+
+## Cómo diferenciarlos rápido (árbol de decisión)
+- Arranca de cero / quiere todo resuelto → **INC101**.
+- Ya cultiva y solo le falta calor sin dejar su tupper/bolsa → **PC400** (placa de contacto, va debajo).
+- Quiere calentar parejo TODO un armario/carpa/estantería, o cultiva kombucha/masa madre/probióticos/plantas/esquejes → **HALO** (climatiza el aire del recinto).
+- Se pueden **combinar** (venta cruzada, no canibalización): INC101 + HALO (incuba en la INC101 y climatiza el resto del armario con HALO); PC400 + HALO (placa para el bulk grande + HALO para uniformar el ambiente).
+
+## Errores a NO cometer (causaban info falsa)
+- NO decir que HALO se coloca debajo de los cultivos (eso es la PC400).
+- NO decir que HALO sirve solo para hongos (sirve para kombucha, masa madre, probióticos, germinación, esquejes, indoor).
+- NO decir que la PC400 controla humedad ni que es un recinto cerrado (solo aporta calor por contacto).
+
+---
+
 ### roturas-garantia.md
 # FAQ — Roturas, repuestos, garantía y devoluciones
 

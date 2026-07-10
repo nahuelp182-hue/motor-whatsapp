@@ -18,11 +18,15 @@ const TN_STORE = process.env.TN_STORE_ID    ?? '1957278'
 const TN_TOKEN = process.env.TN_ACCESS_TOKEN ?? ''
 const TN_BASE  = 'https://api.tiendanube.com/v1'
 const UA       = 'Micelium/1.0 (nahuelp182@gmail.com)'
-const TRANSFER_DISCOUNT = 0.13
 
 // Número empresa al que se deriva al cliente (NO el número dedicado a la Cloud API)
 const EMPRESA_WA = process.env.WA_EMPRESA ?? '5493525623546'
-const WA_LINK = `https://wa.me/${EMPRESA_WA}?text=${encodeURIComponent('Hola! Escribo desde WhatsApp 🍄')}`
+// Texto que le llega a la empresa cuando el cliente toca el botón (para identificarlo en métricas)
+const WA_LINK = `https://wa.me/${EMPRESA_WA}?text=${encodeURIComponent('Hola, vengo del asistente virtual')}`
+const WA_BTN_TEXT = 'Chatear con equipo' // ≤20 chars (límite de botón cta_url)
+
+// Tienda (para armar links de ficha de producto)
+const TIENDA_BASE = 'https://infomicelium.com.ar/productos'
 
 // ─────────── Precios en vivo desde Tiendanube ───────────
 function tnName(name: unknown): string {
@@ -34,13 +38,13 @@ function tnName(name: unknown): string {
   return ''
 }
 
-function fmtAR(n: number): string {
-  return '$' + n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-}
-
-async function bloquePreciosEnVivo(): Promise<string> {
+// Catálogo en vivo desde Tiendanube: nombre + link a la ficha (SIN precios).
+// La escalera de precios/promos/cuotas se ve en la tienda, no la cotiza el bot.
+async function bloqueCatalogo(): Promise<string> {
+  const guia =
+    'Cuando el cliente quiera precio/info de un producto, NO cotices números: mandá el LINK de su ficha (ahí ve precio, promos y cuotas). Usá EXACTAMENTE estos links, no los inventes.'
   if (!TN_TOKEN) {
-    return '=== PRECIOS EN VIVO ===\n(No disponible ahora.) Si preguntan precio, pedí disculpas y ofrecé pasar con una persona o remitir a infomicelium.com.ar.'
+    return `=== CATÁLOGO CON LINKS ===\n(No disponible ahora.) Si preguntan por un producto, remití a la tienda: https://infomicelium.com.ar`
   }
   try {
     const res = await fetch(`${TN_BASE}/${TN_STORE}/products?per_page=15&published=true`, {
@@ -51,22 +55,16 @@ async function bloquePreciosEnVivo(): Promise<string> {
     const lines: string[] = []
     let i = 1
     for (const p of prods) {
-      const variants = (p.variants as Array<Record<string, unknown>>) ?? [{}]
-      const v = variants[0] ?? {}
-      const lista = Number(p.price ?? v.price ?? 0)
-      const promoRaw = (p.promotional_price ?? v.promotional_price) as string | number | null
-      const promo = promoRaw ? Number(promoRaw) : null
-      const vigente = promo ?? lista
-      const transfer = Math.round(vigente * (1 - TRANSFER_DISCOUNT) * 100) / 100
       const nombre = tnName(p.name)
-      if (!nombre || !lista) continue
-      lines.push(`${i}. ${nombre} | lista ${fmtAR(lista)} | promo ${promo ? fmtAR(promo) + ' (6 cuotas sin interés)' : '—'} | transferencia ${fmtAR(transfer)}`)
+      const handle = tnName(p.handle)
+      if (!nombre || !handle) continue
+      lines.push(`${i}. ${nombre} → ${TIENDA_BASE}/${handle}/`)
       i++
     }
-    return `=== PRECIOS EN VIVO (Tiendanube, ahora) ===\n${lines.join('\n')}`
+    return `=== CATÁLOGO CON LINKS (Tiendanube, en vivo) ===\n${guia}\n${lines.join('\n')}`
   } catch (e) {
-    console.error('TN precios error:', e)
-    return '=== PRECIOS EN VIVO ===\n(Error al cargar. Derivá si preguntan precio.)'
+    console.error('TN catálogo error:', e)
+    return `=== CATÁLOGO CON LINKS ===\n(Error al cargar.) Remití a la tienda: https://infomicelium.com.ar`
   }
 }
 
@@ -79,9 +77,9 @@ RESPUESTAS BREVES SIEMPRE (la gente lee poco): 1 a 3 líneas salvo tema técnico
 
 Seguí SIEMPRE la base de conocimiento de abajo (tono, reglas, seguridad, FAQ, menú). Respetá a rajatabla las reglas de seguridad y de derivación. NO inventes: si algo no está respaldado por la KB o por los datos que te doy acá, DERIVÁ (no improvises).
 
-PRECIOS: usá SOLO el bloque "PRECIOS EN VIVO" de más abajo, nunca precios de memoria.
-- Si piden "info y precio" EN GENERAL (sin decir qué producto) → listá los productos NUMERADOS por NOMBRE (¡SIN precios!) y preguntá cuál le interesa.
-- Cuando ELIJAN o pregunten por un producto PUNTUAL → recién ahí el precio, y SIEMPRE en ESCALERA para que la promo se lea como rebaja: lista (el más alto, "antes") → promo ("6 cuotas sin interés con tarjeta") → transferencia (el más bajo). Formato AR: $246.209,13.
+PRECIOS: NUNCA cotizás precios ni armás escaleras de precio (la escalera visual de precios, promos y cuotas se ve mejor en la tienda). No digas números de precio de memoria ni de ningún lado.
+- Si piden "info y precios" EN GENERAL (sin decir qué producto) → listá los productos NUMERADOS por NOMBRE (¡SIN precios!) y preguntá cuál le interesa.
+- Cuando ELIJAN o pregunten por un producto PUNTUAL (incluido su precio) → NO cotices: mandá el LINK de su ficha (del bloque "CATÁLOGO CON LINKS" de abajo, usá el link EXACTO, no lo inventes) con una línea breve. Ej.: "Mirá toda la info, el precio y las promos acá 👇 <link>". Podés sumar 1-2 datos clave del producto, pero el precio va SIEMPRE por el link.
 
 ACÁ NO TENÉS HERRAMIENTAS DE PEDIDOS NI DE ENVÍOS. Por eso DERIVÁ (no lo resuelvas solo, no inventes datos) cuando el cliente pida: estado/seguimiento de su envío, buscar su pedido, manuales/guías (son solo para compradores verificados y acá no podés verificar la compra), roturas/garantía/fallas, plata/reintegros/reembolsos, reclamos que escalan, temas legales/salud/consumo de sustancias, psilocibe/"mágicos"/Golden Teacher, o mayoristas/prensa.
 Cuando DERIVES: en la RESPUESTA invitá al cliente, breve y cálido, a SEGUIR POR WHATSAPP con el equipo (ahí lo atienden mejor). NO escribas vos el número ni el link de WhatsApp: el sistema agrega el link automáticamente al final de tu respuesta. Ej. de cierre: "Para esto te ayudamos mejor con el equipo 👇". Y marcá DERIVAR.
@@ -110,7 +108,7 @@ function parseSalida(raw: string): Salida {
 }
 
 // ─────────── Cerebro de Ariel ───────────
-async function pensar(mensaje: string, precios: string, historial: Turno[]): Promise<Salida> {
+async function pensar(mensaje: string, catalogo: string, historial: Turno[]): Promise<Salida> {
   const client = new Anthropic()
   const messages = [
     ...historial.map((t) => ({ role: t.role, content: t.content })),
@@ -121,7 +119,7 @@ async function pensar(mensaje: string, precios: string, historial: Turno[]): Pro
     max_tokens: 500,
     system: [
       { type: 'text', text: PREAMBULO, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: precios },
+      { type: 'text', text: catalogo },
     ],
     messages,
   })
@@ -153,6 +151,36 @@ async function enviarMensajeWA(to: string, texto: string): Promise<boolean> {
     await diag('wa_send_fail', to, { status: res.status, body: bodyText.slice(0, 1500), texto: texto.slice(0, 200) })
   } else {
     await diag('wa_send_ok', to, { status: res.status })
+  }
+  return res.ok
+}
+
+// Mensaje interactivo con botón (cta_url): muestra un botón limpio en vez de una URL larga.
+async function enviarBotonWA(to: string, cuerpo: string, displayText: string, url: string): Promise<boolean> {
+  const res = await fetch(`${WA_API_URL}/${WA_PHONE_ID}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${WA_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'cta_url',
+        body: { text: cuerpo },
+        action: { name: 'cta_url', parameters: { display_text: displayText, url } },
+      },
+    }),
+  })
+  const bodyText = await res.text().catch(() => '')
+  if (!res.ok) {
+    console.error(`WA botón FALLO ${res.status}:`, bodyText)
+    await diag('wa_send_fail', to, { status: res.status, body: bodyText.slice(0, 1500), texto: '[cta_url]' })
+  } else {
+    await diag('wa_send_ok', to, { status: res.status, kind: 'cta_url' })
   }
   return res.ok
 }
@@ -215,13 +243,18 @@ export async function POST(req: NextRequest) {
           // 'recibido'/'pensado' son los kinds que getHistorial() consulta para reconstruir el hilo
           await diag('recibido', from, { texto: texto.slice(0, 300), wamid: msg.id })
 
-          const [precios, historial] = await Promise.all([bloquePreciosEnVivo(), getHistorial(from)])
-          const { respuesta, derivar, motivo } = await pensar(texto, precios, historial)
+          const [catalogo, historial] = await Promise.all([bloqueCatalogo(), getHistorial(from)])
+          const { respuesta, derivar, motivo } = await pensar(texto, catalogo, historial)
           await diag('pensado', from, { derivar, motivo, respuesta: respuesta.slice(0, 300) })
 
-          let salidaCliente = respuesta
-          if (derivar) salidaCliente += (respuesta ? '\n\n' : '') + `👉 ${WA_LINK}`
-          if (salidaCliente) await enviarMensajeWA(from, salidaCliente)
+          if (derivar) {
+            // Botón limpio "Chatear con equipo" (cta_url) en vez de una URL larga.
+            const cuerpo = respuesta || 'Te paso con una persona del equipo 👇'
+            const okBtn = await enviarBotonWA(from, cuerpo, WA_BTN_TEXT, WA_LINK)
+            if (!okBtn) await enviarMensajeWA(from, `${cuerpo}\n\n${WA_LINK}`)
+          } else if (respuesta) {
+            await enviarMensajeWA(from, respuesta)
+          }
 
           if (derivar) {
             await notifyNahuel(
