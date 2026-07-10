@@ -17,16 +17,22 @@ import { FunnelViz } from '@/components/FunnelViz'
 import { ThemePicker, THEMES, type Theme } from '@/components/ThemePicker'
 import { SalesCadence } from '@/components/SalesCadence'
 import { PerformanceSection } from '@/components/PerformanceSection'
+import { AttributionSection } from '@/components/AttributionSection'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type TimelineDay = { date: string; revenue: number; spend: number; clicks: number; net: number }
+type TimelineDay = {
+  date: string; revenue: number; spend: number; clicks: number; net: number
+  meta_ads: number; sin_utm_con_landing: number; sin_dato_de_visita: number; otro: number
+}
 type Summary = {
   totalRevenue: number; metaSpend: number; netRevenue: number
-  newCustomers: number; cac: number; ltv: number
-  clicks: number; impressions: number; reach: number; roas: number
+  newCustomers: number; cac: number; cacMetaReal: number; ltv: number
+  clicks: number; impressions: number; reach: number
+  roasBlended: number; roasMetaReal: number
 }
+type Channel = { key: string; label: string; color: string; orders: number; revenue: number }
 type Trend7d = { last7Rev: number; prev7Rev: number; last7Orders: number; prev7Orders: number; delta: number; direction: 'up'|'down'|'neutral' }
-type Analytics = { period: { since: string; until: string }; summary: Summary; timeline: TimelineDay[]; trend7d?: Trend7d }
+type Analytics = { period: { since: string; until: string }; summary: Summary; channels: Channel[]; timeline: TimelineDay[]; trend7d?: Trend7d }
 
 type Product  = { name: string; units: number; revenue: number; orders: number; pct: number }
 type Category = { name: string; color: string; revenue: number; orders: number; units: number; pct: number; products: Product[] }
@@ -39,7 +45,8 @@ type OrdersData = {
 type MonthStat = {
   key: string; label: string; revenue: number; spend: number
   net: number; orders: number; clicks: number; reach: number
-  roas: number; cac: number; avgTicket: number
+  roas: number; roasBlended: number; cac: number; cacMetaReal: number
+  metaRevenue: number; metaOrders: number; avgTicket: number
 }
 type MoM = { revenue: number; spend: number; net: number; orders: number; clicks: number; reach: number; roas: number; cac: number; avgTicket: number; curMonth: string; prevMonth: string }
 type MonthlyData = {
@@ -186,9 +193,12 @@ export default function DashboardPage() {
   const tnOrders   = ordersData?.summary.totalOrders  ?? 0
   const tnAvgOrder = ordersData?.summary.avgOrderValue ?? 0
   const netRev     = tnRevenue - (s?.metaSpend ?? 0)
-  const roas       = (s?.metaSpend ?? 0) > 0 ? tnRevenue / (s?.metaSpend ?? 1) : 0
-  // CAC usando órdenes reales de TN (no Prisma, que solo tiene clientes del webhook)
-  const cac        = tnOrders > 0 && s ? s.metaSpend / tnOrders : 0
+  // ROAS real: solo revenue de órdenes confirmadas como Meta Ads (utm/fbclid capturado
+  // por TN al click) / gasto Meta. Antes esto era tnRevenue/metaSpend (TODO el revenue,
+  // incluida venta orgánica) -> ROAS siempre inflado. Ver lib/attribution.ts.
+  const roas        = s?.roasMetaReal ?? 0
+  const roasBlended = s?.roasBlended  ?? ((s?.metaSpend ?? 0) > 0 ? tnRevenue / (s?.metaSpend ?? 1) : 0)
+  const cac         = s?.cacMetaReal ?? 0
 
   // ── chart view config
   const chartConfig = {
@@ -331,10 +341,10 @@ export default function DashboardPage() {
               tip="Lo que gastaste en publicidad en Meta Ads (Facebook + Instagram) durante el período seleccionado." />
             <MetricCard label="Ingreso neto"      value={ARS(netRev)}           sub="bruto − gasto ads" highlight={netRev > 0} mom={monthly?.mom.net}  sparkData={mergedTimeline.map(d=>d.net)}
               tip="Ingresos brutos menos gasto en Meta Ads. Es lo que te queda en cuenta después de pagar la publicidad. No incluye otros costos operativos." />
-            <MetricCard label="ROAS"              value={`${roas.toFixed(1)}x`} sub="revenue / spend"   highlight={roas >= 3}  mom={monthly?.mom.roas}
-              tip="Return On Ad Spend: por cada peso invertido en Meta, cuántos pesos en ventas generaste. ROAS 3x = $3 vendidos por cada $1 gastado. Saludable: ≥3x." />
-            <MetricCard label="CAC"               value={ARS(cac)}              sub={`${tnOrders} órdenes`}               mom={monthly?.mom.cac}      momInvert
-              tip="Costo de Adquisición de Cliente: cuánto gastaste en Meta para conseguir cada nuevo cliente. Debería ser menor al LTV. Ideal: CAC < LTV / 3." />
+            <MetricCard label="ROAS Meta real"   value={`${roas.toFixed(1)}x`} sub="solo revenue de Meta"   highlight={roas >= 3}  mom={monthly?.mom.roas}
+              tip={`Return On Ad Spend real: revenue de órdenes CONFIRMADAS como Meta Ads (utm/fbclid capturado por Tiendanube) / gasto Meta. Ya no mezcla venta orgánica. ROAS blended legado (ingreso total/gasto, lo que mostraba antes): ${roasBlended.toFixed(1)}x.`} />
+            <MetricCard label="CAC Meta real"    value={ARS(cac)}              sub={`${(data?.channels?.find(c=>c.key==='meta_ads')?.orders) ?? 0} órdenes Meta`}   mom={monthly?.mom.cac}      momInvert
+              tip="Costo de Adquisición de Cliente: gasto Meta / órdenes confirmadas como Meta Ads (no todas las órdenes nuevas). Debería ser menor al LTV. Ideal: CAC < LTV / 3." />
             <MetricCard label="LTV"               value={ARS(s.ltv)}            sub="por cliente histórico"
               tip="Lifetime Value: ingreso total promedio que generó cada cliente durante toda su historia de compras. Se calcula sobre todos los clientes registrados, no solo el período. Saludable: LTV ≥ 3× el CAC." />
             <MetricCard label="Ticket promedio"   value={ARS(tnAvgOrder)}       sub="por orden"                          mom={monthly?.mom.avgTicket} sparkData={mergedTimeline.map(d=>d.revenue)}
@@ -509,49 +519,48 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Fuentes de tráfico */}
+            {/* Fuentes de tráfico — revenue real por canal, ver AttributionSection abajo */}
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
-              <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4">Fuentes de tráfico</h3>
+              <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4">Fuentes de tráfico (órdenes)</h3>
               <div className="space-y-3">
-                {/* Meta Ads */}
-                <div>
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-white/60 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full inline-block" style={{ background: 'rgb(var(--ac))' }} />Meta Ads (pago)
-                    </span>
-                    <span className="text-white/80 font-semibold">{NUM(s.clicks)} clicks</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: '100%', background: 'rgb(var(--ac) / 0.6)' }} />
-                  </div>
-                </div>
-                {/* Orgánico - requiere GA4 */}
-                <div className="opacity-30">
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-white/60 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />Orgánico
-                    </span>
-                    <span className="text-white/40 text-[10px]">requiere GA4</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-white/5" />
-                </div>
-                <div className="opacity-30">
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-white/60 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-indigo-400 inline-block" />Directo
-                    </span>
-                    <span className="text-white/40 text-[10px]">requiere GA4</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-white/5" />
-                </div>
+                {(data?.channels ?? []).filter(c => c.orders > 0).map(c => {
+                  const totOrders = (data?.channels ?? []).reduce((s2, x) => s2 + x.orders, 0)
+                  const pct = totOrders > 0 ? (c.orders / totOrders) * 100 : 0
+                  return (
+                    <div key={c.key}>
+                      <div className="flex justify-between text-xs mb-1.5">
+                        <span className="text-white/60 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.color }} />{c.label}
+                        </span>
+                        <span className="text-white/80 font-semibold">{c.orders} órdenes ({pct.toFixed(0)}%)</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%`, background: c.color, opacity: 0.7 }} />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
               <div className="mt-4 pt-4 border-t border-white/5 rounded-xl bg-white/[0.02] p-3">
                 <p className="text-[10px] text-white/55 leading-relaxed">
-                  Para ver orgánico y directo conectá <span className="text-indigo-300">Google Analytics 4</span> con el store ID de GA4.
+                  Clasificación por utm/fbclid capturado por Tiendanube al momento del click. Detalle y ROAS real abajo.
                 </p>
               </div>
             </div>
           </div>
+
+          {/* ── De dónde viene la gente: revenue real por canal + ROAS Meta real ── */}
+          {data && (
+            <div className="mb-5">
+              <AttributionSection
+                channels={data.channels ?? []}
+                timeline={data.timeline}
+                summary={{ metaSpend: s.metaSpend, roasMetaReal: s.roasMetaReal, roasBlended: s.roasBlended, cacMetaReal: s.cacMetaReal }}
+                since={since} until={until} acHex={theme.acHex}
+              />
+            </div>
+          )}
 
           {/* ── Bottom: Mensajes + LTV ───────────────────────────────── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
@@ -898,7 +907,7 @@ export default function DashboardPage() {
                         <th className="text-right pb-2 font-medium">Ingresos</th>
                         <th className="text-right pb-2 font-medium">Meta</th>
                         <th className="text-right pb-2 font-medium">Neto</th>
-                        <th className="text-right pb-2 font-medium">ROAS</th>
+                        <th className="text-right pb-2 font-medium">ROAS Meta</th>
                         <th className="text-right pb-2 font-medium">Órd.</th>
                       </tr>
                     </thead>
@@ -918,7 +927,8 @@ export default function DashboardPage() {
                             <td className={`py-2 text-right font-mono font-semibold ${m.net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                               {ARS(m.net)}
                             </td>
-                            <td className={`py-2 text-right font-mono ${m.roas >= 3 ? 'text-emerald-400' : m.roas > 0 ? 'text-orange-400' : 'text-white/20'}`}>
+                            <td className={`py-2 text-right font-mono ${m.roas >= 3 ? 'text-emerald-400' : m.roas > 0 ? 'text-orange-400' : 'text-white/20'}`}
+                              title={`Blended legado (sin segmentar canal): ${m.roasBlended}x`}>
                               {m.roas > 0 ? `${m.roas}x` : '—'}
                             </td>
                             <td className="py-2 text-right font-mono text-white/55">{m.orders || '—'}</td>

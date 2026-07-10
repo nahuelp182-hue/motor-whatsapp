@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { fetchTNOrdersClassified, aggregateByChannel, CHANNEL_LABEL, CHANNEL_COLOR, type TNClass } from '@/lib/attribution'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,23 +65,37 @@ export async function GET(req: NextRequest) {
     const endDate   = new Date(until + 'T23:59:59-03:00')
 
     const whereStore  = storeId ? { store_id: storeId } : {}
-    const wherePeriod = { ...whereStore, createdAt: { gte: startDate, lte: endDate } }
 
-    // ── TN: Revenue por día ──────────────────────────────────────
-    const periodCustomers = await prisma.customer.findMany({
-      where: wherePeriod,
-      select: { createdAt: true, total_spent: true },
-      orderBy: { createdAt: 'asc' },
-    })
+    // ── TN: órdenes reales del período (por fecha de orden, no lifetime del cliente) ──
+    // Antes esto usaba prisma.customer.total_spent (acumulado histórico, bucketeado en
+    // el día de ALTA del cliente) -> inflaba "revenue del período" con ventas de otros
+    // meses. Ahora se trae la orden real de TN, clasificada por canal de origen
+    // (utm/fbclid capturado por TN al momento del click -> ver lib/attribution.ts).
+    const classifiedOrders = await fetchTNOrdersClassified(since, until)
+    const byChannel = aggregateByChannel(classifiedOrders)
+    const channels = (Object.keys(byChannel) as TNClass[]).map(k => ({
+      key: k,
+      label: CHANNEL_LABEL[k],
+      color: CHANNEL_COLOR[k],
+      orders: byChannel[k].orders,
+      revenue: byChannel[k].revenue,
+    }))
 
-    const revenueByDay = periodCustomers.reduce<Record<string, number>>((acc, c) => {
-      const day = c.createdAt.toISOString().slice(0, 10)
-      acc[day] = (acc[day] ?? 0) + c.total_spent
+    const revenueByDay = classifiedOrders.reduce<Record<string, number>>((acc, o) => {
+      const day = o.createdAt.slice(0, 10)
+      acc[day] = (acc[day] ?? 0) + o.total
       return acc
     }, {})
 
-    const totalRevenue = periodCustomers.reduce((s, c) => s + c.total_spent, 0)
-    const newCustomers = periodCustomers.length
+    const revenueByDayChannel = classifiedOrders.reduce<Record<string, Record<string, number>>>((acc, o) => {
+      const day = o.createdAt.slice(0, 10)
+      if (!acc[day]) acc[day] = {}
+      acc[day][o.tnClass] = (acc[day][o.tnClass] ?? 0) + o.total
+      return acc
+    }, {})
+
+    const totalRevenue = classifiedOrders.reduce((s, o) => s + o.total, 0)
+    const newCustomers = classifiedOrders.length
 
     // ── Meta Ads por día ─────────────────────────────────────────
     const [metaDays, metaTotals] = await Promise.all([
@@ -106,21 +121,19 @@ export async function GET(req: NextRequest) {
       clicks:      metaByDay[date]?.clicks      ?? 0,
       impressions: metaByDay[date]?.impressions ?? 0,
       net:         (revenueByDay[date] ?? 0) - (metaByDay[date]?.spend ?? 0),
+      meta_ads:            revenueByDayChannel[date]?.meta_ads ?? 0,
+      sin_utm_con_landing: revenueByDayChannel[date]?.sin_utm_con_landing ?? 0,
+      sin_dato_de_visita:  revenueByDayChannel[date]?.sin_dato_de_visita ?? 0,
+      otro:                (revenueByDayChannel[date]?.google_ads ?? 0) + (revenueByDayChannel[date]?.otro_utm ?? 0),
     }))
 
     // ── Net revenue total ─────────────────────────────────────────
     const netRevenue = totalRevenue - metaTotals.spend
 
-    // ── Fuentes de tráfico (estimado con datos disponibles) ───────
-    // Meta clicks = paid traffic
-    // Resto = orgánico + directo (estimado, sin GA4)
-    const metaClicks = metaTotals.clicks
-    // Sin GA4 no tenemos total de visitas, mostramos lo que tenemos
-    const trafficSources = [
-      { source: 'Meta Ads',  value: metaClicks,              color: '#f97316' },
-      { source: 'Orgánico',  value: null,                    color: '#34d399' }, // requiere GA4
-      { source: 'Directo',   value: null,                    color: '#818cf8' }, // requiere GA4
-    ]
+    // ── Fuentes de tráfico: revenue real por canal (Capa 1, ver lib/attribution.ts) ──
+    const trafficSources = channels
+      .filter(c => c.orders > 0 || c.revenue > 0)
+      .map(c => ({ source: c.label, value: c.orders, revenue: c.revenue, color: c.color }))
 
     // ── LTV / CAC ────────────────────────────────────────────────
     const ltvResult = await prisma.customer.aggregate({
@@ -130,6 +143,13 @@ export async function GET(req: NextRequest) {
     })
     const ltv = ltvResult._count.id > 0 ? (ltvResult._sum.total_spent ?? 0) / ltvResult._count.id : 0
     const cac = newCustomers > 0 ? metaTotals.spend / newCustomers : 0
+
+    // ── ROAS real de Meta: SOLO revenue de órdenes confirmadas como meta_ads ──
+    // (antes: totalRevenue/metaSpend mezclaba ventas orgánicas -> ROAS inflado, ver
+    // feedback_attribution_framework). cacMetaReal usa solo las órdenes de ese canal.
+    const metaChannel = byChannel.meta_ads
+    const roasMetaReal = metaTotals.spend > 0 ? metaChannel.revenue / metaTotals.spend : 0
+    const cacMetaReal  = metaChannel.orders > 0 ? metaTotals.spend / metaChannel.orders : 0
 
     // ── Comparativa 7 días (siempre vs hoy, independiente del filtro) ──
     const now    = new Date()
@@ -169,12 +189,15 @@ export async function GET(req: NextRequest) {
         netRevenue,
         newCustomers,
         cac,
+        cacMetaReal,
         ltv,
         clicks:      metaTotals.clicks,
         impressions: metaTotals.impressions,
         reach:       metaTotals.reach,
-        roas: metaTotals.spend > 0 ? totalRevenue / metaTotals.spend : 0,
+        roasBlended: metaTotals.spend > 0 ? totalRevenue / metaTotals.spend : 0, // legado: TN total / gasto Meta, mezcla orgánico. NO usar para decisiones.
+        roasMetaReal,
       },
+      channels,
       timeline,
       trafficSources,
       trend7d,

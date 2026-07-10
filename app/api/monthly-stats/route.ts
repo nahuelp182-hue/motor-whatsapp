@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { classifyOrder, type TNOrderRaw } from '@/lib/attribution'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,14 +57,14 @@ async function fetchMetaMonthly(since: string, until: string) {
 }
 
 // ── TN: órdenes paginadas para un rango ──────────────────────────────────────
-async function fetchTNOrders(since: string, until: string) {
+async function fetchTNOrders(since: string, until: string): Promise<TNOrderRaw[]> {
   if (!TN_TOKEN) return []
-  const all: { total: string; created_at: string; contact_phone?: string; products?: { name: string | {es?:string}; quantity: number; price: string }[] }[] = []
+  const all: TNOrderRaw[] = []
   let page = 1
   while (true) {
     const url = `https://api.tiendanube.com/v1/${TN_STORE}/orders?payment_status=paid` +
       `&created_at_min=${since}T00:00:00-03:00&created_at_max=${until}T23:59:59-03:00` +
-      `&per_page=50&page=${page}&fields=id,total,created_at,contact_phone`
+      `&per_page=50&page=${page}&fields=id,number,total,created_at,contact_phone,landing_url,customer_visit,gateway`
     const res  = await fetch(url, { headers: { Authentication: `bearer ${TN_TOKEN}`, 'User-Agent': TN_UA } })
     const data = await res.json()
     if (!Array.isArray(data) || data.length === 0) break
@@ -100,14 +101,19 @@ export async function GET(_req: NextRequest) {
     // ── 2. TN órdenes del período completo ──────────────────────────────────
     const tnOrders = await fetchTNOrders(earliest, latest)
 
-    // Agrupar por mes
-    const tnByMonth: Record<string, { revenue: number; orders: number; phones: Set<string> }> = {}
+    // Agrupar por mes (+ desglose por canal real: ver lib/attribution.ts)
+    const tnByMonth: Record<string, { revenue: number; orders: number; phones: Set<string>; metaRevenue: number; metaOrders: number }> = {}
     for (const o of tnOrders) {
       const key = o.created_at.slice(0, 7)
-      if (!tnByMonth[key]) tnByMonth[key] = { revenue: 0, orders: 0, phones: new Set() }
-      tnByMonth[key].revenue += parseFloat(o.total ?? '0')
+      if (!tnByMonth[key]) tnByMonth[key] = { revenue: 0, orders: 0, phones: new Set(), metaRevenue: 0, metaOrders: 0 }
+      const total = parseFloat(o.total ?? '0')
+      tnByMonth[key].revenue += total
       tnByMonth[key].orders  += 1
       if (o.contact_phone) tnByMonth[key].phones.add(o.contact_phone)
+      if (classifyOrder(o) === 'meta_ads') {
+        tnByMonth[key].metaRevenue += total
+        tnByMonth[key].metaOrders  += 1
+      }
     }
 
     // ── 3. Clientes DB — repeat rate ─────────────────────────────────────────
@@ -144,22 +150,30 @@ export async function GET(_req: NextRequest) {
       const reach  = reachMap[m.key]  ?? 0
       const rev    = tn?.revenue ?? 0
       const orders = tn?.orders  ?? 0
+      const metaRev    = tn?.metaRevenue ?? 0
+      const metaOrders = tn?.metaOrders  ?? 0
       const net    = rev - spend
-      const roas   = spend > 0 ? rev / spend  : 0
-      const cac    = orders > 0 ? spend / orders : 0
+      const roasBlended = spend > 0 ? rev / spend  : 0       // legado: mezcla ventas orgánicas, NO usar para decisiones
+      const roas   = spend > 0 ? metaRev / spend : 0          // ROAS real: solo revenue confirmado como Meta Ads
+      const cac    = orders > 0 ? spend / orders : 0           // legado: gasto / TODAS las órdenes nuevas
+      const cacMetaReal = metaOrders > 0 ? spend / metaOrders : 0
       return {
         key:    m.key,
         label:  `${m.key.slice(5)} / ${m.key.slice(2, 4)}`,
         month:  m.month,
         year:   m.year,
         revenue: rev,
+        metaRevenue: metaRev,
+        metaOrders,
         spend,
         net,
         orders,
         clicks,
         reach,
         roas:   Math.round(roas * 10) / 10,
+        roasBlended: Math.round(roasBlended * 10) / 10,
         cac:    Math.round(cac),
+        cacMetaReal: Math.round(cacMetaReal),
         avgTicket: orders > 0 ? Math.round(rev / orders) : 0,
       }
     })
