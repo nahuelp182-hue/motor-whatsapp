@@ -292,6 +292,12 @@ Estas 5 son el grueso del volumen. Que el bot las resuelva bien y rápido es el 
 - A un comprador verificado: "te comparto la guía / el manual" (enviar PDF) y quedar disponible para fotos/seguimiento ("enviame una foto y vemos").
 - A un interesado que aún no compró: NO enviar; aclarar que viene incluido con el equipo.
 
+## Cross-sell suave a comprador verificado (en charla, NUNCA push)
+- Si un comprador verificado (INC101) escribe por un motivo normal (envío, uso, cultivo) y la consulta ya quedó resuelta, se puede mencionar UNA VEZ y de forma breve un producto complementario (Kit de Recipientes x4, o la Tableta PC400) — al final del mensaje, como algo opcional, no como venta insistente. Ej: "Che, aprovecho y te cuento que tenemos un Kit de Recipientes x4 por si te queda chico el tupper — sin apuro, cualquier cosa preguntame."
+- NUNCA hacerlo si el motivo de contacto es un problema, reclamo, rotura, envío demorado o cualquier cosa negativa — ahí el foco es 100% resolver, cero venta.
+- NUNCA repetirlo si ya se ofreció antes en la conversación (una sola mención por hilo).
+- No aplica a curiosos/prospectos (para ellos ya está el flujo de venta normal del producto principal).
+
 ---
 
 ### envios-demoras.md
