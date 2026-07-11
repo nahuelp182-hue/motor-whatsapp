@@ -253,6 +253,7 @@ export default function DashboardPage() {
           <div className="flex gap-3">
             <a href="/conversaciones" className="text-xs text-white/45 hover:text-white/80">💬 Conversaciones del bot →</a>
             <a href="/marketing-automatico" className="text-xs text-white/45 hover:text-white/80">📣 Marketing automático →</a>
+            <a href="/calendario" className="text-xs text-white/45 hover:text-white/80">📅 Calendario comercial →</a>
           </div>
         </div>
 
