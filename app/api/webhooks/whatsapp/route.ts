@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
 import { diag, getHistorial, logClaudeUsage, type Turno } from '@/lib/diag'
+import { prisma } from '@/lib/prisma'
 
 const MODELO = 'claude-haiku-4-5-20251001'
 
@@ -35,6 +36,34 @@ const MANUAL_PC400  = process.env.MANUAL_PC400  ?? 'https://www.youtube.com/watc
 // diag con canal 'wa' para separar de Instagram en la vista de conversaciones.
 function wdiag(kind: string, sender: string, detail: Record<string, unknown>): Promise<void> {
   return diag(kind, sender, { ...detail, ch: 'wa' })
+}
+
+// Si "from" respondió después de un review_request enviado (ventana 14 días) y todavía
+// no guardamos su reseña, se guarda el texto tal cual. No interfiere con la respuesta
+// normal del bot — el cliente igual recibe una respuesta conversacional.
+async function capturarResenaSiCorresponde(from: string, texto: string): Promise<void> {
+  try {
+    const suf = from.replace(/\D/g, '').slice(-10)
+    if (suf.length < 10) return
+
+    const desde = new Date(Date.now() - 14 * 86_400_000)
+    const pedidos = await prisma.messageLog.findMany({
+      where: { tipo_evento: 'review_request', estado: 'SENT', createdAt: { gte: desde } },
+      include: { customer: true },
+      orderBy: { createdAt: 'desc' },
+    })
+    const match = pedidos.find((p) => p.customer.telefono.replace(/\D/g, '').endsWith(suf))
+    if (!match) return
+
+    const yaTiene = await prisma.review.findFirst({ where: { customer_id: match.customer_id } })
+    if (yaTiene) return
+
+    await prisma.review.create({
+      data: { store_id: match.store_id, customer_id: match.customer_id, texto: texto.slice(0, 1000) },
+    })
+  } catch {
+    // no romper el flujo del bot si falla la captura de reseña
+  }
 }
 
 // ─────────── Precios en vivo desde Tiendanube ───────────
@@ -319,6 +348,7 @@ export async function POST(req: NextRequest) {
         try {
           // 'recibido'/'pensado' son los kinds que getHistorial() consulta para reconstruir el hilo
           await wdiag('recibido', from, { texto: texto.slice(0, 300), wamid: msg.id, nombre })
+          await capturarResenaSiCorresponde(from, texto)
 
           const [catalogo, historial] = await Promise.all([bloqueCatalogo(), getHistorial(from)])
           const { respuesta, derivar, motivo, manual } = await pensar(texto, catalogo, historial)

@@ -32,13 +32,18 @@ export async function GET(req: NextRequest) {
   const store = await prisma.store.findFirst({ where: { is_active: true } })
   if (!store) return NextResponse.json({ error: 'Sin store activa' }, { status: 404 })
 
-  const [logs, campaigns] = await Promise.all([
+  const [logs, campaigns, reviews] = await Promise.all([
     prisma.messageLog.findMany({
       where: { store_id: store.id, tipo_evento: { in: [...EVENTOS] }, createdAt: { gte: since } },
       include: { customer: true },
       orderBy: { createdAt: 'desc' },
     }),
     prisma.campaign.findMany({ where: { store_id: store.id } }),
+    prisma.review.findMany({
+      where: { store_id: store.id, createdAt: { gte: since } },
+      include: { customer: true },
+      orderBy: { createdAt: 'desc' },
+    }),
   ])
 
   const porEvento = Object.fromEntries(
@@ -70,5 +75,12 @@ export async function GET(req: NextRequest) {
 
   const campanas = campaigns.map((c) => ({ tipo: c.tipo, is_active: c.is_active }))
 
-  return NextResponse.json({ days, porEvento, templates, campanas, recientes })
+  const resenas = reviews.map((r) => ({
+    ts: r.createdAt,
+    cliente: r.customer.nombre,
+    telefono: r.customer.telefono,
+    texto: r.texto,
+  }))
+
+  return NextResponse.json({ days, porEvento, templates, campanas, recientes, resenas })
 }

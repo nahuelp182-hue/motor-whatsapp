@@ -21,6 +21,7 @@ model Store {
   coupons       Coupon[]
   messageLogs   MessageLog[]
   gclidSessions GclidSession[]
+  reviews       Review[]
 }
 
 model Customer {
@@ -35,6 +36,7 @@ model Customer {
   store       Store        @relation(fields: [store_id], references: [id])
   coupons     Coupon[]
   messageLogs MessageLog[]
+  reviews     Review[]
 
   @@unique([store_id, tiendanube_customer_id])
 }
@@ -80,6 +82,19 @@ model MessageLog {
   store    Store    @relation(fields: [store_id], references: [id])
   customer Customer @relation(fields: [customer_id], references: [id])
   campaign Campaign @relation(fields: [campaign_id], references: [id])
+}
+
+// Respuesta de un cliente tras la plantilla resena_post_entrega — capturada
+// por el webhook de WhatsApp cuando contesta dentro de la ventana de espera.
+model Review {
+  id          String   @id @default(cuid())
+  store_id    String
+  customer_id String
+  texto       String
+  createdAt   DateTime @default(now())
+
+  store    Store    @relation(fields: [store_id], references: [id])
+  customer Customer @relation(fields: [customer_id], references: [id])
 }
 
 enum CampaignType {

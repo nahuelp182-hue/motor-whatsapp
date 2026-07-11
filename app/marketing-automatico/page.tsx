@@ -6,12 +6,14 @@ type Contador = { enviados: number; fallidos: number; pendientes: number }
 type Template = { key: string; name: string; id: string; status: string; category?: string }
 type Campana = { tipo: string; is_active: boolean }
 type Reciente = { ts: string; tipo_evento: string; estado: string; cliente: string; telefono: string; error: string | null }
+type Resena = { ts: string; cliente: string; telefono: string; texto: string }
 type Data = {
   days: number
   porEvento: Record<string, Contador>
   templates: Template[]
   campanas: Campana[]
   recientes: Reciente[]
+  resenas: Resena[]
   error?: string
 }
 
@@ -58,7 +60,7 @@ export default function MarketingAutomaticoPage() {
       const json = (await res.json()) as Data
       setData(json)
     } catch {
-      setData({ days, porEvento: {}, templates: [], campanas: [], recientes: [], error: 'No se pudo cargar' })
+      setData({ days, porEvento: {}, templates: [], campanas: [], recientes: [], resenas: [], error: 'No se pudo cargar' })
     } finally {
       setLoading(false)
     }
@@ -149,6 +151,25 @@ export default function MarketingAutomaticoPage() {
                   </div>
                 )
               })}
+            </div>
+
+            {/* Reseñas recibidas */}
+            <div className="mb-5 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <h2 className="mb-3 text-sm font-semibold text-white/80">⭐ Reseñas recibidas ({data.resenas.length})</h2>
+              {data.resenas.length === 0 && (
+                <p className="text-sm text-white/40">Todavía no llegó ninguna respuesta al pedido de reseña.</p>
+              )}
+              <div className="space-y-2">
+                {data.resenas.map((r, i) => (
+                  <div key={i} className="rounded-xl border border-white/[0.05] p-3">
+                    <div className="mb-1 flex items-center justify-between gap-2 text-xs text-white/40">
+                      <span>{r.cliente || telLindo(r.telefono)}</span>
+                      <span>{hora(r.ts)}</span>
+                    </div>
+                    <p className="text-sm text-white/85 whitespace-pre-wrap break-words">{r.texto}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Actividad reciente */}
