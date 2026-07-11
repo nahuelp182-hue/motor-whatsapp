@@ -11,6 +11,9 @@ type TNOrder = {
   total: string
   checkout_url?: string
   products: TNProduct[]
+  created_at?: string
+  payment_status?: string
+  status?: string
 }
 
 // ── WhatsApp Cloud API ────────────────────────────────────────────────────────
@@ -39,6 +42,45 @@ async function sendWhatsAppCloud(
     })
     if (!res.ok) {
       const err = await res.json() as { error?: { message: string } }
+      return { ok: false, error: err.error?.message ?? `HTTP ${res.status}` }
+    }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+}
+
+async function sendWhatsAppTemplate(
+  phoneNumberId: string,
+  token: string,
+  to: string,
+  templateName: string,
+  languageCode: string,
+  bodyParams: string[]
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${WA_API_URL}/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: [
+            { type: 'body', parameters: bodyParams.map((text) => ({ type: 'text', text })) },
+          ],
+        },
+      }),
+    })
+    if (!res.ok) {
+      const err = (await res.json()) as { error?: { message: string } }
       return { ok: false, error: err.error?.message ?? `HTTP ${res.status}` }
     }
     return { ok: true }
@@ -99,6 +141,108 @@ export class CampaignService {
         scheduled_for: new Date(Date.now() + 30 * 60 * 1000),
       },
     })
+  }
+
+  /**
+   * RECOVERY — polling de carritos abandonados (Tiendanube NO tiene webhook
+   * checkout/abandoned; hay que consultar /orders?status=open&payment_status=pending).
+   * Cadencia de 2 toques por plantilla aprobada de Meta (fuera de ventana de 24h,
+   * WhatsApp Cloud API exige template, no texto libre). Llamado por un cron externo
+   * (VPS) cada ~30 min. Horario 9-21 AR.
+   */
+  async pollAbandonedCarts() {
+    const campaign = await this.getActiveCampaign(CampaignType.RECOVERY)
+    if (!campaign) return { checked: 0, sent: 0, skipped: 'sin campaña activa' }
+
+    const config = campaign.configuracion as {
+      wa_phone_number_id: string
+      template_name: string
+      template_lang: string
+    }
+
+    const hourAr = (new Date().getUTCHours() + 24 - 3) % 24
+    if (hourAr < 9 || hourAr >= 21) {
+      return { checked: 0, sent: 0, skipped: 'fuera de horario 9-21 AR' }
+    }
+
+    const TOQUE1_MIN_H = 2
+    const VENTANA_MAX_H = 36
+    const TOQUE2_AFTER_H = 22
+
+    const orders = await this.fetchPendingOrders()
+    let sent = 0
+
+    for (const o of orders) {
+      if (!o.contact_phone || !o.created_at) continue
+      const ageH = (Date.now() - new Date(o.created_at).getTime()) / 3_600_000
+      const customer = await this.upsertCustomer(o)
+
+      const logs = await prisma.messageLog.findMany({
+        where: {
+          store_id: this.store.id,
+          customer_id: customer.id,
+          campaign_id: campaign.id,
+          tipo_evento: { in: ['cart_recovery_1', 'cart_recovery_2'] },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+      const t1 = logs.find((l) => l.tipo_evento === 'cart_recovery_1')
+      const t2 = logs.find((l) => l.tipo_evento === 'cart_recovery_2')
+
+      let touch: 1 | 2 | null = null
+      if (!t1 && ageH >= TOQUE1_MIN_H && ageH <= VENTANA_MAX_H) {
+        touch = 1
+      } else if (t1 && !t2) {
+        const hSinceT1 = (Date.now() - t1.createdAt.getTime()) / 3_600_000
+        if (hSinceT1 >= TOQUE2_AFTER_H) touch = 2
+      }
+      if (!touch) continue
+
+      const firstName = o.contact_name.split(' ')[0]
+      const product = o.products[0]?.name?.split(' - ')[0] ?? 'tu pedido'
+      const link = o.checkout_url ?? 'https://infomicelium.com.ar'
+
+      const log = await prisma.messageLog.create({
+        data: {
+          store_id: this.store.id,
+          customer_id: customer.id,
+          campaign_id: campaign.id,
+          estado: 'PENDING',
+          tipo_evento: `cart_recovery_${touch}`,
+        },
+      })
+
+      const result = await sendWhatsAppTemplate(
+        config.wa_phone_number_id,
+        this.store.whatsapp_api_token,
+        customer.telefono,
+        config.template_name,
+        config.template_lang,
+        [firstName, product, link]
+      )
+
+      await prisma.messageLog.update({
+        where: { id: log.id },
+        data: { estado: result.ok ? 'SENT' : 'FAILED', error_details: result.ok ? null : result.error },
+      })
+      if (result.ok) sent++
+    }
+
+    return { checked: orders.length, sent }
+  }
+
+  private async fetchPendingOrders(): Promise<TNOrder[]> {
+    const res = await fetch(
+      `https://api.tiendanube.com/v1/${this.store.tiendanube_store_id}/orders?status=open&payment_status=pending&per_page=100`,
+      {
+        headers: {
+          Authentication: `bearer ${this.store.tiendanube_access_token}`,
+          'User-Agent': 'MotorWhatsApp (nahuelp182@gmail.com)',
+        },
+      }
+    )
+    if (!res.ok) return []
+    return (await res.json()) as TNOrder[]
   }
 
   /**
