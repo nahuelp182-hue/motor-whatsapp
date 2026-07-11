@@ -6,7 +6,8 @@ import { CopiarPlantilla } from '@/components/CopiarPlantilla'
 
 export const dynamic = 'force-dynamic' // recomputar countdowns en cada visita
 
-const RANGOS = [60, 90, 120]
+const RANGOS = [60, 90, 120, 365]
+const RANGO_LABEL = (d: number) => (d >= 365 ? 'Año' : `${d} días`)
 
 const EST_DOT: Record<PrepEstado, string> = {
   vencido: '#f87171', ahora: '#fb923c', pronto: '#fbbf24', ok: '#4ade80',
@@ -137,7 +138,7 @@ export default async function CalendarioPage({
                   d === horizonte ? 'bg-white/[0.1] text-white' : 'text-white/50 hover:text-white/80'
                 }`}
               >
-                {d} días
+                {RANGO_LABEL(d)}
               </a>
             ))}
           </div>

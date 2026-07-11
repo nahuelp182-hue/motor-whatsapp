@@ -15,6 +15,7 @@ type Regla =
   | { tipo: 'fijo'; mes: number; dia: number }
   | { tipo: 'nth'; mes: number; weekday: number; n: number } // weekday 0=lun..6=dom
   | { tipo: 'rango'; desde: [number, number]; hasta: [number, number] }
+  | { tipo: 'pascua'; offset: number } // Pascua + offset dias (Carnaval=-48, Viernes Santo=-2, etc.)
   | { tipo: 'fijo_anio'; fecha: string }
 
 type FechaRaw = {
@@ -72,6 +73,25 @@ function nthWeekday(anio: number, mes: number, weekday: number, n: number): Date
   throw new Error(`nthWeekday sin resultado: ${anio}-${mes} wd${weekday} n${n}`)
 }
 
+// Domingo de Pascua (algoritmo de Gauss / computus gregoriano). Date a medianoche UTC.
+function domingoPascua(anio: number): Date {
+  const a = anio % 19
+  const b = Math.floor(anio / 100)
+  const c = anio % 100
+  const d = Math.floor(b / 4)
+  const e = b % 4
+  const f = Math.floor((b + 8) / 25)
+  const g = Math.floor((b - f + 1) / 3)
+  const h = (19 * a + b - d - g + 15) % 30
+  const i = Math.floor(c / 4)
+  const k = c % 4
+  const l = (32 + 2 * e + 2 * i - h - k) % 7
+  const m = Math.floor((a + 11 * h + 22 * l) / 451)
+  const mes = Math.floor((h + l - 7 * m + 114) / 31)
+  const dia = ((h + l - 7 * m + 114) % 31) + 1
+  return new Date(Date.UTC(anio, mes - 1, dia))
+}
+
 // Proxima ocurrencia >= hoy. null si es one-off ya vencido.
 function resolverFecha(regla: Regla, hoy: Date): Date | null {
   if (regla.tipo === 'fijo_anio') {
@@ -84,6 +104,7 @@ function resolverFecha(regla: Regla, hoy: Date): Date | null {
     let dt: Date
     if (regla.tipo === 'fijo') dt = new Date(Date.UTC(anio, regla.mes - 1, regla.dia))
     else if (regla.tipo === 'nth') dt = nthWeekday(anio, regla.mes, regla.weekday, regla.n)
+    else if (regla.tipo === 'pascua') dt = new Date(domingoPascua(anio).getTime() + regla.offset * DIA_MS)
     else dt = new Date(Date.UTC(anio, regla.desde[0] - 1, regla.desde[1])) // rango: ancla en 'desde'
     if (diasEntre(dt, hoy) >= 0) return dt
   }

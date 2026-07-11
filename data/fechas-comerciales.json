@@ -326,13 +326,15 @@
       "id": "hotsale",
       "nombre": "Hot Sale AR (CACE)",
       "regla": {
-        "tipo": "fijo_anio",
-        "fecha": "2027-05-10"
+        "tipo": "nth",
+        "mes": 5,
+        "weekday": 0,
+        "n": 2
       },
       "categoria": "retail",
       "negocio": "micelium",
       "relevancia": 5,
-      "promo": "El evento de descuentos #1 del primer semestre. Precio de evento 72hs + cuotas + stock limitado real.",
+      "promo": "El evento de descuentos #1 del primer semestre. Precio de evento 72hs + cuotas + stock limitado real. (CACE confirma la fecha exacta cada anio.)",
       "justificativo": "Hot Sale: el precio mas bajo del primer semestre en tu incubadora. 72 horas, cuotas sin interes, stock del evento limitado.",
       "wsp": "🔥 Hot Sale: el precio mas bajo del semestre en tu equipo de cultivo. 72hs + cuotas. Stock limitado. Te reservo el link antes de que arranque?",
       "prep": {
@@ -376,6 +378,224 @@
       "promo": "'Date el gusto con el medio aguinaldo'. Combo mejora de setup / variedad premium.",
       "justificativo": "Cayo el medio aguinaldo. Mejora tu setup o sumate una variedad premium — precio especial de mitad de anio.",
       "wsp": "Cayo el aguinaldo 💵 Buen momento para mejorar tu setup o sumar una variedad premium. Precio especial de mitad de anio. Te muestro?",
+      "prep": {
+        "stock": 15,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "singles_day",
+      "nombre": "Cyber Week / 11.11",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 11,
+        "dia": 11
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 3,
+      "promo": "Antesala del CyberMonday: flash de 24-48hs con el mejor precio online del mes.",
+      "justificativo": "11.11, el dia de descuentos online mas grande del mundo. Aprovecha el precio flash de hoy en tu equipo de cultivo — manana vuelve a subir.",
+      "wsp": "Hoy es 11.11, el dia de las ofertas online 🌐 Precio flash SOLO hoy en tu incubadora. Te paso el link antes de que se termine?",
+      "prep": {
+        "stock": 20,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "dia_tierra",
+      "nombre": "Dia de la Tierra",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 4,
+        "dia": 22
+      },
+      "categoria": "cultural",
+      "negocio": "micelium",
+      "relevancia": 4,
+      "promo": "Angulo sustentable: produci tu propio alimento en casa. Combo eco + envio bonificado.",
+      "justificativo": "Dia de la Tierra: el gesto mas concreto es producir tu propio alimento en casa, sin traslados ni packaging. Arranca tu cultivo con envio bonificado.",
+      "wsp": "Hoy es el Dia de la Tierra 🌎 El gesto mas real: producir tu propio alimento en casa. Arranca tu cultivo con envio bonificado esta semana. Te muestro como?",
+      "prep": {
+        "stock": 30,
+        "creativos": 14,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "dia_medio_ambiente",
+      "nombre": "Dia Mundial del Medio Ambiente",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 6,
+        "dia": 5
+      },
+      "categoria": "cultural",
+      "negocio": "micelium",
+      "relevancia": 4,
+      "promo": "Mismo angulo eco/autosuficiencia. Contenido educativo + descuento suave.",
+      "justificativo": "Consumir distinto empieza en casa: tu propio cultivo, cero traslados. Sumate en el Dia del Medio Ambiente.",
+      "wsp": "Dia del Medio Ambiente 🌱 Producir en casa es el consumo mas consciente. Te muestro el kit para arrancar tu propio cultivo?",
+      "prep": {
+        "stock": 20,
+        "creativos": 14,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "vuelta_al_cole",
+      "nombre": "Vuelta al cole",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 2,
+        "dia": 15
+      },
+      "categoria": "estacional",
+      "negocio": "micelium",
+      "relevancia": 3,
+      "promo": "Proyecto educativo para el ano escolar. Combo para chicos / escuelas.",
+      "justificativo": "Arranca el ano escolar: el cultivo como proyecto de ciencia para seguir en casa todo el ano.",
+      "wsp": "Arranca el cole 🎒 Un proyecto de ciencia real para acompanar el ano: el cultivo que se ve crecer. Te muestro el combo para chicos?",
+      "prep": {
+        "stock": 25,
+        "creativos": 14,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "carnaval",
+      "nombre": "Carnaval (finde largo)",
+      "regla": {
+        "tipo": "pascua",
+        "offset": -48
+      },
+      "categoria": "estacional",
+      "negocio": "micelium",
+      "relevancia": 2,
+      "promo": "Finde largo de febrero. Angulo verano/hobby.",
+      "justificativo": "Finde largo de Carnaval: sumale un proyecto nuevo al verano.",
+      "wsp": "",
+      "prep": {
+        "stock": 15,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "semana_santa",
+      "nombre": "Semana Santa (finde largo XL)",
+      "regla": {
+        "tipo": "pascua",
+        "offset": -3
+      },
+      "categoria": "estacional",
+      "negocio": "micelium",
+      "relevancia": 3,
+      "promo": "Finde largo de 4 dias: proyecto para hacer en casa. Combo con acompanamiento.",
+      "justificativo": "Cuatro dias en casa. El plan ideal para arrancar tu cultivo y verlo crecer durante el finde largo.",
+      "wsp": "Finde largo de Semana Santa 🏠 4 dias perfectos para arrancar un proyecto en casa. El cultivo de girgolas se ve crecer en dias. Te paso el kit?",
+      "prep": {
+        "stock": 20,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "dia_trabajador",
+      "nombre": "Dia del Trabajador (1 de mayo)",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 5,
+        "dia": 1
+      },
+      "categoria": "cultural",
+      "negocio": "micelium",
+      "relevancia": 2,
+      "promo": "Feriado / posible finde largo. Angulo descanso + hobby.",
+      "justificativo": "Feriado del Trabajador: date un respiro y arranca ese proyecto que venias posponiendo.",
+      "wsp": "",
+      "prep": {
+        "stock": 15,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "liquidacion_invierno",
+      "nombre": "Liquidacion de mitad de ano",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 8,
+        "dia": 1
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 3,
+      "promo": "Liquidacion de invierno: descuento en variedades de temporada / stock a renovar.",
+      "justificativo": "Liquidacion de mitad de ano: precios de invierno antes de que arranque la primavera. Stock limitado.",
+      "wsp": "Liquidacion de mitad de ano 🏷️ Precios de invierno en variedades seleccionadas, stock limitado. Te paso lo que queda?",
+      "prep": {
+        "stock": 20,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "dia_maestro",
+      "nombre": "Dia del Maestro (11 sep)",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 9,
+        "dia": 11
+      },
+      "categoria": "cultural",
+      "negocio": "micelium",
+      "relevancia": 2,
+      "promo": "Regalo para docentes / proyecto de aula.",
+      "justificativo": "Para la seno o el profe que ama ensenar: un cultivo real para llevar al aula. Regalo original para el Dia del Maestro.",
+      "wsp": "",
+      "prep": {
+        "stock": 15,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "halloween",
+      "nombre": "Halloween",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 10,
+        "dia": 31
+      },
+      "categoria": "cultural",
+      "negocio": "micelium",
+      "relevancia": 2,
+      "promo": "Angulo estetico/bosque. Contenido de redes mas que descuento fuerte.",
+      "justificativo": "Temporada de bosque y tierra: sumate a la estetica de Halloween con tu propio cultivo.",
+      "wsp": "",
+      "prep": {
+        "stock": 15,
+        "creativos": 14,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "ano_nuevo",
+      "nombre": "Ano Nuevo",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 12,
+        "dia": 30
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 3,
+      "promo": "Cierre de ano: brindis + proposito nuevo. Regalo de ultimo momento / gift card.",
+      "justificativo": "Cerra el ano regalando (o regalandote) un proyecto para arrancar el proximo: tu propio cultivo en casa.",
+      "wsp": "Se va el ano 🎉 El regalo (o autoregalo) para arrancar el proximo: tu propio cultivo en casa. Gift card disponible si es de ultimo momento. Te paso info?",
       "prep": {
         "stock": 15,
         "creativos": 10,
