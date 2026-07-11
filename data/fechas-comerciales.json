@@ -1,0 +1,386 @@
+{
+  "_meta": {
+    "descripcion": "Calendario comercial vivo Micelium. Cada fecha = un justificativo para una promo. Objetivo: +20% ventas anuales.",
+    "negocios": {
+      "micelium": "Incubadoras / autocultivo (WSP + Meta + TN). Canal promo principal: WhatsApp masivo. UNICO negocio de este sistema."
+    },
+    "prep_default_dias": {
+      "stock": 45,
+      "creativos": 21,
+      "plantilla_wsp": 10
+    },
+    "reglas_copy": "En plantillas WSP evitar disparadores de politica. Voz de marca: cultivo, incubadora, girgolas/melena de leon/reishi, equipo. NO 'hongo'/'laboratorio' si el texto se reusa en Meta.",
+    "leyenda_regla": "fijo={mes,dia} | nth={mes,weekday(0=lun..6=dom),n} | rango={desde:[m,d],hasta:[m,d]} | fijo_anio para one-offs"
+  },
+  "fechas": [
+    {
+      "id": "amigo",
+      "nombre": "Dia del Amigo",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 7,
+        "dia": 20
+      },
+      "categoria": "cultural",
+      "negocio": "micelium",
+      "relevancia": 4,
+      "promo": "2x1 en 'combo para regalar' o 10% + envio gratis presentandolo como regalo para ese amigo cultivador.",
+      "justificativo": "El amigo que siempre quiso arrancar su cultivo. Regalale la incubadora esta semana con envio bonificado — solo por el Dia del Amigo.",
+      "wsp": "Feliz semana del amigo! 🎉 Si tenes ese amigo que siempre habla de arrancar su propio cultivo, esta es la excusa perfecta: hasta el 20/7 te bonificamos el envio en la incubadora + guia de arranque. Le mando el link?",
+      "prep": {
+        "stock": 20,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "mundial_final",
+      "nombre": "Final Mundial FIFA 2026",
+      "regla": {
+        "tipo": "fijo_anio",
+        "fecha": "2026-07-19"
+      },
+      "categoria": "deportivo",
+      "negocio": "micelium",
+      "relevancia": 5,
+      "promo": "Promo relampago 'Semana del Mundial': codigo CAMPEON con 15% valido solo hasta el pitazo final.",
+      "justificativo": "Argentina va por otra estrella. Festejamos con vos: codigo CAMPEON, 15% en tu incubadora valido SOLO hasta la final. Cuando termina el partido, termina la promo.",
+      "wsp": "Vamos que se viene la final! 🏆 Lo festejamos con vos: codigo CAMPEON = 15% en tu equipo de cultivo, valido SOLO hasta el pitazo final del domingo. Te paso el link antes de que se termine?",
+      "prep": {
+        "stock": 15,
+        "creativos": 7,
+        "plantilla_wsp": 5
+      }
+    },
+    {
+      "id": "vacaciones_invierno",
+      "nombre": "Vacaciones de invierno (tiempo en casa)",
+      "regla": {
+        "tipo": "rango",
+        "desde": [
+          7,
+          14
+        ],
+        "hasta": [
+          7,
+          27
+        ]
+      },
+      "categoria": "estacional",
+      "negocio": "micelium",
+      "relevancia": 4,
+      "promo": "Kit 'proyecto de invierno' para hacer en casa con los chicos: incubadora + variedad facil (girgolas), combo educativo.",
+      "justificativo": "Dos semanas en casa. Convertilas en un proyecto que se ve crecer dia a dia: el cultivo de interior mas facil para hacer en familia estas vacaciones.",
+      "wsp": "Vacaciones de invierno = proyecto en casa 🏠 El cultivo de girgolas es el plan ideal para estos dias: se ve crecer en dias y lo pueden seguir los chicos. Te muestro el kit de arranque?",
+      "prep": {
+        "stock": 20,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "nino",
+      "nombre": "Dia del Nino",
+      "regla": {
+        "tipo": "nth",
+        "mes": 8,
+        "weekday": 6,
+        "n": 3
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 3,
+      "promo": "Angulo 'regalo que ensena': combo educativo de cultivo. Descuento 10% + guia para chicos.",
+      "justificativo": "Un regalo que no se rompe en una semana. El cultivo que ven crecer con sus propias manos — ciencia real para el Dia del Nino.",
+      "wsp": "Buscando un regalo distinto para el Dia del Nino? 🧒 El kit de cultivo es ciencia que se ve crecer — aprenden haciendo. 10% + guia para chicos esta semana. Te paso info?",
+      "prep": {
+        "stock": 30,
+        "creativos": 14,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "primavera_estudiante",
+      "nombre": "Dia de la Primavera / Estudiante",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 9,
+        "dia": 21
+      },
+      "categoria": "cultural",
+      "negocio": "micelium",
+      "relevancia": 3,
+      "promo": "Arranque de temporada: 'renova tu cultivo para la primavera'. Combo con variedad nueva.",
+      "justificativo": "Llega la primavera, arranca la mejor epoca para cultivar. Renova tu setup con una variedad nueva — precio de estreno de temporada.",
+      "wsp": "Llego la primavera 🌱 la mejor epoca para cultivar. Sumale una variedad nueva a tu incubadora con precio de estreno de temporada. Te muestro las opciones?",
+      "prep": {
+        "stock": 30,
+        "creativos": 14,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "cyber_ml_octubre",
+      "nombre": "Dia de la Madre AR",
+      "regla": {
+        "tipo": "nth",
+        "mes": 10,
+        "weekday": 6,
+        "n": 3
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 5,
+      "promo": "Segundo pico retail del anio. Combo regalo premium + envio gratis + packaging especial. Descuento escalonado.",
+      "justificativo": "Para la mama que tiene todo menos tiempo para ella: el cultivo relajante que cuida en casa. Regalo original con envio bonificado para el Dia de la Madre.",
+      "wsp": "Se viene el Dia de la Madre 💐 Un regalo distinto: el cultivo de interior que la acompana todo el anio. Envio bonificado + packaging de regalo si lo pedis esta semana. Te paso el link?",
+      "prep": {
+        "stock": 45,
+        "creativos": 21,
+        "plantilla_wsp": 10
+      }
+    },
+    {
+      "id": "cybermonday",
+      "nombre": "CyberMonday AR (CACE)",
+      "regla": {
+        "tipo": "nth",
+        "mes": 11,
+        "weekday": 0,
+        "n": 1
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 5,
+      "promo": "El evento de descuentos mas grande online. Mejor precio del anio 72hs + cuotas sin interes. Stock limitado real.",
+      "justificativo": "CyberMonday: el mejor precio del anio en tu incubadora, solo 72 horas. Cuotas sin interes. Cuando se agota el stock del evento, vuelve el precio normal.",
+      "wsp": "🔥 CyberMonday: el mejor precio del anio en tu equipo de cultivo, SOLO 72hs y con cuotas. Stock del evento limitado. Queres que te reserve el link antes de que arranque?",
+      "prep": {
+        "stock": 45,
+        "creativos": 21,
+        "plantilla_wsp": 10
+      }
+    },
+    {
+      "id": "blackfriday",
+      "nombre": "Black Friday",
+      "regla": {
+        "tipo": "nth",
+        "mes": 11,
+        "weekday": 4,
+        "n": 4
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 5,
+      "promo": "Refuerzo del CyberMonday para rezagados. Descuento fuerte 1 solo dia + upsell de variedades.",
+      "justificativo": "Te perdiste el Cyber? Black Friday es tu ultima chance del anio a este precio. Un solo dia.",
+      "wsp": "Black Friday ⚡ Ultima chance del anio a precio de evento en tu incubadora. Un solo dia. Te mando el link ahora asi no te lo perdes?",
+      "prep": {
+        "stock": 20,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "aguinaldo_dic",
+      "nombre": "Aguinaldo de diciembre (plata en mano)",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 12,
+        "dia": 18
+      },
+      "categoria": "financiero",
+      "negocio": "micelium",
+      "relevancia": 4,
+      "promo": "Angulo 'date el gusto con el aguinaldo'. Combo premium autocultivo, cuotas o precio contado especial.",
+      "justificativo": "Llego el aguinaldo. Date el gusto que venias posponiendo: tu propio cultivo en casa, listo para el verano. Precio especial de fin de anio.",
+      "wsp": "Llego el aguinaldo 🎁 Date el gusto que venias pateando: tu incubadora lista para arrancar en verano. Precio especial de fin de anio. Te paso el link?",
+      "prep": {
+        "stock": 20,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "navidad",
+      "nombre": "Navidad",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 12,
+        "dia": 25
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 5,
+      "promo": "Pico anual. 'Regalo que se recuerda'. Deadline de envio pre-Navidad como urgencia real. Gift card si no llega a tiempo.",
+      "justificativo": "El regalo que nadie mas va a traer. Pedilo antes del [deadline envio] para que llegue para Navidad — o regala la gift card y que elija su variedad.",
+      "wsp": "🎄 Falta poco para Navidad! El regalo que nadie mas trae: un cultivo propio para regalar. Pedilo antes del [fecha] para que llegue a tiempo. Te ayudo a elegir?",
+      "prep": {
+        "stock": 45,
+        "creativos": 21,
+        "plantilla_wsp": 10
+      }
+    },
+    {
+      "id": "reyes",
+      "nombre": "Reyes Magos",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 1,
+        "dia": 6
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 3,
+      "promo": "Ultimo regalo de la temporada. Angulo 'para los que dejan todo para ultimo momento'. Envio express destacado.",
+      "justificativo": "Todavia estas a tiempo para Reyes. El regalo educativo que ensena y entretiene todo el verano. Envio express disponible.",
+      "wsp": "Todavia a tiempo para Reyes 👑 El regalo educativo que dura todo el verano. Envio express disponible. Te paso las opciones?",
+      "prep": {
+        "stock": 20,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "verano_autocultivo",
+      "nombre": "Arranque de verano (nuevos hobbies)",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 1,
+        "dia": 15
+      },
+      "categoria": "estacional",
+      "negocio": "micelium",
+      "relevancia": 3,
+      "promo": "Proposito de anio nuevo: 'este anio si arranco mi cultivo'. Combo principiante con acompanamiento.",
+      "justificativo": "Ano nuevo, proyecto nuevo. Este es el verano en que finalmente arrancas tu cultivo — combo principiante con acompanamiento paso a paso.",
+      "wsp": "Arranca el anio nuevo! Si tu proposito es finalmente tener tu cultivo, este es el combo para principiantes con acompanamiento paso a paso. Te cuento como funciona?",
+      "prep": {
+        "stock": 20,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "san_valentin",
+      "nombre": "San Valentin",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 2,
+        "dia": 14
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 3,
+      "promo": "Angulo 'regalo en pareja / hobby juntos'. Combo doble variedad, packaging de regalo.",
+      "justificativo": "Un plan para hacer juntos, no otro peluche. El cultivo que cuidan de a dos — regalo original para San Valentin.",
+      "wsp": "San Valentin 💚 Regalale un plan para hacer juntos, no otro peluche. El cultivo de a dos, con packaging de regalo. Te muestro el combo?",
+      "prep": {
+        "stock": 20,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "mujer",
+      "nombre": "Dia de la Mujer",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 3,
+        "dia": 8
+      },
+      "categoria": "cultural",
+      "negocio": "micelium",
+      "relevancia": 2,
+      "promo": "Angulo autocuidado/hobby propio. Descuento suave + contenido de comunidad.",
+      "justificativo": "Un espacio propio, un proyecto que es solo tuyo. El cultivo de interior como ritual de autocuidado.",
+      "wsp": "",
+      "prep": {
+        "stock": 15,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "otono_indoor",
+      "nombre": "Otono - temporada indoor",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 4,
+        "dia": 15
+      },
+      "categoria": "estacional",
+      "negocio": "micelium",
+      "relevancia": 4,
+      "promo": "'La incubadora hace el clima por vos'. Angulo tecnico: cultivar todo el anio sin depender del tiempo. Combo variedades de estacion.",
+      "justificativo": "Afuera baja la temperatura, adentro tu cultivo sigue como si nada. La incubadora controla el clima por vos — cultiva todo el otono sin drama.",
+      "wsp": "Llega el frio 🍂 pero tu cultivo no se entera: la incubadora mantiene el clima ideal sola. Es la mejor epoca para arrancar indoor. Te muestro como?",
+      "prep": {
+        "stock": 30,
+        "creativos": 14,
+        "plantilla_wsp": 7
+      }
+    },
+    {
+      "id": "hotsale",
+      "nombre": "Hot Sale AR (CACE)",
+      "regla": {
+        "tipo": "fijo_anio",
+        "fecha": "2027-05-10"
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 5,
+      "promo": "El evento de descuentos #1 del primer semestre. Precio de evento 72hs + cuotas + stock limitado real.",
+      "justificativo": "Hot Sale: el precio mas bajo del primer semestre en tu incubadora. 72 horas, cuotas sin interes, stock del evento limitado.",
+      "wsp": "🔥 Hot Sale: el precio mas bajo del semestre en tu equipo de cultivo. 72hs + cuotas. Stock limitado. Te reservo el link antes de que arranque?",
+      "prep": {
+        "stock": 45,
+        "creativos": 21,
+        "plantilla_wsp": 10
+      }
+    },
+    {
+      "id": "madre_no_aplica_padre",
+      "nombre": "Dia del Padre AR",
+      "regla": {
+        "tipo": "nth",
+        "mes": 6,
+        "weekday": 6,
+        "n": 3
+      },
+      "categoria": "retail",
+      "negocio": "micelium",
+      "relevancia": 4,
+      "promo": "Angulo 'hobby para el viejo': proyecto tranquilo y satisfactorio. Combo regalo + envio bonificado.",
+      "justificativo": "Para el papa que ya tiene todas las herramientas: un hobby nuevo, tranquilo y que da resultados. Regalo original con envio bonificado.",
+      "wsp": "Se viene el Dia del Padre 👨 Para el viejo que ya tiene de todo: un hobby nuevo y satisfactorio. Cultivo en casa con envio bonificado. Te paso el link?",
+      "prep": {
+        "stock": 30,
+        "creativos": 14,
+        "plantilla_wsp": 10
+      }
+    },
+    {
+      "id": "aguinaldo_jun",
+      "nombre": "Aguinaldo de junio (plata en mano)",
+      "regla": {
+        "tipo": "fijo",
+        "mes": 6,
+        "dia": 28
+      },
+      "categoria": "financiero",
+      "negocio": "micelium",
+      "relevancia": 3,
+      "promo": "'Date el gusto con el medio aguinaldo'. Combo mejora de setup / variedad premium.",
+      "justificativo": "Cayo el medio aguinaldo. Mejora tu setup o sumate una variedad premium — precio especial de mitad de anio.",
+      "wsp": "Cayo el aguinaldo 💵 Buen momento para mejorar tu setup o sumar una variedad premium. Precio especial de mitad de anio. Te muestro?",
+      "prep": {
+        "stock": 15,
+        "creativos": 10,
+        "plantilla_wsp": 7
+      }
+    }
+  ]
+}
