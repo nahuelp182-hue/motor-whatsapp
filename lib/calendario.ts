@@ -31,7 +31,7 @@ type FechaRaw = {
   prep: Partial<Record<PrepKey, number>>
 }
 
-export type PrepInfo = { key: PrepKey; limite: string; faltan: number; estado: PrepEstado }
+export type PrepInfo = { key: PrepKey; antes: number; limite: string; faltan: number; estado: PrepEstado }
 export type ItemCalendario = {
   id: string
   nombre: string
@@ -134,7 +134,7 @@ export function construirCalendario(horizonteDias = 90): ItemCalendario[] {
       .filter((k) => f.prep[k] != null)
       .map((k) => {
         const p = prepEstado(fe, f.prep[k]!, hoy)
-        return { key: k, limite: p.limite.toISOString().slice(0, 10), faltan: p.faltan, estado: p.estado }
+        return { key: k, antes: f.prep[k]!, limite: p.limite.toISOString().slice(0, 10), faltan: p.faltan, estado: p.estado }
       })
 
     // Entra si el evento cae en la ventana, o si alguna tarea de prep ya arranco (aunque el evento este mas lejos).
@@ -178,4 +178,56 @@ export function fechaLinda(iso: string): string {
   const dt = new Date(Date.UTC(y, m - 1, d))
   const wd = (dt.getUTCDay() + 6) % 7
   return `${dias[wd]} ${d} ${meses[m - 1]} ${y}`
+}
+
+// ── Payload para Google Calendar (usado por el cron de sync) ────────────────────
+const CAT_EMO: Record<Categoria, string> = {
+  retail: '🛍️', cultural: '🎉', deportivo: '🏆', estacional: '🌦️', financiero: '💵', otro: '📌',
+}
+const CAT_COLOR_ID: Record<Categoria, string> = { // ids de la paleta de Google Calendar
+  retail: '6', cultural: '3', deportivo: '10', estacional: '9', financiero: '4', otro: '8',
+}
+
+export type EventoCalendario = {
+  key: string          // estable: id-anio (para upsert idempotente)
+  fecha: string        // YYYY-MM-DD (all-day start)
+  fechaFin: string     // YYYY-MM-DD (all-day end = dia siguiente)
+  summary: string
+  description: string
+  colorId: string
+  reminders: number[]  // minutos antes del evento
+}
+
+function fechaMasDias(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d) + n * DIA_MS).toISOString().slice(0, 10)
+}
+
+// Construye los eventos a espejar en el calendario, para fechas dentro de la ventana.
+export function construirEventosCalendario(horizonteDias = 120): EventoCalendario[] {
+  return construirCalendario(horizonteDias)
+    .filter((it) => it.faltan >= 0 && it.faltan <= horizonteDias)
+    .map((it) => {
+      const anio = it.fecha.slice(0, 4)
+      const lineas = [
+        `PROMO: ${it.promo}`, '',
+        `JUSTIFICATIVO: ${it.justificativo}`, '',
+        'PREP (deadlines):',
+        ...it.prep.map((p) => `  - ${PREP_LABEL[p.key]}: limite ${p.limite} (${p.antes}d antes)`),
+      ]
+      if (it.wsp) lineas.push('', 'PLANTILLA WSP (borrador):', it.wsp)
+
+      const mins = new Set<number>([1440]) // vispera siempre
+      for (const p of it.prep) if (p.antes <= 28) mins.add(p.antes * 1440) // tope Google ~4 semanas
+
+      return {
+        key: `${it.id}-${anio}`,
+        fecha: it.fecha,
+        fechaFin: fechaMasDias(it.fecha, 1),
+        summary: `${CAT_EMO[it.categoria]} ${it.nombre}`,
+        description: lineas.join('\n'),
+        colorId: CAT_COLOR_ID[it.categoria],
+        reminders: [...mins].sort((a, b) => b - a).slice(0, 5),
+      }
+    })
 }
