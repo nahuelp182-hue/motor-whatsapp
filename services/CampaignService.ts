@@ -14,6 +14,8 @@ type TNOrder = {
   created_at?: string
   payment_status?: string
   status?: string
+  paid_at?: string | null
+  cancelled_at?: string | null
 }
 
 // ── WhatsApp Cloud API ────────────────────────────────────────────────────────
@@ -234,6 +236,97 @@ export class CampaignService {
   private async fetchPendingOrders(): Promise<TNOrder[]> {
     const res = await fetch(
       `https://api.tiendanube.com/v1/${this.store.tiendanube_store_id}/orders?status=open&payment_status=pending&per_page=100`,
+      {
+        headers: {
+          Authentication: `bearer ${this.store.tiendanube_access_token}`,
+          'User-Agent': 'MotorWhatsApp (nahuelp182@gmail.com)',
+        },
+      }
+    )
+    if (!res.ok) return []
+    return (await res.json()) as TNOrder[]
+  }
+
+  /**
+   * REVIEW — pide reseña/testimonio a los pedidos pagados hace 7-10 días.
+   * No depende de confirmación de entrega del correo (no disponible de forma
+   * confiable) — usa paid_at + ventana de shipping típica (3-5 días) + margen.
+   * Llamado por el mismo cron externo que RECOVERY (VPS, cada ~30 min).
+   */
+  async pollReviewRequests() {
+    const campaign = await this.getActiveCampaign(CampaignType.REVIEW)
+    if (!campaign) return { checked: 0, sent: 0, skipped: 'sin campaña activa' }
+
+    const config = campaign.configuracion as {
+      wa_phone_number_id: string
+      template_name: string
+      template_lang: string
+    }
+
+    const hourAr = (new Date().getUTCHours() + 24 - 3) % 24
+    if (hourAr < 9 || hourAr >= 21) {
+      return { checked: 0, sent: 0, skipped: 'fuera de horario 9-21 AR' }
+    }
+
+    const MIN_DIAS = 7
+    const MAX_DIAS = 10
+
+    const orders = await this.fetchRecentPaidOrders()
+    let sent = 0
+
+    for (const o of orders) {
+      if (!o.contact_phone || !o.paid_at || o.cancelled_at) continue
+      const diasDesdePago = (Date.now() - new Date(o.paid_at).getTime()) / 86_400_000
+      if (diasDesdePago < MIN_DIAS || diasDesdePago > MAX_DIAS) continue
+
+      const customer = await this.upsertCustomer(o)
+
+      const existing = await prisma.messageLog.findFirst({
+        where: {
+          store_id: this.store.id,
+          customer_id: customer.id,
+          campaign_id: campaign.id,
+          tipo_evento: 'review_request',
+        },
+      })
+      if (existing) continue
+
+      const firstName = o.contact_name.split(' ')[0]
+      const product = o.products[0]?.name?.split(' - ')[0] ?? 'tu pedido'
+
+      const log = await prisma.messageLog.create({
+        data: {
+          store_id: this.store.id,
+          customer_id: customer.id,
+          campaign_id: campaign.id,
+          estado: 'PENDING',
+          tipo_evento: 'review_request',
+        },
+      })
+
+      const result = await sendWhatsAppTemplate(
+        config.wa_phone_number_id,
+        this.store.whatsapp_api_token,
+        customer.telefono,
+        config.template_name,
+        config.template_lang,
+        [firstName, product]
+      )
+
+      await prisma.messageLog.update({
+        where: { id: log.id },
+        data: { estado: result.ok ? 'SENT' : 'FAILED', error_details: result.ok ? null : result.error },
+      })
+      if (result.ok) sent++
+    }
+
+    return { checked: orders.length, sent }
+  }
+
+  private async fetchRecentPaidOrders(): Promise<TNOrder[]> {
+    const since = new Date(Date.now() - 11 * 86_400_000).toISOString()
+    const res = await fetch(
+      `https://api.tiendanube.com/v1/${this.store.tiendanube_store_id}/orders?payment_status=paid&per_page=100&created_at_min=${since}`,
       {
         headers: {
           Authentication: `bearer ${this.store.tiendanube_access_token}`,

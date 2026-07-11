@@ -1,0 +1,1 @@
+ALTER TYPE "CampaignType" ADD VALUE 'REVIEW';
