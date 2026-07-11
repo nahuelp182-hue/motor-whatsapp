@@ -28,6 +28,15 @@ const WA_BTN_TEXT = 'Chatear con equipo' // ≤20 chars (límite de botón cta_u
 // Tienda (para armar links de ficha de producto)
 const TIENDA_BASE = 'https://infomicelium.com.ar/productos'
 
+// Material por comprador verificado (link, no PDF). Coincide con el bot del VPS.
+const MANUAL_INC101 = process.env.MANUAL_INC101 ?? 'https://drive.google.com/drive/folders/1jTrnlfAGvPp1qkw5ZBBTtIdIXB-g2DOv'
+const MANUAL_PC400  = process.env.MANUAL_PC400  ?? 'https://www.youtube.com/watch?v=Un_uMpa30so'
+
+// diag con canal 'wa' para separar de Instagram en la vista de conversaciones.
+function wdiag(kind: string, sender: string, detail: Record<string, unknown>): Promise<void> {
+  return diag(kind, sender, { ...detail, ch: 'wa' })
+}
+
 // ─────────── Precios en vivo desde Tiendanube ───────────
 function tnName(name: unknown): string {
   if (typeof name === 'string') return name
@@ -68,6 +77,60 @@ async function bloqueCatalogo(): Promise<string> {
   }
 }
 
+// ─────────── Verificación de compra (para mandar manuales) ───────────
+type ManualId = 'inc101' | 'pc400'
+type Pedido = { encontrado: boolean; manuales: ManualId[]; numero?: number }
+
+const soloDigitos = (s: string): string => (s || '').replace(/\D/g, '')
+
+function manualesDeProductos(prods: Array<{ name?: unknown }>): ManualId[] {
+  const set = new Set<ManualId>()
+  for (const p of prods) {
+    const n = tnName(p.name).toLowerCase()
+    if (/inc101|incubadora/.test(n)) set.add('inc101')
+    if (/pc400|tableta/.test(n)) set.add('pc400')
+  }
+  return [...set]
+}
+
+// Busca un pedido PAGADO del cliente por teléfono o por un dato numérico del mensaje
+// (nº de orden o DNI). Sirve para verificar la compra antes de mandar material.
+async function buscarPedido(phone: string, texto: string): Promise<Pedido> {
+  if (!TN_TOKEN) return { encontrado: false, manuales: [] }
+  const tel8 = soloDigitos(phone).slice(-8)
+  const tokens = texto.match(/\d{3,9}/g) ?? [] // posible nº orden (4) o DNI (7-8)
+  try {
+    for (let page = 1; page <= 6; page++) {
+      const url = `${TN_BASE}/${TN_STORE}/orders?payment_status=paid&per_page=50&page=${page}` +
+        `&fields=number,contact_phone,contact_identification,products`
+      const res = await fetch(url, { headers: { Authentication: `bearer ${TN_TOKEN}`, 'User-Agent': UA } })
+      if (!res.ok) break
+      const data = (await res.json()) as Array<{
+        number: number; contact_phone?: string; contact_identification?: string; products?: Array<{ name?: unknown }>
+      }>
+      if (!Array.isArray(data) || data.length === 0) break
+      for (const o of data) {
+        const oPhone8 = soloDigitos(o.contact_phone ?? '').slice(-8)
+        const matchTel = tel8.length >= 8 && oPhone8 === tel8
+        const matchTok = tokens.some((t) => String(o.number) === t || soloDigitos(o.contact_identification ?? '') === t)
+        if (matchTel || matchTok) {
+          return { encontrado: true, manuales: manualesDeProductos(o.products ?? []), numero: o.number }
+        }
+      }
+      if (data.length < 50) break
+    }
+  } catch (e) {
+    console.error('buscarPedido error:', e)
+  }
+  return { encontrado: false, manuales: [] }
+}
+
+function linkDeManual(m: ManualId): string {
+  return m === 'pc400'
+    ? `Tableta PC400 (video de uso): ${MANUAL_PC400}`
+    : `Incubadora INC101 (manual + guías): ${MANUAL_INC101}`
+}
+
 // ─────────── Preámbulo del asistente (WhatsApp) ───────────
 const PREAMBULO = `Sos el ASISTENTE VIRTUAL de atención al cliente de Micelium Argentina (fabricante de incubadoras automáticas para cultivo de hongos). Atendés por WhatsApp. NO uses nombre de persona: te presentás como "el asistente virtual de Micelium". Sos TRANSPARENTE: nunca te hacés pasar por una persona.
 
@@ -81,30 +144,35 @@ PRECIOS: NUNCA cotizás precios ni armás escaleras de precio (la escalera visua
 - Si piden "info y precios" EN GENERAL (sin decir qué producto) → listá los productos NUMERADOS por NOMBRE (¡SIN precios!) y preguntá cuál le interesa.
 - Cuando ELIJAN o pregunten por un producto PUNTUAL (incluido su precio) → NO cotices: mandá el LINK de su ficha (del bloque "CATÁLOGO CON LINKS" de abajo, usá el link EXACTO, no lo inventes) con una línea breve. Ej.: "Mirá toda la info, el precio y las promos acá 👇 <link>". Podés sumar 1-2 datos clave del producto, pero el precio va SIEMPRE por el link.
 
-ACÁ NO TENÉS HERRAMIENTAS DE PEDIDOS NI DE ENVÍOS. Por eso DERIVÁ (no lo resuelvas solo, no inventes datos) cuando el cliente pida: estado/seguimiento de su envío, buscar su pedido, manuales/guías (son solo para compradores verificados y acá no podés verificar la compra), roturas/garantía/fallas, plata/reintegros/reembolsos, reclamos que escalan, temas legales/salud/consumo de sustancias, psilocibe/"mágicos"/Golden Teacher, o mayoristas/prensa.
+MANUALES / GUÍAS / MATERIAL (solo para quien YA compró): si el cliente pide el manual, la guía, el instructivo o el material de uso de su equipo, NO derivés: marcá [MANUAL] con el producto (inc101 = incubadora, pc400 = tableta; si no queda claro cuál, poné ?). En [RESPUESTA] poné algo breve y cálido tipo "¡Genial! Te dejo el material 👇" — el SISTEMA verifica la compra y adjunta el link (no escribas vos ningún link de manual). Si es una preventa (todavía no compró) y pide el manual, NO marques [MANUAL]: explicale breve que el material viene con la compra.
+
+ACÁ NO TENÉS HERRAMIENTAS DE ENVÍOS. Por eso DERIVÁ (no lo resuelvas solo, no inventes datos) cuando el cliente pida: estado/seguimiento de su envío, buscar su pedido, roturas/garantía/fallas, plata/reintegros/reembolsos, reclamos que escalan, temas legales/salud/consumo de sustancias, psilocibe/"mágicos"/Golden Teacher, o mayoristas/prensa.
 Cuando DERIVES: en la RESPUESTA invitá al cliente, breve y cálido, a SEGUIR POR WHATSAPP con el equipo (ahí lo atienden mejor). NO escribas vos el número ni el link de WhatsApp: el sistema agrega el link automáticamente al final de tu respuesta. Ej. de cierre: "Para esto te ayudamos mejor con el equipo 👇". Y marcá DERIVAR.
 
 FORMATO DE SALIDA OBLIGATORIO (respetá estas etiquetas EXACTAS, en este orden):
 [RESPUESTA]
 <el texto tal cual se le envía al cliente>
-[DERIVAR] si
+[DERIVAR] si|no
 [MOTIVO] <motivo corto si derivás; si no derivás poné "no" en DERIVAR y dejá MOTIVO vacío>
+[MANUAL] <inc101|pc400|? — SOLO si el cliente pide el manual de su compra; si no aplica, omití esta línea>
 
 === BASE DE CONOCIMIENTO ===
 ${KB_MICELIUM}
 === FIN ===`
 
 // ─────────── Parseo de salida del cerebro ───────────
-type Salida = { respuesta: string; derivar: boolean; motivo: string }
+type Salida = { respuesta: string; derivar: boolean; motivo: string; manual: ManualId | '?' | null }
 
 function parseSalida(raw: string): Salida {
-  const mResp = raw.match(/\[RESPUESTA\]\s*([\s\S]*?)\s*(?:\[DERIVAR\]|$)/i)
+  const mResp = raw.match(/\[RESPUESTA\]\s*([\s\S]*?)\s*(?:\[DERIVAR\]|\[MANUAL\]|$)/i)
   const mDer  = raw.match(/\[DERIVAR\]\s*(si|sí|no)/i)
-  const mMot  = raw.match(/\[MOTIVO\]\s*([\s\S]*?)\s*$/i)
+  const mMot  = raw.match(/\[MOTIVO\]\s*([\s\S]*?)\s*(?:\[MANUAL\]|$)/i)
+  const mMan  = raw.match(/\[MANUAL\]\s*(inc101|pc400|\?)/i)
   const respuesta = (mResp ? mResp[1] : raw).trim()
   const derivar = mDer ? /s[ií]/i.test(mDer[1]) : false
   const motivo = mMot ? mMot[1].trim() : ''
-  return { respuesta, derivar, motivo }
+  const manual = mMan ? (mMan[1].toLowerCase() as ManualId | '?') : null
+  return { respuesta, derivar, motivo, manual }
 }
 
 // ─────────── Cerebro de Ariel ───────────
@@ -148,9 +216,9 @@ async function enviarMensajeWA(to: string, texto: string): Promise<boolean> {
   const bodyText = await res.text().catch(() => '')
   if (!res.ok) {
     console.error(`WA send FALLO ${res.status}:`, bodyText)
-    await diag('wa_send_fail', to, { status: res.status, body: bodyText.slice(0, 1500), texto: texto.slice(0, 200) })
+    await wdiag('wa_send_fail', to, { status: res.status, body: bodyText.slice(0, 1500), texto: texto.slice(0, 200) })
   } else {
-    await diag('wa_send_ok', to, { status: res.status })
+    await wdiag('wa_send_ok', to, { status: res.status })
   }
   return res.ok
 }
@@ -178,11 +246,17 @@ async function enviarBotonWA(to: string, cuerpo: string, displayText: string, ur
   const bodyText = await res.text().catch(() => '')
   if (!res.ok) {
     console.error(`WA botón FALLO ${res.status}:`, bodyText)
-    await diag('wa_send_fail', to, { status: res.status, body: bodyText.slice(0, 1500), texto: '[cta_url]' })
+    await wdiag('wa_send_fail', to, { status: res.status, body: bodyText.slice(0, 1500), texto: '[cta_url]' })
   } else {
-    await diag('wa_send_ok', to, { status: res.status, kind: 'cta_url' })
+    await wdiag('wa_send_ok', to, { status: res.status, kind: 'cta_url' })
   }
   return res.ok
+}
+
+// Deriva al equipo: botón limpio con fallback a link en texto.
+async function derivarAlEquipo(to: string, cuerpo: string): Promise<void> {
+  const okBtn = await enviarBotonWA(to, cuerpo, WA_BTN_TEXT, WA_LINK)
+  if (!okBtn) await enviarMensajeWA(to, `${cuerpo}\n\n${WA_LINK}`)
 }
 
 // GET — verificación del webhook por Meta
@@ -239,36 +313,72 @@ export async function POST(req: NextRequest) {
         const from = msg.from ?? ''
         if (!from) continue
 
+        const nombre = value.contacts?.find((c) => c.wa_id === from)?.profile?.name
+          ?? value.contacts?.[0]?.profile?.name
+
         try {
           // 'recibido'/'pensado' son los kinds que getHistorial() consulta para reconstruir el hilo
-          await diag('recibido', from, { texto: texto.slice(0, 300), wamid: msg.id })
+          await wdiag('recibido', from, { texto: texto.slice(0, 300), wamid: msg.id, nombre })
 
           const [catalogo, historial] = await Promise.all([bloqueCatalogo(), getHistorial(from)])
-          const { respuesta, derivar, motivo } = await pensar(texto, catalogo, historial)
-          await diag('pensado', from, { derivar, motivo, respuesta: respuesta.slice(0, 300) })
+          const { respuesta, derivar, motivo, manual } = await pensar(texto, catalogo, historial)
 
-          if (derivar) {
-            // Botón limpio "Chatear con equipo" (cta_url) en vez de una URL larga.
-            const cuerpo = respuesta || 'Te paso con una persona del equipo 👇'
-            const okBtn = await enviarBotonWA(from, cuerpo, WA_BTN_TEXT, WA_LINK)
-            if (!okBtn) await enviarMensajeWA(from, `${cuerpo}\n\n${WA_LINK}`)
+          // Estado final que se envía + se loguea (un solo 'pensado' por mensaje).
+          let outText = respuesta
+          let didDerivar = derivar
+          let accion: string | undefined
+
+          if (manual) {
+            // Comprador pidió material → verificar compra por teléfono o dato numérico.
+            const pedido = await buscarPedido(from, texto)
+            if (pedido.encontrado) {
+              const targets: ManualId[] =
+                manual === 'inc101' || manual === 'pc400'
+                  ? [manual]
+                  : pedido.manuales.length ? pedido.manuales : ['inc101']
+              const links = targets.map(linkDeManual).join('\n')
+              outText = `${respuesta ? respuesta + '\n\n' : '📚 Acá tenés tu material 👇\n\n'}${links}\n\nCualquier duda del cultivo, escribime 🍄`
+              didDerivar = false
+              accion = 'manual_enviado'
+              await enviarMensajeWA(from, outText)
+            } else if (/\d{3,9}/.test(texto)) {
+              // Dio un dato pero no matcheó ninguna compra → lo pasa al equipo.
+              outText = 'No pude encontrar tu compra con ese dato 😕 Te paso con el equipo para que te ayude 👇'
+              didDerivar = true
+              accion = 'manual_no_verificado'
+              await derivarAlEquipo(from, outText)
+            } else {
+              // Todavía no dio con qué verificar → se lo pedimos (sin derivar aún).
+              outText = 'Con gusto te mando el material 🙌 Para confirmar tu compra, pasame tu número de orden (está en el mail de compra) o el DNI con el que compraste.'
+              didDerivar = false
+              accion = 'manual_pide_orden'
+              await enviarMensajeWA(from, outText)
+            }
+          } else if (derivar) {
+            outText = respuesta || 'Te paso con una persona del equipo 👇'
+            await derivarAlEquipo(from, outText)
           } else if (respuesta) {
             await enviarMensajeWA(from, respuesta)
           }
 
-          if (derivar) {
+          await wdiag('pensado', from, {
+            derivar: didDerivar, motivo, accion, respuesta: outText.slice(0, 300),
+          })
+
+          if (didDerivar) {
             await notifyNahuel(
               '🔔 WhatsApp: lead derivado al equipo',
               `Un mensaje de WhatsApp fue derivado al equipo.\n\n` +
               `Número: ${from}\n` +
+              (nombre ? `Nombre: ${nombre}\n` : '') +
               `Mensaje: "${texto}"\n` +
-              `Motivo: ${motivo || '(sin especificar)'}\n\n` +
+              `Motivo: ${accion === 'manual_no_verificado' ? 'comprador no verificado (pidió manual)' : (motivo || '(sin especificar)')}\n\n` +
               `Se le pasó el link a wa.me/${EMPRESA_WA}. Si no escribe, contactalo desde WhatsApp.`,
             )
           }
         } catch (err) {
           console.error('WA webhook error:', err)
-          await diag('wa_error', from, { error: String(err).slice(0, 1000) })
+          await wdiag('wa_error', from, { error: String(err).slice(0, 1000) })
           try {
             await enviarMensajeWA(from, '¡Hola! 👋 Gracias por escribirnos, en un ratito te respondemos 🍄')
           } catch {}

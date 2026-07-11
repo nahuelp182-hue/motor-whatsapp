@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/send-pending",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/resumen-bot",
+      "schedule": "0 1 * * *"
     }
   ]
 }

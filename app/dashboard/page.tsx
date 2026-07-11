@@ -250,6 +250,7 @@ export default function DashboardPage() {
         <div>
           <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: acStr(0.65) }}>Motor WhatsApp</p>
           <h1 className="text-lg font-bold tracking-tight">Panel de métricas</h1>
+          <a href="/conversaciones" className="text-xs text-white/45 hover:text-white/80">💬 Conversaciones del bot →</a>
         </div>
 
         {/* Controles de fecha */}
