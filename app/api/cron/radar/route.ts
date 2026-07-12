@@ -3,6 +3,7 @@ import pg from 'pg'
 import { notifyNahuel } from '@/lib/notify'
 import {
   minarCategoria, ensureTabla, guardarSnapshot, ultimosDos, analizar,
+  youtubeNicho, ensureTablaYT, guardarYT,
 } from '@/lib/radar'
 
 export const runtime = 'nodejs'
@@ -48,6 +49,16 @@ export async function GET(req: NextRequest) {
     }
     await guardarSnapshot(p, hoy)
 
+    // Fuente YouTube (solo si hay API key) — 1 corrida/día, gasto de quota mínimo.
+    let ytCount = 0
+    if (process.env.YOUTUBE_API_KEY) {
+      try {
+        await ensureTablaYT(p)
+        const vids = await youtubeNicho(process.env.YOUTUBE_API_KEY)
+        if (vids.length) { await guardarYT(p, vids); ytCount = vids.length }
+      } catch { /* YouTube no debe romper el radar de categoría */ }
+    }
+
     const a = analizar(hoy, previo)
 
     // Email solo si hay emergentes (no molestar con lo de siempre).
@@ -71,6 +82,7 @@ export async function GET(req: NextRequest) {
         emergentes: a.emergentes.length,
         contenido: a.contenido.length,
         compra: a.compra.length,
+        youtube: ytCount,
         hayBase: a.hayBase,
       },
     })

@@ -122,6 +122,80 @@ export async function ultimosDos(p: pg.Pool): Promise<
   }))
 }
 
+// ── Fuente YouTube: qué contenido de nicho performa (search por views) ──────
+export type YTVideo = { videoId: string; titulo: string; canal: string; views: number }
+
+const YT_QUERIES = [
+  'como cultivar girgolas', 'como cultivar hongos en casa', 'melena de leon hongo beneficios',
+  'reishi para que sirve', 'kit autocultivo hongos', 'setas ostra cultivo casa',
+]
+// El título/desc debe tocar el nicho (filtra hindi/inglés y "diente de león").
+const YT_OK = ['hongo', 'seta', 'girgola', 'gírgola', 'champiñon', 'champiñón', 'champinon',
+  'micelio', 'cultiv', 'ostra', 'melena de le', 'reishi', 'ganoderma', 'shiitake', 'shitake',
+  'adaptogen', 'ashwagandha', 'cordyceps']
+
+async function ytApi(ep: string, params: Record<string, string>, key: string): Promise<any> {
+  const u = `https://www.googleapis.com/youtube/v3/${ep}?`
+    + new URLSearchParams({ ...params, key }).toString()
+  const r = await fetch(u, { signal: AbortSignal.timeout(12000) })
+  if (!r.ok) return null
+  return r.json()
+}
+
+/** Corre las queries de nicho, dedup + filtra ruido, top por views. */
+export async function youtubeNicho(key: string): Promise<YTVideo[]> {
+  const ids = new Set<string>()
+  for (const q of YT_QUERIES) {
+    const s = await ytApi('search', {
+      part: 'snippet', q, type: 'video', order: 'viewCount',
+      relevanceLanguage: 'es', maxResults: '6',
+    }, key)
+    for (const it of s?.items ?? []) if (it.id?.videoId) ids.add(it.id.videoId)
+  }
+  if (ids.size === 0) return []
+  const v = await ytApi('videos', { part: 'statistics,snippet', id: [...ids].join(',') }, key)
+  const rows: YTVideo[] = []
+  for (const it of v?.items ?? []) {
+    const t = (it.snippet?.title ?? '') as string
+    const d = (it.snippet?.description ?? '') as string
+    const blob = (t + ' ' + d).toLowerCase()
+    if (blob.includes('diente de le')) continue           // diente de león ≠ melena de león
+    if (!YT_OK.some((w) => blob.includes(w))) continue     // fuera de nicho
+    rows.push({
+      videoId: it.id, titulo: t, canal: it.snippet?.channelTitle ?? '',
+      views: Number(it.statistics?.viewCount ?? 0),
+    })
+  }
+  rows.sort((a, b) => b.views - a.views)
+  return rows.slice(0, 15)
+}
+
+export async function ensureTablaYT(p: pg.Pool) {
+  await p.query(`CREATE TABLE IF NOT EXISTS radar_youtube (
+    fecha date PRIMARY KEY,
+    videos jsonb NOT NULL,
+    created_at timestamptz DEFAULT now()
+  )`)
+}
+
+export async function guardarYT(p: pg.Pool, videos: YTVideo[]) {
+  await p.query(
+    `INSERT INTO radar_youtube (fecha, videos) VALUES (current_date, $1)
+       ON CONFLICT (fecha) DO UPDATE SET videos = $1, created_at = now()`,
+    [JSON.stringify(videos)],
+  )
+}
+
+export async function leerYT(p: pg.Pool): Promise<YTVideo[]> {
+  try {
+    const { rows } = await p.query(
+      `SELECT videos FROM radar_youtube ORDER BY fecha DESC LIMIT 1`)
+    if (rows.length === 0) return []
+    const v = rows[0].videos
+    return (typeof v === 'string' ? JSON.parse(v) : v) as YTVideo[]
+  } catch { return [] }
+}
+
 /** Compara hoy vs previo y arma los tres bloques ordenados. */
 export function analizar(
   hoy: Record<string, number>,

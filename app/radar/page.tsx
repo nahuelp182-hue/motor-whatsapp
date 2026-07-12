@@ -1,5 +1,5 @@
 import pg from 'pg'
-import { ultimosDos, analizar, type Fila, type Analisis } from '@/lib/radar'
+import { ultimosDos, analizar, leerYT, type Fila, type Analisis, type YTVideo } from '@/lib/radar'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -21,18 +21,56 @@ function getPool(): pg.Pool | null {
   return pool
 }
 
-async function cargar(): Promise<{ a: Analisis; fecha: string | null }> {
+async function cargar(): Promise<{ a: Analisis; fecha: string | null; yt: YTVideo[] }> {
   const p = getPool()
   const vacio: Analisis = { emergentes: [], contenido: [], compra: [], hayBase: false, fecha: null }
-  if (!p) return { a: vacio, fecha: null }
+  if (!p) return { a: vacio, fecha: null, yt: [] }
   try {
-    const snaps = await ultimosDos(p)
-    if (snaps.length === 0) return { a: vacio, fecha: null }
+    const [snaps, yt] = await Promise.all([ultimosDos(p), leerYT(p)])
+    if (snaps.length === 0) return { a: vacio, fecha: null, yt }
     const previo = snaps[1]?.consultas ?? null
-    return { a: analizar(snaps[0].consultas, previo), fecha: snaps[0].fecha }
+    return { a: analizar(snaps[0].consultas, previo), fecha: snaps[0].fecha, yt }
   } catch {
-    return { a: vacio, fecha: null }
+    return { a: vacio, fecha: null, yt: [] }
   }
+}
+
+function fmtViews(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.0', '') + 'M'
+  if (n >= 1_000) return Math.round(n / 1_000) + 'K'
+  return String(n)
+}
+
+function TarjetaYouTube({ videos }: { videos: YTVideo[] }) {
+  return (
+    <section className="rounded-2xl border bg-white/[0.02] p-5" style={{ borderColor: '#ef444455' }}>
+      <h2 className="text-sm font-semibold" style={{ color: '#f87171' }}>📺 Qué performa en YouTube</h2>
+      <p className="mb-3 text-[11px] text-white/40">Videos de tu nicho por vistas — formatos/ángulos que funcionan</p>
+      {videos.length === 0 ? (
+        <p className="text-xs italic text-white/35">se llena en el próximo cron</p>
+      ) : (
+        <div className="flex flex-col">
+          {videos.map((v) => (
+            <a
+              key={v.videoId}
+              href={`https://www.youtube.com/watch?v=${v.videoId}`}
+              target="_blank"
+              rel="noopener"
+              className="flex items-start gap-2 border-t border-white/[0.05] py-1.5 text-sm text-white/85 first:border-t-0 hover:text-red-300"
+            >
+              <span className="mt-0.5 shrink-0 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/60">
+                {fmtViews(v.views)}
+              </span>
+              <span className="flex-1">
+                {v.titulo}
+                <span className="block text-[11px] text-white/35">{v.canal}</span>
+              </span>
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
+  )
 }
 
 function Badge({ estado }: { estado: Fila['estado'] }) {
@@ -85,8 +123,8 @@ function Card({ titulo, sub, filas, max, acento }: {
 }
 
 export default async function RadarPage() {
-  const { a, fecha } = await cargar()
-  const total = a.emergentes.length + a.contenido.length + a.compra.length
+  const { a, fecha, yt } = await cargar()
+  const total = a.emergentes.length + a.contenido.length + a.compra.length + yt.length
 
   return (
     <div className="min-h-screen bg-[#0a0a12] text-white">
@@ -135,6 +173,7 @@ export default async function RadarPage() {
               filas={a.compra}
               max={20}
             />
+            <TarjetaYouTube videos={yt} />
           </div>
         )}
       </div>
