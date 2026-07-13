@@ -11,6 +11,8 @@ export function middleware(request: NextRequest) {
   if (pathname === '/mvtrk.js')             return NextResponse.next()  // tracker video GA4 (storefront)
   if (pathname === '/cnc.js')               return NextResponse.next()  // widget "¿cómo nos conociste?" (storefront)
   if (pathname === '/geogate.js')           return NextResponse.next()  // geo-bloqueo storefront por radio
+  if (pathname === '/leadmagnet.js')        return NextResponse.next()  // popup/boton lead magnet (storefront)
+  if (pathname.startsWith('/api/lead'))     return NextResponse.next()  // captura lead magnet (valida + envia guia)
   if (pathname.startsWith('/api/cnc'))      return NextResponse.next()  // endpoint atribución post-compra
   if (pathname.startsWith('/api/auth'))     return NextResponse.next()
   if (pathname.startsWith('/api/cron'))     return NextResponse.next()
@@ -34,6 +36,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.png|.*\\.svg|.*\\.ico).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.png|.*\\.svg|.*\\.ico|.*\\.pdf).*)',
   ],
 }
