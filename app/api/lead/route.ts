@@ -96,11 +96,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'config' }, { status: 500, headers: CORS })
     }
 
-    await sendGuide(email)
+    try {
+      await sendGuide(email)
+    } catch (e) {
+      const detail = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
+      return NextResponse.json({ ok: false, error: 'send', detail }, { status: 500, headers: CORS })
+    }
     void addToTiendanube(email) // best-effort, no bloquea la respuesta
 
     return NextResponse.json({ ok: true }, { headers: CORS })
-  } catch {
-    return NextResponse.json({ ok: false, error: 'server' }, { status: 500, headers: CORS })
+  } catch (e) {
+    const detail = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
+    return NextResponse.json({ ok: false, error: 'server', detail }, { status: 500, headers: CORS })
   }
 }
