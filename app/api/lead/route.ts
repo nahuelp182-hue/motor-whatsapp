@@ -7,10 +7,10 @@ import { promises as dns } from 'dns'
 
 export const runtime = 'nodejs'
 
-const GMAIL_USER = process.env.GMAIL_USER ?? 'nahuelp182@gmail.com'
+const GMAIL_USER = process.env.GMAIL_USER ?? 'info.micelium@gmail.com'
 const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD ?? ''
-const TN_TOKEN = process.env.TN_TOKEN ?? ''
-const TN_STORE = process.env.TN_STORE ?? ''
+const TN_TOKEN = process.env.TN_ACCESS_TOKEN ?? ''
+const TN_STORE = process.env.TN_STORE_ID ?? ''
 const TN_UA = 'MiceliumApp (nahuelp182@gmail.com)'
 const PDF_URL = 'https://mw-micelium.vercel.app/guia-primer-cultivo.pdf'
 
