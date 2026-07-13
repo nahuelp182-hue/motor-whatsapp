@@ -12,6 +12,8 @@ export function middleware(request: NextRequest) {
   if (pathname === '/cnc.js')               return NextResponse.next()  // widget "¿cómo nos conociste?" (storefront)
   if (pathname === '/geogate.js')           return NextResponse.next()  // geo-bloqueo storefront por radio
   if (pathname === '/leadmagnet.js')        return NextResponse.next()  // popup/boton lead magnet (storefront)
+  if (pathname === '/curiosos.js')          return NextResponse.next()  // tracker de curiosos (storefront)
+  if (pathname.startsWith('/api/track'))    return NextResponse.next()  // ingesta de visitas (first-party)
   if (pathname.startsWith('/api/lead'))     return NextResponse.next()  // captura lead magnet (valida + envia guia)
   if (pathname.startsWith('/api/cnc'))      return NextResponse.next()  // endpoint atribución post-compra
   if (pathname.startsWith('/api/auth'))     return NextResponse.next()
