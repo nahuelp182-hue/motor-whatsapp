@@ -47,7 +47,14 @@
     '.lm-msg{font-size:14px;margin-top:10px;min-height:18px}'+
     '.lm-err{color:#b0341d}.lm-ok{color:#3f8f3f}'+
     '.lm-success{padding:8px 0}.lm-success .big{font-size:40px}'+
-    '.lm-success h3{font-size:19px;color:#1c1a17;margin:8px 0 6px}';
+    '.lm-success h3{font-size:19px;color:#1c1a17;margin:8px 0 6px}'+
+    '.lm-blogcta{margin:34px 0;border:1.5px solid #e6ded4;border-radius:14px;background:#faf5ef;padding:22px 24px}'+
+    '.lm-cta-in{display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:space-between}'+
+    '.lm-cta-tx{flex:1;min-width:220px}'+
+    '.lm-cta-tx b{display:block;font-size:16px;color:#1c1a17;margin-bottom:4px}'+
+    '.lm-cta-tx span{font-size:13.5px;color:#5a5148;line-height:1.45}'+
+    '.lm-blogcta button{background:#b0341d;color:#fff;border:none;border-radius:9px;padding:13px 22px;'+
+    'font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap}';
 
   var HTML =
     '<div class="lm-card">'+
@@ -127,6 +134,22 @@
       document.addEventListener('mouseout', function (e) { if (e.clientY <= 0 && !e.relatedTarget) fire(); });
     }
     window.__lmOpen = function(){ form.style.display=''; okBox.style.display='none'; btn.disabled=false; msg.textContent=''; open(); };
+
+    // CTA automatico al final de cada nota del blog (no depende de editar los posts)
+    var pc = document.querySelector('.post-content');
+    if (pc && !document.querySelector('.lm-blogcta')) {
+      var cta = document.createElement('div');
+      cta.className = 'lm-blogcta';
+      cta.innerHTML =
+        '<div class="lm-cta-in">'+
+          '<div class="lm-cta-tx">'+
+            '<b>&iquest;Quer&eacute;s lograr tu primer cultivo sin fracasar?</b>'+
+            '<span>Descarg&aacute; gratis la gu&iacute;a: las 4 etapas, los 3 errores que arruinan todo y 3 recetas para tu primera cosecha.</span>'+
+          '</div>'+
+          '<button type="button" data-leadmagnet>DESCARGAR GU&Iacute;A GRATIS</button>'+
+        '</div>';
+      pc.parentNode.insertBefore(cta, pc.nextSibling);
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
