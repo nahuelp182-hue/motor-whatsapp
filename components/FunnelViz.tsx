@@ -152,7 +152,7 @@ export function FunnelViz({
                           padding: '1px 5px', borderRadius: 6,
                           background: grayscale ? 'rgba(107,114,128,0.14)' : (s.delta >= 0 ? 'rgba(52,211,153,0.16)' : 'rgba(248,113,113,0.16)'),
                           color:      grayscale ? 'var(--t-muted)'          : (s.delta >= 0 ? '#34d399' : '#f87171'),
-                        }} title="Variación vs mismo tramo del mes anterior">
+                        }} title="Variación vs el período anterior de igual cantidad de días (según el filtro de fechas)">
                           {s.delta >= 0 ? '↑' : '↓'}{Math.abs(Math.round(s.delta))}%
                         </span>
                       )}

@@ -77,6 +77,17 @@ function localPrevMonthStart(d = new Date()) {
 function localMonthEnd(d = new Date()) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-01`
 }
+const fmtDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+// Período anterior de IGUAL cantidad de días, inmediatamente previo al rango filtrado.
+// Ej: filtro 07-01→07-13 (13 días) => compara contra 06-18→06-30 (13 días).
+function prevRange(since: string, until: string) {
+  const DAY = 86400000
+  const d0 = new Date(since + 'T00:00:00'), d1 = new Date(until + 'T00:00:00')
+  const span = Math.max(1, Math.round((d1.getTime() - d0.getTime()) / DAY) + 1)
+  const pUntil = new Date(d0.getTime() - DAY)
+  const pSince = new Date(pUntil.getTime() - (span - 1) * DAY)
+  return { since: fmtDate(pSince), until: fmtDate(pUntil) }
+}
 
 // Se evalúa en el browser con timezone local
 const PRESETS = [
@@ -114,6 +125,7 @@ export default function DashboardPage() {
   const [data, setData]               = useState<Analytics | null>(null)
   const [ordersData, setOrdersData]   = useState<OrdersData | null>(null)
   const [monthly, setMonthly]         = useState<MonthlyData | null>(null)
+  const [prevPeriod, setPrevPeriod]   = useState<{ reach: number; clicks: number; orders: number } | null>(null)
   const [loading, setLoading]         = useState(true)
   const [ordersLoading, setOrdersLoading] = useState(true)
   const [monthlyLoading, setMonthlyLoading] = useState(true)
@@ -144,6 +156,20 @@ export default function DashboardPage() {
       setLoading(false)
       setOrdersLoading(false)
     }).catch((e: Error) => { setError(e.message); setLoading(false); setOrdersLoading(false) })
+
+    // Período anterior de igual duración (para el delta del embudo, respeta el filtro)
+    const pr = prevRange(since, until)
+    setPrevPeriod(null)
+    Promise.all([
+      fetch(`/api/analytics?since=${pr.since}&until=${pr.until}`).then(r => r.json()),
+      fetch(`/api/orders-analytics?since=${pr.since}&until=${pr.until}`).then(r => r.json()),
+    ]).then(([pa, po]) => {
+      setPrevPeriod({
+        reach:  pa?.summary?.reach  ?? 0,
+        clicks: pa?.summary?.clicks ?? 0,
+        orders: po?.summary?.totalOrders ?? 0,
+      })
+    }).catch(() => setPrevPeriod(null))
 
     // Stats mensuales: siempre los últimos 12 meses (independiente del filtro)
     fetch('/api/monthly-stats')
@@ -422,10 +448,15 @@ export default function DashboardPage() {
                 Embudo de conversión
                 <HelpTip text="Dos capas: (1) Tráfico Meta Ads = Alcance y Clicks, que son 100% de la publicidad. (2) Negocio total = Compras y Recompras, que incluyen TODOS los canales (Meta + orgánico + directo + Google). El salto entre clicks y compras NO es la conversión de Meta: solo una parte de las compras vino de Meta (se indica el %). La conversión real de Meta está en el benchmark 'CVR Meta' a la derecha." />
               </h3>
-              <span className="text-[10px] text-white/25">{since} → {until}</span>
+              <div className="flex flex-col items-end leading-tight">
+                <span className="text-[10px] text-white/25">{since} → {until}</span>
+                {prevPeriod && (() => {
+                  const pr = prevRange(since, until)
+                  return <span className="text-[9px] text-white/15">Δ vs {pr.since} → {pr.until}</span>
+                })()}
+              </div>
             </div>
             {(() => {
-              const prev = monthly?.series[monthly.series.length - 2]
               const metaCh = data?.channels?.find(c => c.key === 'meta_ads')
               return (
                 <FunnelViz
@@ -437,9 +468,9 @@ export default function DashboardPage() {
                   avgTicket={tnAvgOrder}
                   metaOrders={metaCh?.orders ?? 0}
                   metaRevenue={metaCh?.revenue ?? 0}
-                  prevReach={prev?.reach}
-                  prevClicks={prev?.clicks}
-                  prevOrders={prev?.orders}
+                  prevReach={prevPeriod?.reach}
+                  prevClicks={prevPeriod?.clicks}
+                  prevOrders={prevPeriod?.orders}
                   grayscale={isGrayscale}
                 />
               )
