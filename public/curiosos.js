@@ -138,6 +138,13 @@
     try { fetch(API, { method: 'POST', body: body, keepalive: true, mode: 'cors' }); } catch (e) {}
   }
 
+  /* ---------- beacon de sesión al salir (una sola vez) ---------- */
+  var sent = false;
+  function flush() {
+    if (sent) return; sent = true;
+    send({ event: 'session' });
+  }
+
   /* ---------- thank-you: cosido a compra ---------- */
   if (IS_THANKYOU) {
     var orderNum = null;
@@ -152,14 +159,9 @@
     var em = (document.body ? document.body.innerText : '').match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
     if (em) email = em[0];
     send({ event: 'purchase', order_number: orderNum, email: email });
+    sent = true; // el purchase ya creó la visita → evita un beacon de sesión redundante
   }
 
-  /* ---------- beacon de sesión al salir (una sola vez) ---------- */
-  var sent = false;
-  function flush() {
-    if (sent) return; sent = true;
-    send({ event: 'session' });
-  }
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') flush();
   });
