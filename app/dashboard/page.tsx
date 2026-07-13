@@ -420,12 +420,13 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 flex items-center">
                 Embudo de conversión
-                <HelpTip text="Muestra cuántas personas pasan por cada etapa del proceso de compra: desde que ven el anuncio hasta que recompran. Las tasas entre etapas indican dónde hay más fricción o pérdida." />
+                <HelpTip text="Dos capas: (1) Tráfico Meta Ads = Alcance y Clicks, que son 100% de la publicidad. (2) Negocio total = Compras y Recompras, que incluyen TODOS los canales (Meta + orgánico + directo + Google). El salto entre clicks y compras NO es la conversión de Meta: solo una parte de las compras vino de Meta (se indica el %). La conversión real de Meta está en el benchmark 'CVR Meta' a la derecha." />
               </h3>
               <span className="text-[10px] text-white/25">{since} → {until}</span>
             </div>
             {(() => {
               const prev = monthly?.series[monthly.series.length - 2]
+              const metaCh = data?.channels?.find(c => c.key === 'meta_ads')
               return (
                 <FunnelViz
                   reach={s.reach}
@@ -434,6 +435,8 @@ export default function DashboardPage() {
                   repeats={monthly?.repeatCount ?? 0}
                   revenue={tnRevenue}
                   avgTicket={tnAvgOrder}
+                  metaOrders={metaCh?.orders ?? 0}
+                  metaRevenue={metaCh?.revenue ?? 0}
                   prevReach={prev?.reach}
                   prevClicks={prev?.clicks}
                   prevOrders={prev?.orders}
