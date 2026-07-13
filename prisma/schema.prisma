@@ -22,6 +22,7 @@ model Store {
   messageLogs   MessageLog[]
   gclidSessions GclidSession[]
   reviews       Review[]
+  visitors      Visitor[]
 }
 
 model Customer {
@@ -134,8 +135,8 @@ model GclidSession {
   id         String   @id @default(cuid())
   store_id   String
   gclid      String
-  phone      String?  // normalizado 549..., se rellena cuando el usuario compra
-  order_id   String?  // TN order ID, se rellena al hacer match
+  phone      String? // normalizado 549..., se rellena cuando el usuario compra
+  order_id   String? // TN order ID, se rellena al hacer match
   uploaded   Boolean  @default(false)
   created_at DateTime @default(now())
   expires_at DateTime // 90 días desde la llegada (ventana de conversión de Google Ads)
@@ -144,4 +145,59 @@ model GclidSession {
 
   @@index([store_id, phone])
   @@index([store_id, gclid])
+}
+
+// ─────────────────────────────────────────────────────────────
+// TRACKING DE CURIOSOS — identidad de primera parte + cohortes
+// Separa el tráfico de campaña (Meta TOFU) del SEO/directo de Google,
+// mide permanencia/curiosidad y sigue retorno + recompra en el tiempo.
+// Misma taxonomía de canal que lib/attribution.ts (classifyOrder).
+// ─────────────────────────────────────────────────────────────
+
+model Visitor {
+  id       String @id @default(cuid())
+  store_id String
+  vid      String // UUID de primera parte (cookie 2 años, generado en el browser)
+
+  // FIRST TOUCH — sellado en la 1ra visita, NUNCA se sobreescribe.
+  // Esto es lo que hace confiable la atribución para decidir campañas.
+  ft_channel  String // meta_ads | google_ads | seo | directo | otro_utm
+  ft_source   String? // utm_source, o host del referrer (google/instagram/…)
+  ft_campaign String? // utm_campaign si vino
+  ft_landing  String? // primera landing (con query completa)
+  ft_at       DateTime @default(now())
+
+  // COSIDO A COMPRA — se rellena cuando el visitante llega al thank-you page.
+  email        String?
+  order_number Int?
+  purchased_at DateTime?
+
+  last_seen DateTime @default(now())
+
+  store  Store   @relation(fields: [store_id], references: [id])
+  visits Visit[]
+
+  @@unique([store_id, vid])
+  @@index([store_id, ft_channel])
+  @@index([store_id, ft_at])
+}
+
+model Visit {
+  id         String @id @default(cuid())
+  visitor_id String // FK a Visitor.id
+
+  started_at     DateTime @default(now())
+  duration_ms    Int      @default(0)
+  max_scroll     Int      @default(0) // % máximo de scroll (0-100)
+  pageviews      Int      @default(1)
+  viewed_product Boolean  @default(false)
+  engaged        Boolean  @default(false) // dur≥10s ó scroll≥50% ó vio producto
+
+  channel String // canal de ESTA visita (puede diferir del first touch)
+  landing String?
+
+  visitor Visitor @relation(fields: [visitor_id], references: [id])
+
+  @@index([visitor_id])
+  @@index([started_at])
 }

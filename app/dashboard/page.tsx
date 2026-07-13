@@ -17,6 +17,7 @@ import { ThemePicker, THEMES, type Theme } from '@/components/ThemePicker'
 import { SalesCadence } from '@/components/SalesCadence'
 import { PerformanceSection } from '@/components/PerformanceSection'
 import { AttributionSection } from '@/components/AttributionSection'
+import { CuriososSection } from '@/components/CuriososSection'
 import { GlobalRoasGauge } from '@/components/GlobalRoasGauge'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -574,6 +575,11 @@ export default function DashboardPage() {
               />
             </div>
           )}
+
+          {/* ── Curiosos: cohortes de visitantes por canal ───────────── */}
+          <div className="mb-5">
+            <CuriososSection acHex={theme.acHex} />
+          </div>
 
           {/* ── Bottom: Mensajes + LTV ───────────────────────────────── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
