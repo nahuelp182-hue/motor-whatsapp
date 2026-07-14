@@ -22,6 +22,11 @@ const UA       = 'Micelium/1.0 (nahuelp182@gmail.com)'
 
 // Número empresa al que se deriva al cliente (NO el número dedicado a la Cloud API)
 const EMPRESA_WA = process.env.WA_EMPRESA ?? '5493525623546'
+// Números INTERNOS (no clientes): no pasan por el bot ni por CRM.
+// Tío = encargado de despachar ventas apícolas; sus respuestas se reenvían a Nahuel.
+const TIO_WA    = process.env.WA_TIO    ?? '5493563413104'
+const NAHUEL_WA = process.env.WA_NAHUEL ?? '5493522412228'
+const last10 = (s: string): string => (s || '').replace(/\D/g, '').slice(-10)
 // Texto que le llega a la empresa cuando el cliente toca el botón (para identificarlo en métricas)
 const WA_LINK = `https://wa.me/${EMPRESA_WA}?text=${encodeURIComponent('Hola, vengo del asistente virtual')}`
 const WA_BTN_TEXT = 'Chatear con equipo' // ≤20 chars (límite de botón cta_url)
@@ -252,6 +257,26 @@ async function enviarMensajeWA(to: string, texto: string): Promise<boolean> {
   return res.ok
 }
 
+// Reenvío por PLANTILLA (siempre entrega, aún fuera de ventana 24h). Devuelve true si salió.
+async function reenviarPlantillaWA(to: string, tpl: string, params: string[]): Promise<boolean> {
+  const res = await fetch(`${WA_API_URL}/${WA_PHONE_ID}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'template',
+      template: {
+        name: tpl,
+        language: { code: 'es_AR' },
+        components: [{ type: 'body', parameters: params.map((t) => ({ type: 'text', text: t })) }],
+      },
+    }),
+  })
+  if (!res.ok) console.error('reenvío plantilla FALLO', res.status, (await res.text().catch(() => '')).slice(0, 300))
+  return res.ok
+}
+
 // Mensaje interactivo con botón (cta_url): muestra un botón limpio en vez de una URL larga.
 async function enviarBotonWA(to: string, cuerpo: string, displayText: string, url: string): Promise<boolean> {
   const res = await fetch(`${WA_API_URL}/${WA_PHONE_ID}/messages`, {
@@ -344,6 +369,28 @@ export async function POST(req: NextRequest) {
 
         const nombre = value.contacts?.find((c) => c.wa_id === from)?.profile?.name
           ?? value.contacts?.[0]?.profile?.name
+
+        // ─── Números INTERNOS: NO pasan por el bot ni por CRM/leads ───
+        const desde10 = last10(from)
+        if (desde10 === last10(TIO_WA)) {
+          // Respuesta del tío (despachos) → reenviar a Nahuel. Plantilla primero (siempre entrega),
+          // email de respaldo. Nunca contesta el bot ni se crea lead.
+          try {
+            await wdiag('reenvio_tio', from, { texto: texto.slice(0, 500), wamid: msg.id, nombre })
+            const limpio = texto.replace(/\s+/g, ' ').slice(0, 600)
+            const ok = await reenviarPlantillaWA(NAHUEL_WA, 'aviso_mensaje_tio', [nombre || 'Tu tío', limpio])
+            if (!ok) await notifyNahuel('📨 Mensaje de tu tío (despachos)', `Tu tío (${from}) escribió:\n\n"${texto}"`)
+          } catch (e) {
+            console.error('reenvío tío error:', e)
+            try { await notifyNahuel('📨 Mensaje de tu tío (despachos)', `Tu tío (${from}) escribió:\n\n"${texto}"`) } catch {}
+          }
+          continue
+        }
+        if (desde10 === last10(NAHUEL_WA)) {
+          // Mensajes del propio Nahuel al número: que NO responda el bot.
+          await wdiag('interno_nahuel', from, { texto: texto.slice(0, 300), wamid: msg.id })
+          continue
+        }
 
         try {
           // 'recibido'/'pensado' son los kinds que getHistorial() consulta para reconstruir el hilo
