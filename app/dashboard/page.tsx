@@ -615,16 +615,9 @@ export default function DashboardPage() {
             <CuriososSection acHex={theme.acHex} />
           </div>
 
-          {/* ── Bottom: Mensajes + LTV ───────────────────────────────── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 mb-3">Mensajes WhatsApp</p>
-              <div className="flex gap-8">
-                <div><p className="text-2xl font-bold font-mono text-emerald-400">0</p><p className="text-[10px] text-white/50 mt-1">Enviados</p></div>
-                <div><p className="text-2xl font-bold font-mono text-red-400/70">0</p><p className="text-[10px] text-white/50 mt-1">Fallidos</p></div>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+          {/* ── Bottom: LTV ──────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 gap-4 mb-5">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 md:max-w-md">
               {/* Título con tooltip */}
               <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 mb-4 flex items-center">
                 LTV / CAC ratio
