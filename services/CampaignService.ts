@@ -16,6 +16,9 @@ type TNOrder = {
   status?: string
   paid_at?: string | null
   cancelled_at?: string | null
+  shipping_status?: string | null
+  shipped_at?: string | null
+  updated_at?: string | null
 }
 
 // ── WhatsApp Cloud API ────────────────────────────────────────────────────────
@@ -248,9 +251,12 @@ export class CampaignService {
   }
 
   /**
-   * REVIEW — pide reseña/testimonio a los pedidos pagados hace 7-10 días.
-   * No depende de confirmación de entrega del correo (no disponible de forma
-   * confiable) — usa paid_at + ventana de shipping típica (3-5 días) + margen.
+   * REVIEW — pide reseña/testimonio una vez que el pedido está realmente
+   * entregado (shipping_status === 'delivered', dato que Tiendanube ya trae
+   * en la orden). Espera un margen desde la entrega para que el cliente lo
+   * haya probado. Fallback: si a los MAX_DIAS_FALLBACK de pagado TN nunca
+   * marcó delivered (status desactualizado, retiro en persona, etc.) manda
+   * igual para no dejar el pedido sin pedir reseña. Corte duro a MAX_DIAS_TOTAL.
    * Llamado por el mismo cron externo que RECOVERY (VPS, cada ~30 min).
    */
   async pollReviewRequests() {
@@ -268,8 +274,9 @@ export class CampaignService {
       return { checked: 0, sent: 0, skipped: 'fuera de horario 9-21 AR' }
     }
 
-    const MIN_DIAS = 7
-    const MAX_DIAS = 10
+    const MIN_DIAS_DESDE_ENTREGA = 1
+    const MAX_DIAS_FALLBACK = 15
+    const MAX_DIAS_TOTAL = 20
 
     const orders = await this.fetchRecentPaidOrders()
     let sent = 0
@@ -277,7 +284,16 @@ export class CampaignService {
     for (const o of orders) {
       if (!o.contact_phone || !o.paid_at || o.cancelled_at) continue
       const diasDesdePago = (Date.now() - new Date(o.paid_at).getTime()) / 86_400_000
-      if (diasDesdePago < MIN_DIAS || diasDesdePago > MAX_DIAS) continue
+      if (diasDesdePago > MAX_DIAS_TOTAL) continue
+
+      const entregado = o.shipping_status === 'delivered'
+      if (entregado) {
+        const fechaEntrega = new Date(o.shipped_at ?? o.updated_at ?? o.paid_at)
+        const diasDesdeEntrega = (Date.now() - fechaEntrega.getTime()) / 86_400_000
+        if (diasDesdeEntrega < MIN_DIAS_DESDE_ENTREGA) continue
+      } else if (diasDesdePago < MAX_DIAS_FALLBACK) {
+        continue
+      }
 
       const customer = await this.upsertCustomer(o)
 
@@ -324,7 +340,7 @@ export class CampaignService {
   }
 
   private async fetchRecentPaidOrders(): Promise<TNOrder[]> {
-    const since = new Date(Date.now() - 11 * 86_400_000).toISOString()
+    const since = new Date(Date.now() - 21 * 86_400_000).toISOString()
     const res = await fetch(
       `https://api.tiendanube.com/v1/${this.store.tiendanube_store_id}/orders?payment_status=paid&per_page=100&created_at_min=${since}`,
       {
