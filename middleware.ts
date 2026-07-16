@@ -11,6 +11,7 @@ export function middleware(request: NextRequest) {
   if (pathname === '/mvtrk.js')             return NextResponse.next()  // tracker video GA4 (storefront)
   if (pathname === '/cnc.js')               return NextResponse.next()  // widget "¿cómo nos conociste?" (storefront)
   if (pathname === '/geogate.js')           return NextResponse.next()  // geo-bloqueo storefront por radio
+  if (pathname === '/ldschema.js')          return NextResponse.next()  // JSON-LD schema.org (storefront)
   if (pathname === '/leadmagnet.js')        return NextResponse.next()  // popup/boton lead magnet (storefront)
   if (pathname === '/curiosos.js')          return NextResponse.next()  // tracker de curiosos (storefront)
   if (pathname.startsWith('/api/track'))    return NextResponse.next()  // ingesta de visitas (first-party)
