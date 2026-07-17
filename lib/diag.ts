@@ -86,6 +86,59 @@ export async function comentarioYaRespondido(commentId: string): Promise<boolean
   }
 }
 
+/**
+ * Debounce de ráfagas: ¿llegó un 'recibido' MÁS NUEVO de este sender que el mío?
+ * Si sí, esta invocación no debe responder (la última de la ráfaga responderá por todos).
+ * Nunca lanza; ante error devuelve false (responde igual, no peor que hoy).
+ */
+export async function hayMensajePosterior(sender: string, wamid: string): Promise<boolean> {
+  try {
+    const p = getPool()
+    if (!p || !wamid) return false
+    const r = await p.query(
+      `SELECT 1 FROM ig_diag
+        WHERE sender = $1 AND kind = 'recibido'
+          AND ts > now() - interval '2 minutes'
+          AND id > COALESCE((SELECT id FROM ig_diag WHERE detail->>'wamid' = $2 ORDER BY id DESC LIMIT 1), 0)
+        LIMIT 1`,
+      [sender, wamid],
+    )
+    return (r.rowCount ?? 0) > 0
+  } catch (e) {
+    console.error('hayMensajePosterior error:', e)
+    return false
+  }
+}
+
+/**
+ * Junta el texto de todos los 'recibido' de este sender posteriores a su último 'pensado'
+ * (o de los últimos 2 min si nunca hubo respuesta). Une la ráfaga en un solo mensaje.
+ * Nunca lanza; ante error devuelve [].
+ */
+export async function textosDeLaRafaga(sender: string): Promise<string[]> {
+  try {
+    const p = getPool()
+    if (!p) return []
+    const r = await p.query(
+      `SELECT detail FROM ig_diag
+        WHERE sender = $1 AND kind = 'recibido'
+          AND id > COALESCE((SELECT id FROM ig_diag WHERE sender = $1 AND kind = 'pensado' ORDER BY id DESC LIMIT 1), 0)
+          AND ts > now() - interval '2 minutes'
+        ORDER BY id ASC`,
+      [sender],
+    )
+    const out: string[] = []
+    for (const row of r.rows) {
+      const d = typeof row.detail === 'string' ? JSON.parse(row.detail) : row.detail
+      if (d?.texto) out.push(d.texto as string)
+    }
+    return out
+  } catch (e) {
+    console.error('textosDeLaRafaga error:', e)
+    return []
+  }
+}
+
 export type Turno = { role: 'user' | 'assistant'; content: string }
 
 /**

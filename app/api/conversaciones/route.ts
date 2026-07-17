@@ -29,6 +29,8 @@ type Conversacion = {
   mensajes: Mensaje[]
   derivada: boolean
   manual: boolean
+  seguimiento: boolean
+  feedback: boolean
   error: boolean
 }
 
@@ -55,7 +57,7 @@ export async function GET(req: NextRequest) {
       const d = (typeof r.detail === 'string' ? JSON.parse(r.detail) : r.detail) as Record<string, unknown>
       let c = map.get(r.sender)
       if (!c) {
-        c = { sender: r.sender, nombre: null, ultimoTs: r.ts, mensajes: [], derivada: false, manual: false, error: false }
+        c = { sender: r.sender, nombre: null, ultimoTs: r.ts, mensajes: [], derivada: false, manual: false, seguimiento: false, feedback: false, error: false }
         map.set(r.sender, c)
       }
       c.ultimoTs = r.ts
@@ -69,6 +71,8 @@ export async function GET(req: NextRequest) {
         const accion = typeof d.accion === 'string' ? d.accion : undefined
         if (derivar) c.derivada = true
         if (accion && accion.startsWith('manual')) c.manual = true
+        if (accion && accion.startsWith('seguimiento')) c.seguimiento = true
+        if (d.feedback === true || accion === 'feedback') c.feedback = true
         if (text) c.mensajes.push({ ts: r.ts, role: 'bot', text, derivar, accion })
       } else if (r.kind === 'wa_send_fail' || r.kind === 'wa_error') {
         c.error = true
@@ -84,6 +88,8 @@ export async function GET(req: NextRequest) {
       mensajes: conversaciones.reduce((s, c) => s + c.mensajes.length, 0),
       derivadas: conversaciones.filter((c) => c.derivada).length,
       manuales: conversaciones.filter((c) => c.manual).length,
+      seguimientos: conversaciones.filter((c) => c.seguimiento).length,
+      feedbacks: conversaciones.filter((c) => c.feedback).length,
       errores: conversaciones.filter((c) => c.error).length,
     }
 

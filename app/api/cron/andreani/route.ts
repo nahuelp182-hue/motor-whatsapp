@@ -6,7 +6,7 @@ export const runtime = 'nodejs'
 // Estado real de un envío Andreani. Lo usa el cron del VPS (recordatorio_sucursal),
 // que NO puede alcanzar tracking-api.andreani.com directamente (IP de datacenter
 // bloqueada). Vercel sí llega. Protegido con CRON_SECRET.
-// curl -H "Authorization: Bearer $CRON_SECRET" ".../api/andreani?numero=360003034254330"
+// curl -H "Authorization: Bearer $CRON_SECRET" ".../api/cron/andreani?numero=360003034254330"
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {

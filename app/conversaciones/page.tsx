@@ -10,15 +10,28 @@ type Conversacion = {
   mensajes: Mensaje[]
   derivada: boolean
   manual: boolean
+  seguimiento: boolean
+  feedback: boolean
   error: boolean
 }
-type Totales = { conversaciones: number; mensajes: number; derivadas: number; manuales: number; errores: number }
+type Totales = { conversaciones: number; mensajes: number; derivadas: number; manuales: number; seguimientos: number; feedbacks: number; errores: number }
 type Data = { conversaciones: Conversacion[]; totales: Totales; days: number; error?: string }
 
 const RANGOS = [
   { label: 'Hoy', days: 1 },
   { label: '7 días', days: 7 },
   { label: '30 días', days: 30 },
+]
+
+// Filtros por categoría. `test` decide si una conversación entra en el filtro.
+type FiltroId = 'todos' | 'derivada' | 'seguimiento' | 'manual' | 'feedback' | 'error'
+const FILTROS: Array<{ id: FiltroId; label: string; color?: string; test: (c: Conversacion) => boolean }> = [
+  { id: 'todos',       label: 'Todos',       test: () => true },
+  { id: 'derivada',    label: 'Derivados',   color: '#f59e0b', test: (c) => c.derivada },
+  { id: 'seguimiento', label: 'Seguimiento', color: '#60a5fa', test: (c) => c.seguimiento },
+  { id: 'manual',      label: 'Manuales',    color: '#34d399', test: (c) => c.manual },
+  { id: 'feedback',    label: 'Feedback',    color: '#c084fc', test: (c) => c.feedback },
+  { id: 'error',       label: 'Errores',     color: '#f87171', test: (c) => c.error },
 ]
 
 function hora(ts: string): string {
@@ -38,6 +51,8 @@ export default function ConversacionesPage() {
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
   const [sel, setSel] = useState<string | null>(null)
+  const [filtro, setFiltro] = useState<FiltroId>('todos')
+  const [q, setQ] = useState('')
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -48,7 +63,7 @@ export default function ConversacionesPage() {
       // Selección por defecto: la primera (la más reciente)
       setSel((prev) => prev ?? json.conversaciones[0]?.sender ?? null)
     } catch {
-      setData({ conversaciones: [], totales: { conversaciones: 0, mensajes: 0, derivadas: 0, manuales: 0, errores: 0 }, days, error: 'No se pudo cargar' })
+      setData({ conversaciones: [], totales: { conversaciones: 0, mensajes: 0, derivadas: 0, manuales: 0, seguimientos: 0, feedbacks: 0, errores: 0 }, days, error: 'No se pudo cargar' })
     } finally {
       setLoading(false)
     }
@@ -56,9 +71,19 @@ export default function ConversacionesPage() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  const convs = data?.conversaciones ?? []
-  const actual = convs.find((c) => c.sender === sel) ?? null
+  const todas = data?.conversaciones ?? []
   const t = data?.totales
+  const testFiltro = FILTROS.find((f) => f.id === filtro)?.test ?? (() => true)
+  const qn = q.trim().toLowerCase()
+  const convs = todas.filter((c) => {
+    if (!testFiltro(c)) return false
+    if (!qn) return true
+    if ((c.nombre ?? '').toLowerCase().includes(qn)) return true
+    if (c.sender.includes(qn.replace(/\D/g, ''))) return true
+    return c.mensajes.some((m) => m.text.toLowerCase().includes(qn))
+  })
+  const actual = convs.find((c) => c.sender === sel) ?? null
+  const conteo = (f: (c: Conversacion) => boolean) => todas.filter(f).length
 
   return (
     <div className="min-h-screen bg-[#0a0a12] text-white">
@@ -90,14 +115,34 @@ export default function ConversacionesPage() {
           </div>
         </div>
 
-        {/* KPIs */}
+        {/* Filtros por categoría (clickeables) + búsqueda */}
         {t && (
-          <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-5">
-            <Kpi label="Chats" value={t.conversaciones} />
-            <Kpi label="Mensajes" value={t.mensajes} />
-            <Kpi label="Derivados a Mateo" value={t.derivadas} accent="#f59e0b" />
-            <Kpi label="Manuales enviados" value={t.manuales} accent="#34d399" />
-            <Kpi label="Errores de envío" value={t.errores} accent={t.errores ? '#f87171' : undefined} />
+          <div className="mb-4 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {FILTROS.map((f) => {
+                const n = conteo(f.test)
+                const activo = filtro === f.id
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => { setFiltro(f.id); setSel(null) }}
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition ${
+                      activo ? 'border-white/[0.2] bg-white/[0.08] text-white' : 'border-white/[0.06] bg-white/[0.02] text-white/55 hover:text-white/90'
+                    }`}
+                  >
+                    {f.color && <span className="inline-block h-2 w-2 rounded-full" style={{ background: f.color }} />}
+                    <span>{f.label}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activo ? 'bg-white/[0.15]' : 'bg-white/[0.06] text-white/50'}`}>{n}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <input
+              value={q}
+              onChange={(e) => { setQ(e.target.value); setSel(null) }}
+              placeholder="Buscar por nombre, número o texto del mensaje…"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-white/[0.2] focus:outline-none sm:max-w-md"
+            />
           </div>
         )}
 
@@ -129,9 +174,11 @@ export default function ConversacionesPage() {
                   <div className="mt-0.5 truncate text-xs text-white/45">
                     {c.mensajes[c.mensajes.length - 1]?.text || ''}
                   </div>
-                  <div className="mt-1.5 flex gap-1">
+                  <div className="mt-1.5 flex flex-wrap gap-1">
                     {c.derivada && <Badge color="#f59e0b">derivado</Badge>}
+                    {c.seguimiento && <Badge color="#60a5fa">seguimiento</Badge>}
                     {c.manual && <Badge color="#34d399">manual</Badge>}
+                    {c.feedback && <Badge color="#c084fc">feedback</Badge>}
                     {c.error && <Badge color="#f87171">error</Badge>}
                   </div>
                 </button>
@@ -188,15 +235,6 @@ export default function ConversacionesPage() {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function Kpi({ label, value, accent }: { label: string; value: number; accent?: string }) {
-  return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
-      <div className="text-lg font-semibold" style={accent ? { color: accent } : undefined}>{value}</div>
-      <div className="text-[11px] text-white/45">{label}</div>
     </div>
   )
 }

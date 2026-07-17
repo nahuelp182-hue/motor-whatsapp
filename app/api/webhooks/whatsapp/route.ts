@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
-import { diag, getHistorial, logClaudeUsage, type Turno } from '@/lib/diag'
+import { diag, getHistorial, logClaudeUsage, hayMensajePosterior, textosDeLaRafaga, type Turno } from '@/lib/diag'
+import { getEstadoAndreani } from '@/lib/andreani'
 import { prisma } from '@/lib/prisma'
+
+// Ventana de "debounce": si el cliente manda varios mensajes seguidos, esperamos este
+// tiempo y solo la última invocación responde (a toda la ráfaga junta). Evita respuestas
+// duplicadas/contradictorias cuando llegan 2-3 mensajes casi simultáneos.
+const DEBOUNCE_MS = 7000
 
 const MODELO = 'claude-haiku-4-5-20251001'
 
@@ -113,7 +119,17 @@ async function bloqueCatalogo(): Promise<string> {
 
 // ─────────── Verificación de compra (para mandar manuales) ───────────
 type ManualId = 'inc101' | 'pc400'
-type Pedido = { encontrado: boolean; manuales: ManualId[]; numero?: number }
+type Pedido = {
+  encontrado: boolean
+  manuales: ManualId[]
+  numero?: number
+  // Datos de envío (para seguimiento real):
+  tracking?: string        // nº de seguimiento del correo
+  correo?: string          // texto del correo/transportista (Andreani, Correo Argentino…)
+  esAndreani?: boolean
+  pickup?: boolean         // envío a sucursal (retiro) vs domicilio
+  despachado?: boolean     // shipping_status ya salió del depósito
+}
 
 const soloDigitos = (s: string): string => (s || '').replace(/\D/g, '')
 
@@ -136,11 +152,13 @@ async function buscarPedido(phone: string, texto: string): Promise<Pedido> {
   try {
     for (let page = 1; page <= 6; page++) {
       const url = `${TN_BASE}/${TN_STORE}/orders?payment_status=paid&per_page=50&page=${page}` +
-        `&fields=number,contact_phone,contact_identification,products`
+        `&fields=number,contact_phone,contact_identification,products,` +
+        `shipping_tracking_number,shipping_option,shipping_pickup_type,shipping_status`
       const res = await fetch(url, { headers: { Authentication: `bearer ${TN_TOKEN}`, 'User-Agent': UA } })
       if (!res.ok) break
       const data = (await res.json()) as Array<{
         number: number; contact_phone?: string; contact_identification?: string; products?: Array<{ name?: unknown }>
+        shipping_tracking_number?: string; shipping_option?: string; shipping_pickup_type?: string; shipping_status?: string
       }>
       if (!Array.isArray(data) || data.length === 0) break
       for (const o of data) {
@@ -148,7 +166,17 @@ async function buscarPedido(phone: string, texto: string): Promise<Pedido> {
         const matchTel = tel8.length >= 8 && oPhone8 === tel8
         const matchTok = tokens.some((t) => String(o.number) === t || soloDigitos(o.contact_identification ?? '') === t)
         if (matchTel || matchTok) {
-          return { encontrado: true, manuales: manualesDeProductos(o.products ?? []), numero: o.number }
+          const correo = o.shipping_option ?? ''
+          return {
+            encontrado: true,
+            manuales: manualesDeProductos(o.products ?? []),
+            numero: o.number,
+            tracking: o.shipping_tracking_number || undefined,
+            correo: correo || undefined,
+            esAndreani: /andreani/i.test(correo),
+            pickup: o.shipping_pickup_type === 'pickup',
+            despachado: o.shipping_status === 'shipped',
+          }
         }
       }
       if (data.length < 50) break
@@ -157,6 +185,41 @@ async function buscarPedido(phone: string, texto: string): Promise<Pedido> {
     console.error('buscarPedido error:', e)
   }
   return { encontrado: false, manuales: [] }
+}
+
+// Arma un mensaje de seguimiento con el estado REAL del envío. Devuelve null si no se
+// puede dar una respuesta certera (→ el caller deriva al equipo, nunca inventa).
+async function mensajeSeguimiento(pedido: Pedido): Promise<string | null> {
+  if (!pedido.encontrado) return null
+
+  // Todavía sin nº de seguimiento: o no se despachó, o recién sale.
+  if (!pedido.tracking) {
+    if (pedido.despachado) return null // despachado sin tracking cargado → derivar, no arriesgar
+    return `Tu pedido #${pedido.numero} está confirmado 🙌 Todavía no salió del depósito; ` +
+      `normalmente se despacha al día siguiente hábil a la mañana. Apenas tenga seguimiento te lo paso.`
+  }
+
+  // Andreani: estado en vivo, certero.
+  if (pedido.esAndreani) {
+    const est = await getEstadoAndreani(pedido.tracking)
+    if (!est.ok || est.orden == null) return null // sin dato certero → derivar
+    const link = `https://www.andreani.com/envio/${pedido.tracking}`
+    if (est.entregado) {
+      return `Tu pedido #${pedido.numero} figura como ENTREGADO ✅ Si no lo recibiste, avisame y lo revisamos.\n\nSeguimiento: ${link}`
+    }
+    if (est.enSucursal) {
+      return `¡Buena noticia! Tu pedido #${pedido.numero} ya está EN LA SUCURSAL para retirar 🙌 ` +
+        `Llevá tu DNI. Te conviene pasar pronto: si queda muchos días sin retirar, el correo lo devuelve.\n\nSeguimiento: ${link}`
+    }
+    // En camino / ingresado / pendiente → NO decir "llegó a sucursal".
+    return `Tu pedido #${pedido.numero} está EN CAMINO 🚚 (estado actual: ${est.titulo}). ` +
+      `El plazo habitual es de 3 a 5 días hábiles.\n\nSeguílo acá: ${link}`
+  }
+
+  // Correo Argentino u otro: no hay estado en vivo → damos link + código (certero, sin inventar estado).
+  return `Tu pedido #${pedido.numero} viaja por ${pedido.correo || 'el correo'} 📦 ` +
+    `Seguilo con este código: ${pedido.tracking}\n` +
+    `https://www.correoargentino.com.ar/formularios/ondnc`
 }
 
 function linkDeManual(m: ManualId): string {
@@ -180,7 +243,12 @@ PRECIOS: NUNCA cotizás precios ni armás escaleras de precio (la escalera visua
 
 MANUALES / GUÍAS / MATERIAL (solo para quien YA compró): si el cliente pide el manual, la guía, el instructivo o el material de uso de su equipo, NO derivés: marcá [MANUAL] con el producto (inc101 = incubadora, pc400 = tableta; si no queda claro cuál, poné ?). En [RESPUESTA] poné algo breve y cálido tipo "¡Genial! Te dejo el material 👇" — el SISTEMA verifica la compra y adjunta el link (no escribas vos ningún link de manual). Si es una preventa (todavía no compró) y pide el manual, NO marques [MANUAL]: explicale breve que el material viene con la compra.
 
-ACÁ NO TENÉS HERRAMIENTAS DE ENVÍOS. Por eso DERIVÁ (no lo resuelvas solo, no inventes datos) cuando el cliente pida: estado/seguimiento de su envío, buscar su pedido, roturas/garantía/fallas, plata/reintegros/reembolsos, reclamos que escalan, temas legales/salud/consumo de sustancias, psilocibe/"mágicos"/Golden Teacher, o mayoristas/prensa.
+SEGUIMIENTO DE ENVÍO: si el cliente pregunta dónde está su pedido / cuándo llega / por el estado del envío, NO derivés y NO inventes ningún estado ("ya está en sucursal", "salió hoy", etc. — NUNCA). Marcá [SEGUIMIENTO]. El SISTEMA consulta el estado REAL (Tiendanube + Andreani) y responde con datos ciertos, o deriva solo si no hay dato certero. En [RESPUESTA] poné una línea breve tipo "Dejame ver el estado de tu envío 👇" SIN afirmar nada del estado. Si el cliente todavía no dio con qué ubicar su compra (nº de orden o DNI) y no lo tenemos por su teléfono, pedíselo antes.
+
+FEEDBACK / QUEJA SOBRE EL PRODUCTO: si el cliente comenta una falla, defecto, crítica o problema de calidad del equipo (algo que llegó torcido/roto/mal, o una observación de mejora), marcá [FEEDBACK]. Respondé breve, agradecido y empático, pero NO des instrucciones de reparación ni le pidas que lo arregle/desarme él mismo (nada de "despegá y volvé a pegar", "ajustá", "cambiá vos"). Para cualquier arreglo o reposición lo ve el equipo. El sistema le avisa a Nahuel.
+
+ACÁ NO TENÉS HERRAMIENTAS PARA RESOLVER. Por eso DERIVÁ (no lo resuelvas solo, no inventes datos) cuando el cliente pida: roturas/garantía/fallas que hay que gestionar, plata/reintegros/reembolsos, cambios de pedido (cuotas, dirección, cancelación), reclamos que escalan, temas legales/salud, o mayoristas/prensa.
+PSILOCIBE / "MÁGICOS" / GOLDEN TEACHER: NO derivés por esto. Respondé SIEMPRE con esta única línea neutral y cerrá el tema: "La incubadora sirve para cualquier tipo de cultivo de hongos; controla temperatura y humedad de forma automática. Sobre especies puntuales no asesoramos, pero el equipo funciona igual para lo que quieras cultivar 🙌". No des instrucciones ni recomendaciones de cepas/dosis. Solo si el cliente INSISTE reiteradamente, ahí sí marcá DERIVAR.
 Cuando DERIVES: en la RESPUESTA invitá al cliente, breve y cálido, a SEGUIR POR WHATSAPP con el equipo (ahí lo atienden mejor). NO escribas vos el número ni el link de WhatsApp: el sistema agrega el link automáticamente al final de tu respuesta. Ej. de cierre: "Para esto te ayudamos mejor con el equipo 👇". Y marcá DERIVAR.
 
 FORMATO DE SALIDA OBLIGATORIO (respetá estas etiquetas EXACTAS, en este orden):
@@ -189,24 +257,31 @@ FORMATO DE SALIDA OBLIGATORIO (respetá estas etiquetas EXACTAS, en este orden):
 [DERIVAR] si|no
 [MOTIVO] <motivo corto si derivás; si no derivás poné "no" en DERIVAR y dejá MOTIVO vacío>
 [MANUAL] <inc101|pc400|? — SOLO si el cliente pide el manual de su compra; si no aplica, omití esta línea>
+[SEGUIMIENTO] si — SOLO si el cliente pregunta por el estado/llegada de su envío; si no aplica, omití esta línea
+[FEEDBACK] si — SOLO si el cliente reporta una falla/crítica/defecto del producto; si no aplica, omití esta línea
 
 === BASE DE CONOCIMIENTO ===
 ${KB_MICELIUM}
 === FIN ===`
 
 // ─────────── Parseo de salida del cerebro ───────────
-type Salida = { respuesta: string; derivar: boolean; motivo: string; manual: ManualId | '?' | null }
+type Salida = {
+  respuesta: string; derivar: boolean; motivo: string
+  manual: ManualId | '?' | null; seguimiento: boolean; feedback: boolean
+}
 
 function parseSalida(raw: string): Salida {
-  const mResp = raw.match(/\[RESPUESTA\]\s*([\s\S]*?)\s*(?:\[DERIVAR\]|\[MANUAL\]|$)/i)
+  const mResp = raw.match(/\[RESPUESTA\]\s*([\s\S]*?)\s*(?:\[DERIVAR\]|\[MANUAL\]|\[SEGUIMIENTO\]|\[FEEDBACK\]|$)/i)
   const mDer  = raw.match(/\[DERIVAR\]\s*(si|sí|no)/i)
-  const mMot  = raw.match(/\[MOTIVO\]\s*([\s\S]*?)\s*(?:\[MANUAL\]|$)/i)
+  const mMot  = raw.match(/\[MOTIVO\]\s*([\s\S]*?)\s*(?:\[MANUAL\]|\[SEGUIMIENTO\]|\[FEEDBACK\]|$)/i)
   const mMan  = raw.match(/\[MANUAL\]\s*(inc101|pc400|\?)/i)
+  const mSeg  = raw.match(/\[SEGUIMIENTO\]\s*(si|sí)/i)
+  const mFb   = raw.match(/\[FEEDBACK\]\s*(si|sí)/i)
   const respuesta = (mResp ? mResp[1] : raw).trim()
   const derivar = mDer ? /s[ií]/i.test(mDer[1]) : false
   const motivo = mMot ? mMot[1].trim() : ''
   const manual = mMan ? (mMan[1].toLowerCase() as ManualId | '?') : null
-  return { respuesta, derivar, motivo, manual }
+  return { respuesta, derivar, motivo, manual, seguimiento: !!mSeg, feedback: !!mFb }
 }
 
 // ─────────── Cerebro de Ariel ───────────
@@ -313,6 +388,20 @@ async function derivarAlEquipo(to: string, cuerpo: string): Promise<void> {
   if (!okBtn) await enviarMensajeWA(to, `${cuerpo}\n\n${WA_LINK}`)
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+// Detecta respuestas AUTOMÁTICAS de otros negocios/bots (ej. el auto-responder de APIDAN)
+// para no entrar en un loop bot-contra-bot. Si matchea, no respondemos.
+function esAutoRespuesta(texto: string): boolean {
+  const t = texto.toLowerCase()
+  const patrones = [
+    /te comunicaste con/, /horario de atenci[oó]n/, /a la brevedad (te )?responder/,
+    /gracias por (tu mensaje|comunicarte|contactarnos)/, /mensaje autom[aá]tico/,
+    /responderemos tu consulta/, /nuestro horario/, /fuera de horario/,
+  ]
+  return patrones.some((p) => p.test(t))
+}
+
 // GET — verificación del webhook por Meta
 export async function GET(req: NextRequest) {
   const mode      = req.nextUrl.searchParams.get('hub.mode')
@@ -395,19 +484,63 @@ export async function POST(req: NextRequest) {
         try {
           // 'recibido'/'pensado' son los kinds que getHistorial() consulta para reconstruir el hilo
           await wdiag('recibido', from, { texto: texto.slice(0, 300), wamid: msg.id, nombre })
+
+          // Auto-responder de otro negocio/bot (ej. APIDAN) → no responder, cortar el loop.
+          if (esAutoRespuesta(texto)) {
+            await wdiag('auto_ignorado', from, { texto: texto.slice(0, 200) })
+            continue
+          }
+
           await capturarResenaSiCorresponde(from, texto)
 
+          // ─── Debounce de ráfagas ───
+          // Esperamos un momento; si llegó un mensaje más nuevo de este mismo número,
+          // dejamos que la ÚLTIMA invocación responda por toda la ráfaga (esta se retira).
+          await sleep(DEBOUNCE_MS)
+          if (await hayMensajePosterior(from, msg.id ?? '')) continue
+          const rafaga = await textosDeLaRafaga(from)
+          const mensajeUsuario = rafaga.length > 1 ? rafaga.join('\n') : texto
+
           const [catalogo, historial] = await Promise.all([bloqueCatalogo(), getHistorial(from)])
-          const { respuesta, derivar, motivo, manual } = await pensar(texto, catalogo, historial)
+          const { respuesta, derivar, motivo, manual, seguimiento, feedback } = await pensar(mensajeUsuario, catalogo, historial)
 
           // Estado final que se envía + se loguea (un solo 'pensado' por mensaje).
           let outText = respuesta
           let didDerivar = derivar
           let accion: string | undefined
 
-          if (manual) {
+          if (seguimiento) {
+            // Estado REAL del envío (Tiendanube + Andreani). Nunca inventa: si no hay dato
+            // certero, deriva al equipo.
+            const pedido = await buscarPedido(from, mensajeUsuario)
+            const msgSeg = await mensajeSeguimiento(pedido)
+            if (msgSeg) {
+              outText = msgSeg
+              didDerivar = false
+              accion = pedido.esAndreani ? 'seguimiento_andreani' : 'seguimiento_ok'
+              await enviarMensajeWA(from, outText)
+            } else if (pedido.encontrado) {
+              // Pedido hallado pero sin estado certero (sin tracking cargado / API sin dato) → equipo.
+              outText = 'Encontré tu compra pero no tengo el estado del envío al día en este momento 🙌 Te paso con el equipo para que te confirme dónde está 👇'
+              didDerivar = true
+              accion = 'seguimiento_sin_dato'
+              await derivarAlEquipo(from, outText)
+            } else if (/\d{3,9}/.test(mensajeUsuario)) {
+              // Dio un dato pero no matcheó ninguna compra.
+              outText = 'No pude encontrar tu compra con ese dato 😕 Te paso con el equipo para que lo revise 👇'
+              didDerivar = true
+              accion = 'seguimiento_no_verificado'
+              await derivarAlEquipo(from, outText)
+            } else {
+              // Falta con qué ubicar la compra: se lo pedimos (sin derivar aún).
+              outText = respuesta || 'Para ver tu envío, pasame tu número de orden (está en el mail de compra) o el DNI con el que compraste 🙌'
+              didDerivar = false
+              accion = 'seguimiento_pide_dato'
+              await enviarMensajeWA(from, outText)
+            }
+          } else if (manual) {
             // Comprador pidió material → verificar compra por teléfono o dato numérico.
-            const pedido = await buscarPedido(from, texto)
+            const pedido = await buscarPedido(from, mensajeUsuario)
             if (pedido.encontrado) {
               const targets: ManualId[] =
                 manual === 'inc101' || manual === 'pc400'
@@ -418,7 +551,7 @@ export async function POST(req: NextRequest) {
               didDerivar = false
               accion = 'manual_enviado'
               await enviarMensajeWA(from, outText)
-            } else if (/\d{3,9}/.test(texto)) {
+            } else if (/\d{3,9}/.test(mensajeUsuario)) {
               // Dio un dato pero no matcheó ninguna compra → lo pasa al equipo.
               outText = 'No pude encontrar tu compra con ese dato 😕 Te paso con el equipo para que te ayude 👇'
               didDerivar = true
@@ -434,13 +567,30 @@ export async function POST(req: NextRequest) {
           } else if (derivar) {
             outText = respuesta || 'Te paso con una persona del equipo 👇'
             await derivarAlEquipo(from, outText)
+          } else if (feedback) {
+            // Crítica/defecto del producto: respondemos cálido (sin instrucciones de arreglo)
+            // y le avisamos a Nahuel. NO derivamos (no es un lead perdido, es info para él).
+            outText = respuesta || '¡Gracias por comentárnoslo! Lo tomamos muy en cuenta para mejorar 🙌'
+            accion = 'feedback'
+            await enviarMensajeWA(from, outText)
           } else if (respuesta) {
             await enviarMensajeWA(from, respuesta)
           }
 
           await wdiag('pensado', from, {
-            derivar: didDerivar, motivo, accion, respuesta: outText.slice(0, 300),
+            derivar: didDerivar, motivo, accion, feedback, respuesta: outText.slice(0, 300),
           })
+
+          if (feedback) {
+            await notifyNahuel(
+              '📝 WhatsApp: feedback / crítica de producto',
+              `Un cliente dejó feedback sobre el producto por WhatsApp.\n\n` +
+              `Número: ${from}\n` +
+              (nombre ? `Nombre: ${nombre}\n` : '') +
+              `Mensaje: "${mensajeUsuario}"\n\n` +
+              `El bot respondió sin dar instrucciones de arreglo. Revisá si conviene que lo contactes.`,
+            )
+          }
 
           if (didDerivar) {
             await notifyNahuel(
@@ -448,7 +598,7 @@ export async function POST(req: NextRequest) {
               `Un mensaje de WhatsApp fue derivado al equipo.\n\n` +
               `Número: ${from}\n` +
               (nombre ? `Nombre: ${nombre}\n` : '') +
-              `Mensaje: "${texto}"\n` +
+              `Mensaje: "${mensajeUsuario}"\n` +
               `Motivo: ${accion === 'manual_no_verificado' ? 'comprador no verificado (pidió manual)' : (motivo || '(sin especificar)')}\n\n` +
               `Se le pasó el link a wa.me/${EMPRESA_WA}. Si no escribe, contactalo desde WhatsApp.`,
             )
