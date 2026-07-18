@@ -47,6 +47,27 @@ async function viaWhatsApp(text: string) {
   })
 }
 
+export type Adjunto = { filename: string; content: Buffer; contentType?: string }
+
+/** Avisa a Nahuel por email con un archivo adjunto (ej. comprobante de pago). Nunca lanza. */
+export async function notifyNahuelAdjunto(subject: string, body: string, adjunto: Adjunto): Promise<void> {
+  try {
+    if (!GMAIL_PASS) { await viaTelegram(`${subject}\n\n${body}\n(no se pudo adjuntar: sin credencial de mail)`); return }
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com', port: 587, secure: false,
+      auth: { user: GMAIL_USER, pass: GMAIL_PASS },
+    })
+    await transporter.sendMail({
+      from: GMAIL_USER, to: ALERT_EMAIL, subject, text: body,
+      attachments: [{ filename: adjunto.filename, content: adjunto.content, contentType: adjunto.contentType }],
+    })
+    // Ping fuera de banda para que lo vea al toque (el adjunto va por mail).
+    await Promise.allSettled([viaTelegram(`${subject}\n\n${body}`), viaWhatsApp(`${subject}\n\n${body}`)])
+  } catch (e) {
+    console.error('notifyNahuelAdjunto falló:', e)
+  }
+}
+
 /** Avisa a Nahuel por todos los canales disponibles. Nunca lanza. */
 export async function notifyNahuel(subject: string, body: string): Promise<void> {
   const full = `${subject}\n\n${body}`

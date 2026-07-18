@@ -4,6 +4,7 @@ import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
 import { diag, getHistorial, logClaudeUsage, hayMensajePosterior, textosDeLaRafaga, type Turno } from '@/lib/diag'
 import { getEstadoAndreani } from '@/lib/andreani'
+import { notifyNahuelAdjunto } from '@/lib/notify'
 import { prisma } from '@/lib/prisma'
 
 // Ventana de "debounce": si el cliente manda varios mensajes seguidos, esperamos este
@@ -121,6 +122,7 @@ async function bloqueCatalogo(): Promise<string> {
 type ManualId = 'inc101' | 'pc400'
 type Pedido = {
   encontrado: boolean
+  pagado: boolean          // payment_status === 'paid' (si no, está pendiente de pago)
   manuales: ManualId[]
   numero?: number
   // Datos de envío (para seguimiento real):
@@ -143,25 +145,29 @@ function manualesDeProductos(prods: Array<{ name?: unknown }>): ManualId[] {
   return [...set]
 }
 
-// Busca un pedido PAGADO del cliente por teléfono o por un dato numérico del mensaje
-// (nº de orden o DNI). Sirve para verificar la compra antes de mandar material.
+// Busca un pedido del cliente por teléfono o por un dato numérico del mensaje
+// (nº de orden o DNI). Incluye pendientes de pago (devuelve `pagado`) para poder
+// avisarle al cliente que su pago figura pendiente en vez de decir "no existe".
+// Excluye órdenes canceladas (no son un pedido válido).
 async function buscarPedido(phone: string, texto: string): Promise<Pedido> {
-  if (!TN_TOKEN) return { encontrado: false, manuales: [] }
+  if (!TN_TOKEN) return { encontrado: false, pagado: false, manuales: [] }
   const tel8 = soloDigitos(phone).slice(-8)
   const tokens = texto.match(/\d{3,9}/g) ?? [] // posible nº orden (4) o DNI (7-8)
   try {
     for (let page = 1; page <= 6; page++) {
-      const url = `${TN_BASE}/${TN_STORE}/orders?payment_status=paid&per_page=50&page=${page}` +
-        `&fields=number,contact_phone,contact_identification,products,` +
+      const url = `${TN_BASE}/${TN_STORE}/orders?status=any&per_page=50&page=${page}` +
+        `&fields=number,status,payment_status,contact_phone,contact_identification,products,` +
         `shipping_tracking_number,shipping_option,shipping_pickup_type,shipping_status`
       const res = await fetch(url, { headers: { Authentication: `bearer ${TN_TOKEN}`, 'User-Agent': UA } })
       if (!res.ok) break
       const data = (await res.json()) as Array<{
-        number: number; contact_phone?: string; contact_identification?: string; products?: Array<{ name?: unknown }>
+        number: number; status?: string; payment_status?: string
+        contact_phone?: string; contact_identification?: string; products?: Array<{ name?: unknown }>
         shipping_tracking_number?: string; shipping_option?: string; shipping_pickup_type?: string; shipping_status?: string
       }>
       if (!Array.isArray(data) || data.length === 0) break
       for (const o of data) {
+        if (o.status === 'cancelled') continue // orden cancelada = no es un pedido válido
         const oPhone8 = soloDigitos(o.contact_phone ?? '').slice(-8)
         const matchTel = tel8.length >= 8 && oPhone8 === tel8
         const matchTok = tokens.some((t) => String(o.number) === t || soloDigitos(o.contact_identification ?? '') === t)
@@ -169,6 +175,7 @@ async function buscarPedido(phone: string, texto: string): Promise<Pedido> {
           const correo = o.shipping_option ?? ''
           return {
             encontrado: true,
+            pagado: o.payment_status === 'paid',
             manuales: manualesDeProductos(o.products ?? []),
             numero: o.number,
             tracking: o.shipping_tracking_number || undefined,
@@ -184,7 +191,18 @@ async function buscarPedido(phone: string, texto: string): Promise<Pedido> {
   } catch (e) {
     console.error('buscarPedido error:', e)
   }
-  return { encontrado: false, manuales: [] }
+  return { encontrado: false, pagado: false, manuales: [] }
+}
+
+// Mensaje para una compra que EXISTE pero figura pendiente de pago. No deriva a otro
+// número: pide el comprobante en este mismo chat (el handler de imágenes lo reenvía a
+// Mateo, que verifica el saldo acreditado y marca "pagado" en Tiendanube a mano).
+function mensajePendientePago(numero?: number): string {
+  const ref = numero ? `#${numero}` : ''
+  return `Encontré tu pedido ${ref} 🙌 pero en el sistema todavía figura como PENDIENTE DE PAGO ` +
+    `(a veces la transferencia tarda en impactar o falta adjuntar el comprobante). ` +
+    `Si ya lo pagaste, mandanos acá mismo la foto o el PDF del comprobante y el equipo lo verifica ` +
+    `y te confirma. Apenas quede confirmado, despachamos 👌`
 }
 
 // Arma un mensaje de seguimiento con el estado REAL del envío. Devuelve null si no se
@@ -244,8 +262,11 @@ PRECIOS: NUNCA cotizás precios ni armás escaleras de precio (la escalera visua
 MANUALES / GUÍAS / MATERIAL (solo para quien YA compró): si el cliente pide el manual, la guía, el instructivo o el material de uso de su equipo, NO derivés: marcá [MANUAL] con el producto (inc101 = incubadora, pc400 = tableta; si no queda claro cuál, poné ?). En [RESPUESTA] poné algo breve y cálido tipo "¡Genial! Te dejo el material 👇" — el SISTEMA verifica la compra y adjunta el link (no escribas vos ningún link de manual). Si es una preventa (todavía no compró) y pide el manual, NO marques [MANUAL]: explicale breve que el material viene con la compra.
 
 SEGUIMIENTO DE ENVÍO: si el cliente pregunta dónde está su pedido / cuándo llega / por el estado del envío, NO derivés y NO inventes ningún estado ("ya está en sucursal", "salió hoy", etc. — NUNCA). Marcá [SEGUIMIENTO]. El SISTEMA consulta el estado REAL (Tiendanube + Andreani) y responde con datos ciertos, o deriva solo si no hay dato certero. En [RESPUESTA] poné una línea breve tipo "Dejame ver el estado de tu envío 👇" SIN afirmar nada del estado. Si el cliente todavía no dio con qué ubicar su compra (nº de orden o DNI) y no lo tenemos por su teléfono, pedíselo antes.
+IMPORTANTE: si el cliente te da un NÚMERO DE ORDEN o un DNI para que ubiques su compra, pago o envío (ej. "mi pedido es el 1594", "DNI 35185724", "compré a nombre de X"), marcá SIEMPRE [SEGUIMIENTO] (el sistema resuelve: si el pago está pendiente, si está en camino, etc.). No respondas vos "ya tengo tus datos" sin marcar [SEGUIMIENTO] — sin la etiqueta el sistema no verifica nada.
+PAGO PENDIENTE / COMPROBANTE: si el cliente dice que ya compró/pagó, que va a mandar o mandó el comprobante, o pregunta por qué su pedido figura sin pagar, marcá [SEGUIMIENTO] (el sistema detecta si la orden está pendiente de pago y le pide el comprobante). No afirmes vos que el pago está confirmado ni que no lo está.
 
 FEEDBACK / QUEJA SOBRE EL PRODUCTO: si el cliente comenta una falla, defecto, crítica o problema de calidad del equipo (algo que llegó torcido/roto/mal, o una observación de mejora), marcá [FEEDBACK]. Respondé breve, agradecido y empático, pero NO des instrucciones de reparación ni le pidas que lo arregle/desarme él mismo (nada de "despegá y volvé a pegar", "ajustá", "cambiá vos"). Para cualquier arreglo o reposición lo ve el equipo. El sistema le avisa a Nahuel.
+REGLA DURA ANTI-DIY (aplica en CUALQUIER turno, no solo el primero): NUNCA le confirmes, apruebes ni le sugieras al cliente desarmar, despegar, pegar, forzar, ajustar tornillos ni intervenir físicamente el equipo — AUNQUE sea ÉL quien lo proponga ("voy a despegarla y pegarla de nuevo"). En ese caso NO respondas "perfecto, hacelo": pedile que NO lo manipule, que lo dejamos que lo vea el equipo para no arriesgar el equipo ni su garantía, y marcá [FEEDBACK].
 
 ACÁ NO TENÉS HERRAMIENTAS PARA RESOLVER. Por eso DERIVÁ (no lo resuelvas solo, no inventes datos) cuando el cliente pida: roturas/garantía/fallas que hay que gestionar, plata/reintegros/reembolsos, cambios de pedido (cuotas, dirección, cancelación), reclamos que escalan, temas legales/salud, o mayoristas/prensa.
 PSILOCIBE / "MÁGICOS" / GOLDEN TEACHER: NO derivés por esto. Respondé SIEMPRE con esta única línea neutral y cerrá el tema: "La incubadora sirve para cualquier tipo de cultivo de hongos; controla temperatura y humedad de forma automática. Sobre especies puntuales no asesoramos, pero el equipo funciona igual para lo que quieras cultivar 🙌". No des instrucciones ni recomendaciones de cepas/dosis. Solo si el cliente INSISTE reiteradamente, ahí sí marcá DERIVAR.
@@ -390,6 +411,56 @@ async function derivarAlEquipo(to: string, cuerpo: string): Promise<void> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+// Descarga un archivo (imagen/documento) recibido por WhatsApp Cloud API.
+// Dos pasos: GET /{media_id} → url; luego GET url con Bearer. Devuelve null si falla.
+async function descargarMediaWA(mediaId: string): Promise<{ buffer: Buffer; mime: string } | null> {
+  try {
+    const meta = await fetch(`${WA_API_URL}/${mediaId}`, { headers: { Authorization: `Bearer ${WA_TOKEN}` } })
+    if (!meta.ok) return null
+    const info = (await meta.json()) as { url?: string; mime_type?: string }
+    if (!info.url) return null
+    const bin = await fetch(info.url, { headers: { Authorization: `Bearer ${WA_TOKEN}` } })
+    if (!bin.ok) return null
+    const buf = Buffer.from(await bin.arrayBuffer())
+    return { buffer: buf, mime: info.mime_type ?? 'application/octet-stream' }
+  } catch (e) {
+    console.error('descargarMediaWA error:', e)
+    return null
+  }
+}
+
+// Recibe un archivo del cliente (típicamente un comprobante de pago): acusa recibo,
+// reenvía el archivo a Nahuel/Mateo por mail (adjunto) y NO llama al cerebro. Mateo
+// verifica el saldo acreditado y marca "pagado" en Tiendanube a mano.
+async function manejarArchivo(
+  from: string, nombre: string | undefined, mediaId: string, kind: 'image' | 'document',
+  caption: string, filenameHint: string | undefined,
+): Promise<void> {
+  await wdiag('recibido_archivo', from, { kind, caption: caption.slice(0, 200), nombre, mediaId })
+  const media = await descargarMediaWA(mediaId)
+  const ext = kind === 'document'
+    ? (filenameHint?.split('.').pop() || (media?.mime.split('/')[1] ?? 'pdf'))
+    : (media?.mime.split('/')[1] ?? 'jpg')
+  const fname = `comprobante_${nombre?.replace(/[^\w]+/g, '_') || from}.${ext}`
+  const cuerpo =
+    `Un cliente envió un archivo por WhatsApp (probable comprobante de pago).\n\n` +
+    `Número: ${from}\n` + (nombre ? `Nombre: ${nombre}\n` : '') +
+    (caption ? `Texto: "${caption}"\n` : '') +
+    `\nVerificá el saldo acreditado y, si está OK, marcá "pagado" en Tiendanube.`
+  if (media) {
+    await notifyNahuelAdjunto('🧾 WhatsApp: comprobante / archivo recibido', cuerpo, {
+      filename: fname, content: media.buffer, contentType: media.mime,
+    })
+  } else {
+    await notifyNahuel('🧾 WhatsApp: archivo recibido (no se pudo bajar)', cuerpo + `\n\n(No se pudo descargar el archivo; revisá el chat directo.)`)
+  }
+  const ack = kind === 'document' || /pago|comprob|transfer/i.test(caption)
+    ? '¡Recibimos tu comprobante! 🙌 El equipo verifica el pago y te confirma a la brevedad. Apenas quede confirmado, despachamos 👌'
+    : '¡Recibimos tu archivo! 🙌 Si es el comprobante de pago, el equipo lo verifica y te confirma. Si es una consulta, contame en un texto así te ayudo 👌'
+  await enviarMensajeWA(from, ack)
+  await wdiag('pensado', from, { derivar: false, accion: 'archivo_recibido', respuesta: ack.slice(0, 300) })
+}
+
 // Detecta respuestas AUTOMÁTICAS de otros negocios/bots (ej. el auto-responder de APIDAN)
 // para no entrar en un loop bot-contra-bot. Si matchea, no respondemos.
 function esAutoRespuesta(texto: string): boolean {
@@ -431,6 +502,8 @@ export async function POST(req: NextRequest) {
             timestamp?: string
             type?: string
             text?: { body?: string }
+            image?: { id?: string; caption?: string; mime_type?: string }
+            document?: { id?: string; caption?: string; filename?: string; mime_type?: string }
           }>
           statuses?: Array<unknown>
         }
@@ -448,16 +521,33 @@ export async function POST(req: NextRequest) {
       if (!value) continue
 
       for (const msg of value.messages ?? []) {
-        // Solo texto por ahora; ignorar statuses, audio, imagen, etc.
-        if (msg.type !== 'text') continue
-        const texto = msg.text?.body?.trim()
-        if (!texto) continue
-
         const from = msg.from ?? ''
         if (!from) continue
 
         const nombre = value.contacts?.find((c) => c.wa_id === from)?.profile?.name
           ?? value.contacts?.[0]?.profile?.name
+
+        // ─── Imágenes / documentos (típicamente comprobante de pago) ───
+        // No pasan por el cerebro: se acusan y se reenvían a Mateo para verificar.
+        // (Se excluyen los números internos: no mandan comprobantes.)
+        const desde10Media = last10(from)
+        if ((msg.type === 'image' || msg.type === 'document') &&
+            desde10Media !== last10(TIO_WA) && desde10Media !== last10(NAHUEL_WA)) {
+          const media = msg.type === 'image' ? msg.image : msg.document
+          const mediaId = media?.id
+          if (mediaId) {
+            try {
+              await manejarArchivo(from, nombre, mediaId, msg.type as 'image' | 'document',
+                media?.caption ?? '', msg.type === 'document' ? msg.document?.filename : undefined)
+            } catch (e) { console.error('manejarArchivo error:', e) }
+          }
+          continue
+        }
+
+        // Solo texto de acá en adelante; ignorar statuses, audio, etc.
+        if (msg.type !== 'text') continue
+        const texto = msg.text?.body?.trim()
+        if (!texto) continue
 
         // ─── Números INTERNOS: NO pasan por el bot ni por CRM/leads ───
         const desde10 = last10(from)
@@ -513,6 +603,22 @@ export async function POST(req: NextRequest) {
             // Estado REAL del envío (Tiendanube + Andreani). Nunca inventa: si no hay dato
             // certero, deriva al equipo.
             const pedido = await buscarPedido(from, mensajeUsuario)
+            if (pedido.encontrado && !pedido.pagado) {
+              // La compra existe pero figura pendiente de pago → no hay envío que rastrear.
+              // Le pedimos el comprobante acá mismo y avisamos a Mateo (verifica y marca en TN).
+              outText = mensajePendientePago(pedido.numero)
+              didDerivar = false
+              accion = 'pago_pendiente'
+              await enviarMensajeWA(from, outText)
+              await notifyNahuel(
+                '💸 WhatsApp: compra con pago pendiente',
+                `Un cliente pregunta por su pedido y en TN figura PENDIENTE DE PAGO.\n\n` +
+                `Número: ${from}\n` + (nombre ? `Nombre: ${nombre}\n` : '') +
+                `Pedido: #${pedido.numero ?? '?'}\n` +
+                `Le pedí el comprobante por WhatsApp. Cuando lo mande, te llega el archivo por mail; ` +
+                `verificá el saldo y marcá "pagado" en Tiendanube.`,
+              )
+            } else {
             const msgSeg = await mensajeSeguimiento(pedido)
             if (msgSeg) {
               outText = msgSeg
@@ -538,10 +644,24 @@ export async function POST(req: NextRequest) {
               accion = 'seguimiento_pide_dato'
               await enviarMensajeWA(from, outText)
             }
+            }
           } else if (manual) {
             // Comprador pidió material → verificar compra por teléfono o dato numérico.
             const pedido = await buscarPedido(from, mensajeUsuario)
-            if (pedido.encontrado) {
+            if (pedido.encontrado && !pedido.pagado) {
+              // Compró pero el pago aún no está confirmado → no mandamos material todavía.
+              outText = mensajePendientePago(pedido.numero)
+              didDerivar = false
+              accion = 'pago_pendiente'
+              await enviarMensajeWA(from, outText)
+              await notifyNahuel(
+                '💸 WhatsApp: pidió material con pago pendiente',
+                `Un cliente pidió el material y su pedido figura PENDIENTE DE PAGO en TN.\n\n` +
+                `Número: ${from}\n` + (nombre ? `Nombre: ${nombre}\n` : '') +
+                `Pedido: #${pedido.numero ?? '?'}\n` +
+                `Le pedí el comprobante por WhatsApp. Cuando lo mande te llega por mail; verificá y marcá pagado en TN.`,
+              )
+            } else if (pedido.encontrado) {
               const targets: ManualId[] =
                 manual === 'inc101' || manual === 'pc400'
                   ? [manual]
