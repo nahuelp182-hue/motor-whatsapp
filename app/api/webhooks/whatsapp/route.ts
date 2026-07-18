@@ -29,6 +29,8 @@ const UA       = 'Micelium/1.0 (nahuelp182@gmail.com)'
 
 // Número empresa al que se deriva al cliente (NO el número dedicado a la Cloud API)
 const EMPRESA_WA = process.env.WA_EMPRESA ?? '5493525623546'
+// Mail de la empresa donde Mateo recibe los comprobantes de pago para verificar.
+const EMAIL_EMPRESA = process.env.EMAIL_EMPRESA ?? 'info.micelium@gmail.com'
 // Números INTERNOS (no clientes): no pasan por el bot ni por CRM.
 // Tío = encargado de despachar ventas apícolas; sus respuestas se reenvían a Nahuel.
 const TIO_WA    = process.env.WA_TIO    ?? '5493563413104'
@@ -450,7 +452,7 @@ async function manejarArchivo(
   if (media) {
     await notifyNahuelAdjunto('🧾 WhatsApp: comprobante / archivo recibido', cuerpo, {
       filename: fname, content: media.buffer, contentType: media.mime,
-    })
+    }, EMAIL_EMPRESA)
   } else {
     await notifyNahuel('🧾 WhatsApp: archivo recibido (no se pudo bajar)', cuerpo + `\n\n(No se pudo descargar el archivo; revisá el chat directo.)`)
   }

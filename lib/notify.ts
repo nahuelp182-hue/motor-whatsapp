@@ -13,7 +13,7 @@ const WA_PHONE_ID = process.env.WA_PHONE_NUMBER_ID ?? ''
 const WA_TOKEN    = process.env.WA_TOKEN           ?? ''
 const NAHUEL_WA   = process.env.NAHUEL_WA_PHONE    ?? '5493522412228'
 
-async function viaEmail(subject: string, body: string) {
+async function viaEmail(subject: string, body: string, to: string = ALERT_EMAIL) {
   if (!GMAIL_PASS) return
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -23,7 +23,7 @@ async function viaEmail(subject: string, body: string) {
   })
   await transporter.sendMail({
     from: GMAIL_USER,
-    to: ALERT_EMAIL,
+    to,
     subject,
     text: body,
   })
@@ -49,8 +49,8 @@ async function viaWhatsApp(text: string) {
 
 export type Adjunto = { filename: string; content: Buffer; contentType?: string }
 
-/** Avisa a Nahuel por email con un archivo adjunto (ej. comprobante de pago). Nunca lanza. */
-export async function notifyNahuelAdjunto(subject: string, body: string, adjunto: Adjunto): Promise<void> {
+/** Envía un mail con un archivo adjunto (ej. comprobante de pago). `to` override el destino. Nunca lanza. */
+export async function notifyNahuelAdjunto(subject: string, body: string, adjunto: Adjunto, to: string = ALERT_EMAIL): Promise<void> {
   try {
     if (!GMAIL_PASS) { await viaTelegram(`${subject}\n\n${body}\n(no se pudo adjuntar: sin credencial de mail)`); return }
     const transporter = nodemailer.createTransport({
@@ -58,7 +58,7 @@ export async function notifyNahuelAdjunto(subject: string, body: string, adjunto
       auth: { user: GMAIL_USER, pass: GMAIL_PASS },
     })
     await transporter.sendMail({
-      from: GMAIL_USER, to: ALERT_EMAIL, subject, text: body,
+      from: GMAIL_USER, to, subject, text: body,
       attachments: [{ filename: adjunto.filename, content: adjunto.content, contentType: adjunto.contentType }],
     })
     // Ping fuera de banda para que lo vea al toque (el adjunto va por mail).
