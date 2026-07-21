@@ -201,3 +201,13 @@ model Visit {
   @@index([visitor_id])
   @@index([started_at])
 }
+
+// Contadores de rate limiting (ventana fija). Una fila por clave activa; las vencidas se
+// borran de forma oportunista desde lib/ratelimit.ts, sin cron dedicado.
+model RateLimit {
+  key            String   @id
+  ventana_inicio DateTime @default(now())
+  contador       Int      @default(0)
+
+  @@index([ventana_inicio])
+}

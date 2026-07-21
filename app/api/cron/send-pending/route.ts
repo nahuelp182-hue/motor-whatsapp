@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { CampaignService } from '@/services/CampaignService'
+import { chequearCron } from '@/lib/cron-auth'
 
 // Vercel Cron: llamar cada 5 minutos
 // vercel.json → { "crons": [{ "path": "/api/cron/send-pending", "schedule": "*/5 * * * *" }] }
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const noAuth = chequearCron(req)
+  if (noAuth) return noAuth
 
   const now = new Date()
 

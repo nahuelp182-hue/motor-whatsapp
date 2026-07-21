@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
 import { diag, getHistorial, logClaudeUsage, comentarioYaRespondido, type Turno } from '@/lib/diag'
+import { verificarFirmaMeta } from '@/lib/meta-signature'
 
 const MODELO = 'claude-haiku-4-5-20251001'
 
@@ -303,7 +304,15 @@ export async function POST(req: NextRequest) {
     }>
   }
 
-  try { body = await req.json() } catch { return NextResponse.json({ ok: true }) }
+  // Firma HMAC de Meta antes de procesar nada: sin esto cualquiera puede simular un DM o un
+  // comentario y hacer que el bot responda (y gaste) por cuenta ajena. Ver lib/meta-signature.
+  const firma = await verificarFirmaMeta(req, process.env.META_APP_SECRET)
+  if (!firma.ok) {
+    console.error('[ig] webhook rechazado:', firma.motivo)
+    return NextResponse.json({ error: firma.motivo }, { status: firma.status })
+  }
+
+  try { body = JSON.parse(firma.body) } catch { return NextResponse.json({ ok: true }) }
   if (body.object !== 'instagram' && body.object !== 'page') return NextResponse.json({ ok: true })
 
   for (const entry of body.entry ?? []) {
