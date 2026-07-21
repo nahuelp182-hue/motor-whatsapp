@@ -24,6 +24,13 @@ const PREFIJOS_PUBLICOS = ['/guia']
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // En el subdominio de guías, la raíz lleva directo al índice de guías (no a la home del
+  // proyecto). Así guia.infomicelium.com.ar/ es la portada de contenido, no la plantilla.
+  const host = request.headers.get('host') ?? ''
+  if (host.startsWith('guia.') && (pathname === '/' || pathname === '')) {
+    return NextResponse.redirect(new URL('/guia', request.url))
+  }
+
   // Lo público se resuelve ANTES de mirar la contraseña: no protege nada, así que no puede
   // depender de que esa variable exista. Si dependiera, un env var faltante dejaría sin
   // servicio a los scripts embebidos en la tienda (geogate, tracking, lead magnet) y a las
