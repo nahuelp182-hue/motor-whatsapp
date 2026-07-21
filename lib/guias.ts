@@ -229,26 +229,37 @@ const equipo: Guia = {
     },
     {
       id: 'ficha',
-      titulo: 'Ficha técnica',
+      titulo: 'Ficha técnica del INC101',
       bloques: [
         {
           tipo: 'datos',
           filas: [
-            { clave: 'Medidas exteriores', valor: 'PENDIENTE', verificar: true },
-            { clave: 'Capacidad interior', valor: 'PENDIENTE', verificar: true },
-            { clave: 'Consumo eléctrico', valor: 'PENDIENTE', verificar: true },
-            { clave: 'Rango de temperatura', valor: 'PENDIENTE', verificar: true },
-            { clave: 'Control de humedad', valor: 'PENDIENTE', verificar: true },
-            { clave: 'Renovación de aire', valor: 'PENDIENTE', verificar: true },
-            { clave: 'Garantía', valor: 'PENDIENTE', verificar: true },
+            { clave: 'Medidas exteriores', valor: '40 cm alto × 36 cm ancho × 26 cm profundidad' },
+            {
+              clave: 'Capacidad interior',
+              valor: 'Área útil de cultivo 35 × 25 × 30 cm (≈ 26 litros)',
+            },
+            {
+              clave: 'Cuánto entra',
+              valor: '15 frascos, o 4 recipientes tipo bandeja de 1,5 litros (dos columnas de dos)',
+            },
+            { clave: 'Consumo eléctrico', valor: '20 a 30 W (el máximo, en clima muy frío)' },
+            { clave: 'Rango de temperatura', valor: 'Mantiene entre 10 °C y 30 °C' },
+            { clave: 'Humedad', valor: 'Booster de humedad regulable (paso a paso en el manual)' },
+            { clave: 'Renovación de aire', valor: 'Renovación pasiva por aire caliente' },
+            {
+              clave: 'Garantía',
+              valor: '12 meses de fábrica, y después servicio técnico oficial y repuestos de por vida',
+            },
           ],
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Estas preguntas aparecieron 153 veces en tres meses de WhatsApp. Son las que más ' +
-            'se hacen antes de comprar: conviene que estén respondidas con precisión.',
+            'La garantía es de un año, pero el equipo no deja de tener soporte cuando se vence: ' +
+            'seguimos con repuestos y servicio técnico oficial mientras lo tengas. Es la ' +
+            'diferencia entre comprarle a una fábrica y comprarle a un revendedor.',
         },
       ],
     },
@@ -261,11 +272,11 @@ const equipo: Guia = {
           items: [
             {
               p: '¿Anda con energía solar?',
-              r: 'PENDIENTE: confirmar consumo real para poder responder con un número, no con un "depende".',
+              r: 'Sí. Consume entre 20 y 30 W, así que es de los equipos que un sistema solar hogareño puede sostener sin problema, incluso funcionando las 24 horas.',
             },
             {
               p: '¿Enfría o solo calienta?',
-              r: 'PENDIENTE: confirmar y responder derecho. Es una pregunta recurrente y la respuesta ambigua genera desconfianza.',
+              r: 'El INC101 solo calienta: sostiene la temperatura por encima de la del ambiente, hasta 30 °C. No refrigera. Si estás en una zona donde en verano se pasa de 30 °C de forma sostenida, escribinos antes de comprar y lo hablamos con tu caso.',
             },
             {
               p: '¿Viene con material para empezar?',
