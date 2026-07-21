@@ -4,7 +4,11 @@
 // un proceso distinto, así que un contador en memoria no limita nada. La tabla es chica
 // (una fila por clave activa) y el upsert es atómico, así que dos requests simultáneos no
 // se pisan.
-import { prisma } from '@/lib/prisma'
+//
+// Usa el pool `pg` de diag.ts (pooler de Supabase), NO el cliente Prisma: en este proyecto
+// Prisma con DATABASE_URL directo no conecta en runtime, y el rate limiter "fallaba abierto"
+// silenciosamente (todos los topes quedaban sin efecto). Con pg directo sí funciona.
+import { getPool } from '@/lib/diag'
 
 export type ResultadoLimite = {
   permitido: boolean
@@ -25,22 +29,29 @@ export async function consumirLimite(
   limite: number,
   ventanaSegundos: number,
 ): Promise<ResultadoLimite> {
+  const pool = getPool()
+  if (!pool) {
+    // Sin DB configurada no se puede limitar. Falla abierto, pero deja rastro.
+    console.error('[ratelimit] sin pool de DB — no se limita:', clave)
+    return { permitido: true, contador: 0, limite, resetEn: 0 }
+  }
   try {
-    const filas = await prisma.$queryRaw<Array<{ contador: number; edad: number }>>`
-      INSERT INTO "RateLimit" ("key", "ventana_inicio", "contador")
-      VALUES (${clave}, now(), 1)
-      ON CONFLICT ("key") DO UPDATE SET
-        "contador" = CASE
-          WHEN "RateLimit"."ventana_inicio" < now() - make_interval(secs => ${ventanaSegundos}::float)
-          THEN 1 ELSE "RateLimit"."contador" + 1 END,
-        "ventana_inicio" = CASE
-          WHEN "RateLimit"."ventana_inicio" < now() - make_interval(secs => ${ventanaSegundos}::float)
-          THEN now() ELSE "RateLimit"."ventana_inicio" END
-      RETURNING "contador",
-                EXTRACT(EPOCH FROM (now() - "ventana_inicio"))::int AS "edad"
-    `
-    const contador = Number(filas[0]?.contador ?? 1)
-    const edad = Number(filas[0]?.edad ?? 0)
+    const { rows } = await pool.query(
+      `INSERT INTO "RateLimit" ("key", "ventana_inicio", "contador")
+       VALUES ($1, now(), 1)
+       ON CONFLICT ("key") DO UPDATE SET
+         "contador" = CASE
+           WHEN "RateLimit"."ventana_inicio" < now() - make_interval(secs => $2::float)
+           THEN 1 ELSE "RateLimit"."contador" + 1 END,
+         "ventana_inicio" = CASE
+           WHEN "RateLimit"."ventana_inicio" < now() - make_interval(secs => $2::float)
+           THEN now() ELSE "RateLimit"."ventana_inicio" END
+       RETURNING "contador",
+                 EXTRACT(EPOCH FROM (now() - "ventana_inicio"))::int AS "edad"`,
+      [clave, ventanaSegundos],
+    )
+    const contador = Number(rows[0]?.contador ?? 1)
+    const edad = Number(rows[0]?.edad ?? 0)
     return {
       permitido: contador <= limite,
       contador,
@@ -77,8 +88,10 @@ export function respuesta429(r: ResultadoLimite, headersExtra: Record<string, st
  */
 export async function limpiarVencidos(): Promise<void> {
   if (Math.random() > 0.02) return
+  const pool = getPool()
+  if (!pool) return
   try {
-    await prisma.$executeRaw`DELETE FROM "RateLimit" WHERE "ventana_inicio" < now() - interval '1 day'`
+    await pool.query(`DELETE FROM "RateLimit" WHERE "ventana_inicio" < now() - interval '1 day'`)
   } catch {
     /* best-effort */
   }

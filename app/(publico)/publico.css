@@ -277,6 +277,30 @@
 .mic-chat-enviar:disabled { opacity: 0.45; cursor: default; }
 .mic-chat-nota { font-size: 0.78rem; color: var(--tinta-tenue); margin-top: 1rem; line-height: 1.6; }
 
+/* ── Acceso al área de cliente ──────────────────────────────────────────── */
+
+.mic-acceso { margin-top: 2.5rem; max-width: 26rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.mic-campo { display: flex; flex-direction: column; gap: 0.4rem; }
+.mic-campo > span { font-size: 0.9rem; color: var(--tinta-suave); }
+.mic-campo input {
+  padding: 0.85rem 1.1rem; font-size: 1rem; background: var(--papel);
+  border: 1px solid var(--linea-fuerte); border-radius: 10px; color: var(--tinta); outline: none;
+}
+.mic-campo input:focus { border-color: var(--sage); }
+.mic-campo small { font-size: 0.78rem; color: var(--tinta-tenue); }
+.mic-acceso-error {
+  color: var(--terracota); font-size: 0.9rem; line-height: 1.6;
+  border-left: 2px solid var(--terracota); padding-left: 1rem; margin: 0;
+}
+.mic-acceso .mic-boton { border: none; cursor: pointer; align-self: flex-start; }
+.mic-acceso .mic-boton:disabled { opacity: 0.5; cursor: default; }
+
+.mic-salir {
+  background: none; border: 1px solid var(--linea-fuerte); color: var(--tinta-suave);
+  padding: 0.35rem 0.9rem; border-radius: 8px; font-size: 0.8rem; cursor: pointer;
+}
+.mic-salir:hover { border-color: var(--terracota); color: var(--terracota); }
+
 @media (prefers-reduced-motion: reduce) {
   .mic * { transition: none !important; animation: none !important; }
 }

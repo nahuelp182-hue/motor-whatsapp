@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { COOKIE_SESION, verificarSesion } from '@/lib/session'
+import {
+  COOKIE_SESION,
+  verificarSesion,
+  COOKIE_CLIENTE_NOMBRE,
+  verificarSesionCliente,
+} from '@/lib/session'
 
 // Assets del storefront que se sirven a cualquiera (van embebidos en Tiendanube).
 const PUBLICOS = new Set([
@@ -14,12 +19,12 @@ const PUBLICOS = new Set([
 
 // APIs que por diseño reciben tráfico no autenticado. Cada una valida lo suyo: los webhooks
 // por firma HMAC, los crons por CRON_SECRET, el resto por rate limit.
-const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks', '/api/asistente']
+const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks', '/api/asistente', '/api/acceso']
 
 // Capa pública de contenido: indexable y sin login a propósito. El conocimiento general es
 // lo que construye confianza antes de la compra; lo privado (manuales del equipo, pedidos)
 // va en rutas aparte que sí piden sesión.
-const PREFIJOS_PUBLICOS = ['/guia']
+const PREFIJOS_PUBLICOS = ['/guia', '/acceso']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -41,6 +46,18 @@ export async function middleware(request: NextRequest) {
   }
   if (pathname === '/login') return NextResponse.next()
   if (API_ABIERTAS.some(p => pathname.startsWith(p))) return NextResponse.next()
+
+  // Área privada del CLIENTE: identidad y cookie propias, separadas del dashboard interno.
+  // Sin sesión de cliente → a /acceso (no al login del panel). El secreto de firma es el
+  // mismo del server; solo se usa para integridad de la cookie, no da acceso al dashboard.
+  if (pathname === '/mi-equipo' || pathname.startsWith('/mi-equipo/')) {
+    const secreto = process.env.DASHBOARD_PASSWORD
+    const cli = secreto
+      ? await verificarSesionCliente(request.cookies.get(COOKIE_CLIENTE_NOMBRE)?.value, secreto)
+      : null
+    if (cli) return NextResponse.next()
+    return NextResponse.redirect(new URL('/acceso', request.url))
+  }
 
   // De acá para abajo, todo es privado. FALLA CERRADO: antes, si faltaba DASHBOARD_PASSWORD
   // se dejaba pasar TODO, así que un deploy sin esa variable publicaba el dashboard

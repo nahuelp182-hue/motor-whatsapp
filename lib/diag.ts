@@ -3,7 +3,10 @@ import pg from 'pg'
 
 let pool: pg.Pool | null = null
 
-function getPool(): pg.Pool | null {
+// Exportado para que otros módulos (ratelimit) reusen el MISMO pool con el pooler de Supabase
+// (DB_HOST/PORT/USER/PASSWORD). Es la conexión que funciona en este proyecto; el cliente
+// Prisma con DATABASE_URL directo no conecta igual en el runtime de producción.
+export function getPool(): pg.Pool | null {
   if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD) return null
   if (!pool) {
     pool = new pg.Pool({

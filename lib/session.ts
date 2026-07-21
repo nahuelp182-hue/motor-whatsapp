@@ -78,3 +78,57 @@ export async function verificarSesion(
 
 export const COOKIE_SESION = COOKIE
 export const MAX_AGE_SESION = DIAS * 86400
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sesión de CLIENTE (área privada /mi-equipo). Cookie e identidad separadas de la del
+// dashboard: un cliente logueado nunca puede ver nada del panel interno, y viceversa.
+//
+// El payload lleva los datos MÍNIMOS del pedido (número, nombre de pila, qué equipos). Van
+// firmados, así el área privada funciona aunque Tiendanube esté caído, sin volver a pedir
+// PII. El customerId/orderId sale SIEMPRE de acá (cookie firmada server-side), NUNCA de un
+// parámetro de la request: es la defensa contra IDOR (que alguien pida el pedido de otro).
+
+const COOKIE_CLIENTE = 'mic-cliente'
+const DIAS_CLIENTE = 30
+
+export type SesionCliente = {
+  num: number // número de pedido
+  nom: string // nombre de pila
+  eq: string[] // equipos comprados
+  iat: number
+  exp: number
+}
+
+export async function crearSesionCliente(
+  datos: { num: number; nom: string; eq: string[] },
+  secreto: string,
+  dias = DIAS_CLIENTE,
+): Promise<string> {
+  const ahora = Math.floor(Date.now() / 1000)
+  const s: SesionCliente = { ...datos, iat: ahora, exp: ahora + dias * 86400 }
+  const payload = b64url(enc.encode(JSON.stringify(s)))
+  return `${payload}.${await firmar(payload, secreto)}`
+}
+
+export async function verificarSesionCliente(
+  valor: string | undefined,
+  secreto: string,
+): Promise<SesionCliente | null> {
+  if (!valor) return null
+  const punto = valor.lastIndexOf('.')
+  if (punto < 1) return null
+  const payload = valor.slice(0, punto)
+  const firma = valor.slice(punto + 1)
+  if (!igualSeguro(firma, await firmar(payload, secreto))) return null
+  try {
+    const s = JSON.parse(desdeB64url(payload)) as SesionCliente
+    if (typeof s.exp !== 'number' || s.exp < Math.floor(Date.now() / 1000)) return null
+    if (typeof s.num !== 'number') return null
+    return s
+  } catch {
+    return null
+  }
+}
+
+export const COOKIE_CLIENTE_NOMBRE = COOKIE_CLIENTE
+export const MAX_AGE_CLIENTE = DIAS_CLIENTE * 86400
