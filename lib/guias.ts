@@ -299,6 +299,45 @@ export function getGuia(slug: string): Guia | undefined {
   return GUIAS.find(g => g.slug === slug)
 }
 
+/**
+ * Serializa todas las guías a texto plano para dárselas de contexto al asistente. Se cachea
+ * en el prompt (cache_control), así que este texto viaja una vez y las siguientes respuestas
+ * salen ~10x más baratas. A esta escala (3 guías) no hace falta base vectorial: entra entero.
+ */
+export function guiasParaPrompt(): string {
+  const partes: string[] = []
+  for (const g of GUIAS) {
+    partes.push(`\n═══ GUÍA: ${g.titulo} (URL: /guia/${g.slug}) ═══`)
+    partes.push(g.resumen)
+    for (const s of g.secciones) {
+      partes.push(`\n## ${s.titulo}`)
+      for (const b of s.bloques) {
+        switch (b.tipo) {
+          case 'parrafo':
+            partes.push(b.texto)
+            break
+          case 'vital':
+            partes.push(`VITAL ${b.numero} — ${b.titulo}: ${b.texto}`)
+            break
+          case 'pasos':
+            partes.push(b.items.map((t, i) => `${i + 1}. ${t}`).join('\n'))
+            break
+          case 'aviso':
+            partes.push(`(${b.tono === 'cuidado' ? 'IMPORTANTE' : 'Nota'}) ${b.texto}`)
+            break
+          case 'faq':
+            partes.push(b.items.map(it => `P: ${it.p}\nR: ${it.r}`).join('\n'))
+            break
+          case 'datos':
+            partes.push(b.filas.map(f => `${f.clave}: ${f.verificar ? '(sin confirmar)' : f.valor}`).join('\n'))
+            break
+        }
+      }
+    }
+  }
+  return partes.join('\n')
+}
+
 export function tienePendientes(g: Guia): boolean {
   return g.secciones.some(s =>
     s.bloques.some(

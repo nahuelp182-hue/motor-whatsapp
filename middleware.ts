@@ -14,7 +14,7 @@ const PUBLICOS = new Set([
 
 // APIs que por diseño reciben tráfico no autenticado. Cada una valida lo suyo: los webhooks
 // por firma HMAC, los crons por CRON_SECRET, el resto por rate limit.
-const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks']
+const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks', '/api/asistente']
 
 // Capa pública de contenido: indexable y sin login a propósito. El conocimiento general es
 // lo que construye confianza antes de la compra; lo privado (manuales del equipo, pedidos)

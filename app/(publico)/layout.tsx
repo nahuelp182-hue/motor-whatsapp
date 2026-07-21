@@ -35,6 +35,7 @@ export default function PublicoLayout({ children }: { children: React.ReactNode 
           </a>
           <nav className="mic-nav">
             <a href="/guia">Guías</a>
+            <a href="/guia/asistente">Asistente</a>
             <a href="https://infomicelium.com.ar">Tienda</a>
           </nav>
         </header>

@@ -46,13 +46,13 @@ export default function IndiceGuias() {
       </ol>
 
       <div className="mic-cierre">
-        <h3>¿Tu cultivo va mal y no sabés por qué?</h3>
+        <h3>¿Tenés una duda puntual?</h3>
         <p>
-          Escribinos con tres datos y casi siempre alcanza: cuántos días pasaron desde que
-          armaste, qué temperatura marca el equipo y en qué zona del país estás.
+          Preguntale al asistente: responde al instante con la información de estas guías. Y si
+          tu cultivo va mal o hay una falla, te pasa con una persona del equipo.
         </p>
-        <a className="mic-boton" href="https://wa.me/543512145521">
-          Escribir por WhatsApp
+        <a className="mic-boton" href="/guia/asistente">
+          Abrir el asistente
         </a>
       </div>
     </>
