@@ -20,7 +20,18 @@ import { guiasParaPrompt } from '@/lib/guias'
 export const MODELO_ASISTENTE = 'claude-haiku-4-5-20251001'
 export const WA_HUMANO = '543512145521'
 
-export function systemAsistenteWeb(): Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> {
+// Contexto del cliente ya verificado (sale de la cookie firmada, NUNCA del body). Cuando está
+// presente, el asistente pasa a "modo cliente": ya sabe quién es, qué compró y su envío.
+export type ContextoCliente = {
+  nombre: string
+  numero: number
+  equipos: string[]
+  envio?: string // resumen legible del estado de envío, o vacío
+}
+
+export function systemAsistenteWeb(
+  ctx?: ContextoCliente,
+): Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> {
   const reglasWeb = `
 Estás respondiendo en el SITIO WEB público de Micelium (una página de guías), NO en WhatsApp.
 Sos el asistente virtual de Micelium: cálido, breve, argentino, y transparente en que sos un
@@ -61,12 +72,35 @@ donde-conseguir-insumos, como-funciona-la-incubadora), o "-" si ninguna aplica.
 
   const contextoGuias = `CONTENIDO DE LAS GUÍAS PÚBLICAS (fuente de verdad):\n${guiasParaPrompt()}`
 
-  return [
+  const bloques: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [
     // Cacheado: KB + reglas + guías viajan una vez y se reusan (respuestas ~10x más baratas).
     { type: 'text', text: KB_MICELIUM, cache_control: { type: 'ephemeral' } },
     { type: 'text', text: reglasWeb },
     { type: 'text', text: contextoGuias, cache_control: { type: 'ephemeral' } },
   ]
+
+  // MODO CLIENTE. Este bloque NO se cachea: es distinto por cada cliente y va al final para no
+  // romper el prefijo cacheado. Los datos ya vienen verificados desde la cookie firmada, así
+  // que el asistente puede confiar en ellos, pero SOLO son del propio cliente (anti-IDOR).
+  if (ctx) {
+    const equipos = ctx.equipos.map(e => (e === 'inc101' ? 'Incubadora INC101' : e === 'pc400' ? 'Tableta térmica' : 'su compra')).join(', ')
+    bloques.push({
+      type: 'text',
+      text:
+        `MODO CLIENTE — esta persona YA COMPRÓ y está identificada:\n` +
+        `- Nombre: ${ctx.nombre || '(sin nombre)'}\n` +
+        `- Pedido: #${ctx.numero}\n` +
+        `- Compró: ${equipos || 'un equipo'}\n` +
+        (ctx.envio ? `- Estado del envío: ${ctx.envio}\n` : '') +
+        `\nAtendelo por su nombre y con confianza: NO le pidas el número de pedido ni qué compró, ` +
+        `ya lo sabés. Si pregunta por su envío, respondé con el estado de arriba. Si vas a ` +
+        `escalar a una persona, ya conocés su pedido (#${ctx.numero}), así que no se lo pidas de ` +
+        `nuevo. El resto de las reglas siguen igual: no inventes datos técnicos, y para un ` +
+        `cultivo que va mal o una falla, derivá al equipo.`,
+    })
+  }
+
+  return bloques
 }
 
 export type SalidaAsistente = { respuesta: string; guia: string | null; whatsapp: boolean }

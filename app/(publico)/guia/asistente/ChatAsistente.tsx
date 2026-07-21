@@ -10,11 +10,15 @@ const TITULOS_GUIA: Record<string, string> = {
   'como-funciona-la-incubadora': 'Cómo funciona la incubadora',
 }
 
-const SALUDO: Turno = {
-  role: 'assistant',
-  content:
-    '¡Hola! Soy el asistente de Micelium. Te ayudo con dudas del equipo, el cultivo o tu ' +
-    'compra. ¿Qué querés saber?',
+function saludoInicial(nombre: string | null): Turno {
+  return {
+    role: 'assistant',
+    content: nombre
+      ? `¡Hola, ${nombre}! Soy el asistente de Micelium. Ya sé qué equipo tenés y cómo viene tu ` +
+        'envío, así que preguntame directamente lo que necesites.'
+      : '¡Hola! Soy el asistente de Micelium. Te ayudo con dudas del equipo, el cultivo o tu ' +
+        'compra. ¿Qué querés saber?',
+  }
 }
 
 function sid(): string {
@@ -31,8 +35,8 @@ function sid(): string {
   }
 }
 
-export default function ChatAsistente() {
-  const [turnos, setTurnos] = useState<Turno[]>([SALUDO])
+export default function ChatAsistente({ nombreCliente = null }: { nombreCliente?: string | null }) {
+  const [turnos, setTurnos] = useState<Turno[]>(() => [saludoInicial(nombreCliente)])
   const [texto, setTexto] = useState('')
   const [cargando, setCargando] = useState(false)
   const finRef = useRef<HTMLDivElement>(null)
@@ -52,9 +56,8 @@ export default function ChatAsistente() {
     setCargando(true)
 
     try {
-      const historial = nuevos
-        .filter(t => t !== SALUDO)
-        .map(t => ({ role: t.role, content: t.content }))
+      // El turno 0 es siempre el saludo del asistente: no va en el historial que se manda.
+      const historial = nuevos.slice(1).map(t => ({ role: t.role, content: t.content }))
       const r = await fetch('/api/asistente', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -140,14 +140,24 @@ export default async function MiEquipo() {
       </section>
 
       <div className="mic-cierre">
-        <h3>¿Tu cultivo va mal o tenés una falla?</h3>
+        <h3>¿Tenés una duda sobre tu equipo?</h3>
         <p>
-          Escribinos por WhatsApp con tu número de pedido (#{sesion.num}) y lo vemos con una
-          persona del equipo. Para dudas generales, el asistente responde al instante.
+          El asistente ya sabe qué compraste y cómo viene tu envío: preguntale directamente. Y si
+          tu cultivo va mal o hay una falla, escribinos por WhatsApp con tu pedido (#{sesion.num})
+          y lo vemos con una persona.
         </p>
-        <a className="mic-boton" href="https://wa.me/543512145521">
-          Escribir por WhatsApp
-        </a>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <Link className="mic-boton" href="/guia/asistente">
+            Preguntar al asistente
+          </Link>
+          <a
+            className="mic-boton"
+            href="https://wa.me/543512145521"
+            style={{ background: 'transparent', color: 'var(--verde-hondo)', border: '1px solid var(--linea-fuerte)' }}
+          >
+            Escribir por WhatsApp
+          </a>
+        </div>
       </div>
     </>
   )

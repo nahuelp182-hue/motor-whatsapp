@@ -8,7 +8,10 @@ import {
   systemAsistenteWeb,
   parseAsistente,
   sanearHistorial,
+  type ContextoCliente,
 } from '@/lib/asistente-web'
+import { COOKIE_CLIENTE_NOMBRE, verificarSesionCliente } from '@/lib/session'
+import { estadoEnvio } from '@/lib/pedidos'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -68,12 +71,33 @@ export async function POST(req: NextRequest) {
 
   const historial = sanearHistorial(body.historial)
 
+  // MODO CLIENTE: el contexto sale SIEMPRE de la cookie firmada, jamás del body. Un atacante
+  // no puede "declararse" cliente ni pedir el pedido de otro: si la cookie no verifica, no hay
+  // contexto y se atiende como frío.
+  let ctxCliente: ContextoCliente | undefined
+  const secreto = process.env.DASHBOARD_PASSWORD
+  if (secreto) {
+    const ses = await verificarSesionCliente(req.cookies.get(COOKIE_CLIENTE_NOMBRE)?.value, secreto)
+    if (ses) {
+      let envioTxt = ''
+      const env = await estadoEnvio(ses.num).catch(() => null)
+      if (env?.tracking) {
+        envioTxt = env.despachado
+          ? `despachado y en camino${env.esAndreani ? ' por Andreani' : ''}, seguimiento ${env.tracking}`
+          : 'en preparación, todavía sin despachar'
+      } else if (env) {
+        envioTxt = 'todavía sin número de seguimiento cargado'
+      }
+      ctxCliente = { nombre: ses.nom, numero: ses.num, equipos: ses.eq, envio: envioTxt }
+    }
+  }
+
   try {
     const client = new Anthropic()
     const response = await client.messages.create({
       model: MODELO_ASISTENTE,
       max_tokens: 500,
-      system: systemAsistenteWeb(),
+      system: systemAsistenteWeb(ctxCliente),
       messages: [
         ...historial,
         {
@@ -82,7 +106,7 @@ export async function POST(req: NextRequest) {
         },
       ],
     })
-    await logClaudeUsage('web', MODELO_ASISTENTE, response.usage)
+    await logClaudeUsage(ctxCliente ? 'web-cliente' : 'web', MODELO_ASISTENTE, response.usage)
 
     const block = response.content[0]
     const raw = block && block.type === 'text' ? block.text : ''
