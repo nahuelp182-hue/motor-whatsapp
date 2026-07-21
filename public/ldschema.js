@@ -1,26 +1,38 @@
-/* MICELIUM-LDSCHEMA v1
- * Inyecta JSON-LD (schema.org) en el storefront de Tiendanube, que no emite
- * ningun dato estructurado propio. Lee todo del DOM (meta OG/twitter) asi el
- * precio/stock se mantienen solos cuando cambian en TN.
+/* MICELIUM-LDSCHEMA v2
+ * Complemento client-side del JSON-LD del storefront.
  *
- * Emite: Organization + WebSite (todas las paginas), Product (fichas),
- * Article (posts del blog). FAQPage se agrega por URL cuando exista la pagina.
+ * REPARTO DE RESPONSABILIDADES (revisado 21/07/2026):
+ *  - Tiendanube ya emite server-side: Organization, WebPage, BreadcrumbList,
+ *    Product (con sku, brand, weight, offers/price/availability/inventoryLevel)
+ *    y BlogPosting. NO lo duplicamos: server-side gana siempre porque lo ven
+ *    los crawlers que no ejecutan JS.
+ *  - Organization + WebSite con @id estable viven en el snippet ESTATICO de
+ *    #assortedJs (external-codes de TN) -> visible sin render. Ver
+ *    ~/.claude/assortedJs_snippet_v2.html
+ *  - Este archivo solo agrega lo que ninguno de los dos cubre y que necesita
+ *    leer el DOM.
  *
- * LIMITE CONOCIDO: al inyectarse por JS lo ven los crawlers que renderizan
- * (Googlebot -> AI Overviews/Gemini, Bingbot -> Copilot). GPTBot/ClaudeBot
- * no ejecutan JS y no lo ven; para ellos cuenta el contenido extractable.
+ * QUE QUEDO ACA: enriquecer los posts del blog. El BlogPosting de TN trae
+ * author como string suelto ("Micelium") y un publisher sin @id, asi que no
+ * consolida autoridad en ninguna entidad. Emitimos un BlogPosting con @id
+ * propio que enlaza author/publisher al nodo #org.
+ *
+ * LIMITE CONOCIDO (sin cambios): al inyectarse por JS lo ven los crawlers que
+ * renderizan (Googlebot -> AI Overviews/Gemini, Bingbot -> Copilot).
+ * GPTBot/ClaudeBot/OAI-SearchBot/PerplexityBot no ejecutan JS y no lo ven;
+ * para ellos cuenta el snippet estatico + el contenido extractable.
  */
 (function () {
   if (window.__ldschemaInit) return; window.__ldschemaInit = true;
 
   var ORIGIN = 'https://infomicelium.com.ar';
+  var ORG_ID = ORIGIN + '/#org';
 
   function meta(sel) {
     var el = document.querySelector(sel);
     return el ? el.getAttribute('content') : null;
   }
   function og(p)  { return meta('meta[property="' + p + '"]'); }
-  function tw(n)  { return meta('meta[name="' + n + '"]'); }
   function desc() { return meta('meta[name="description"]'); }
 
   function inject(obj) {
@@ -32,78 +44,47 @@
     } catch (e) {}
   }
 
-  var ORG = {
-    '@type': 'Organization',
-    '@id': ORIGIN + '/#org',
-    name: 'Micelium Argentina',
-    alternateName: 'MICELIUM',
-    url: ORIGIN + '/',
-    description: 'Incubadoras automaticas para cultivo de girgolas, melena de leon, reishi y otras especies en casa. Equipos fabricados en Argentina con control automatico de temperatura y humedad.',
-    email: 'info.micelium@gmail.com',
-    sameAs: ['https://instagram.com/incubadoras_micelium'],
-    areaServed: { '@type': 'Country', name: 'Argentina' }
-  };
+  // Fecha del BlogPosting que ya emitio TN: la reusamos en vez de inventarla.
+  function fechasDeTN() {
+    var out = {};
+    var nodes = document.querySelectorAll('script[type="application/ld+json"]');
+    for (var i = 0; i < nodes.length; i++) {
+      try {
+        var d = JSON.parse(nodes[i].text);
+        if (d && d['@type'] === 'BlogPosting') {
+          if (d.datePublished) out.datePublished = d.datePublished;
+          if (d.dateModified) out.dateModified = d.dateModified;
+          if (d.headline) out.headline = d.headline;
+          if (d.image && d.image.url) out.image = d.image.url;
+          break;
+        }
+      } catch (e) {}
+    }
+    return out;
+  }
 
   function run() {
-    var path = location.pathname;
+    if (location.pathname.indexOf('/blog/posts/') !== 0) return;
 
-    inject({ '@context': 'https://schema.org', '@graph': [ORG, {
-      '@type': 'WebSite',
-      '@id': ORIGIN + '/#website',
-      url: ORIGIN + '/',
-      name: 'Micelium Argentina',
-      publisher: { '@id': ORIGIN + '/#org' },
-      potentialAction: {
-        '@type': 'SearchAction',
-        target: { '@type': 'EntryPoint', urlTemplate: ORIGIN + '/search/?q={search_term_string}' },
-        'query-input': 'required name=search_term_string'
-      }
-    }]});
+    var tn = fechasDeTN();
+    var url = (og('og:url') || location.href).split('?')[0];
 
-    // ---- Product (fichas TN: og:type = tiendanube:product) ----
-    if (og('og:type') === 'tiendanube:product') {
-      // twitter:data1 = "$284.999,00 ARS" -> 284999.00
-      var rawPrice = tw('twitter:data1') || '';
-      var m = rawPrice.replace(/\./g, '').replace(',', '.').match(/([\d.]+)/);
-      var stock = parseInt(tw('twitter:data2') || '0', 10);
-      var prod = {
-        '@context': 'https://schema.org',
-        '@type': 'Product',
-        name: og('og:title'),
-        url: og('og:url') || location.href,
-        image: og('og:image:secure_url') || og('og:image'),
-        description: desc() || undefined,
-        brand: { '@type': 'Brand', name: 'Micelium Argentina' },
-        offers: {
-          '@type': 'Offer',
-          url: og('og:url') || location.href,
-          priceCurrency: 'ARS',
-          price: m ? m[1] : undefined,
-          availability: stock > 0
-            ? 'https://schema.org/InStock'
-            : 'https://schema.org/OutOfStock',
-          itemCondition: 'https://schema.org/NewCondition',
-          seller: { '@id': ORIGIN + '/#org' }
-        }
-      };
-      if (prod.name && prod.offers.price) inject(prod);
-    }
-
-    // ---- Article (posts del blog) ----
-    if (path.indexOf('/blog/posts/') === 0) {
-      var art = {
-        '@context': 'https://schema.org',
-        '@type': 'Article',
-        headline: og('og:title') || document.title,
-        description: desc() || undefined,
-        image: og('og:image:secure_url') || og('og:image') || undefined,
-        mainEntityOfPage: og('og:url') || location.href,
-        inLanguage: 'es-AR',
-        author: { '@id': ORIGIN + '/#org' },
-        publisher: { '@id': ORIGIN + '/#org' }
-      };
-      inject(art);
-    }
+    var art = {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      '@id': url.replace(/\/$/, '') + '#article',
+      headline: tn.headline || og('og:title') || document.title,
+      description: desc() || undefined,
+      image: tn.image || og('og:image:secure_url') || og('og:image') || undefined,
+      datePublished: tn.datePublished || undefined,
+      dateModified: tn.dateModified || tn.datePublished || undefined,
+      mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+      isPartOf: { '@id': ORIGIN + '/#website' },
+      inLanguage: 'es-AR',
+      author: { '@id': ORG_ID },
+      publisher: { '@id': ORG_ID }
+    };
+    inject(art);
   }
 
   if (document.readyState === 'loading') {
