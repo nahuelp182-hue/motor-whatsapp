@@ -16,23 +16,35 @@ const PUBLICOS = new Set([
 // por firma HMAC, los crons por CRON_SECRET, el resto por rate limit.
 const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks']
 
+// Capa pública de contenido: indexable y sin login a propósito. El conocimiento general es
+// lo que construye confianza antes de la compra; lo privado (manuales del equipo, pedidos)
+// va en rutas aparte que sí piden sesión.
+const PREFIJOS_PUBLICOS = ['/guia']
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const password = process.env.DASHBOARD_PASSWORD
 
-  // FALLA CERRADO. Antes, si faltaba DASHBOARD_PASSWORD se dejaba pasar TODO: un deploy sin
-  // esa variable dejaba el dashboard (facturación, clientes, conversaciones) público sin que
-  // nada fallara a la vista. En producción eso ahora es un error explícito.
+  // Lo público se resuelve ANTES de mirar la contraseña: no protege nada, así que no puede
+  // depender de que esa variable exista. Si dependiera, un env var faltante dejaría sin
+  // servicio a los scripts embebidos en la tienda (geogate, tracking, lead magnet) y a las
+  // guías, que es justo lo contrario de lo que se quiere.
+  if (PUBLICOS.has(pathname)) return NextResponse.next()
+  if (PREFIJOS_PUBLICOS.some(p => pathname === p || pathname.startsWith(p + '/'))) {
+    return NextResponse.next()
+  }
+  if (pathname === '/login') return NextResponse.next()
+  if (API_ABIERTAS.some(p => pathname.startsWith(p))) return NextResponse.next()
+
+  // De acá para abajo, todo es privado. FALLA CERRADO: antes, si faltaba DASHBOARD_PASSWORD
+  // se dejaba pasar TODO, así que un deploy sin esa variable publicaba el dashboard
+  // (facturación, clientes, conversaciones) sin que nada fallara a la vista.
+  const password = process.env.DASHBOARD_PASSWORD
   if (!password) {
     if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Servicio mal configurado' }, { status: 503 })
     }
     return NextResponse.next()
   }
-
-  if (PUBLICOS.has(pathname)) return NextResponse.next()
-  if (pathname === '/login') return NextResponse.next()
-  if (API_ABIERTAS.some(p => pathname.startsWith(p))) return NextResponse.next()
 
   const sesion = await verificarSesion(request.cookies.get(COOKIE_SESION)?.value, password)
   if (sesion) return NextResponse.next()
