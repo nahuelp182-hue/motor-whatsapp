@@ -290,10 +290,347 @@ const equipo: Guia = {
   relacionadas: ['donde-conseguir-insumos', 'los-dos-vitales'],
 }
 
+const cultivar: Guia = {
+  slug: 'que-se-puede-cultivar',
+  titulo: 'Qué se puede cultivar',
+  eyebrow: 'Qué esperar',
+  resumen:
+    'Qué especies andan bien en el equipo, cuáles son las más fáciles para arrancar y qué ' +
+    'rinde cada una. Una idea realista antes de empezar.',
+  intencion: 'informacional',
+  actualizado: '2026-07-21',
+  mensajesQueResuelve: 36,
+  secciones: [
+    {
+      id: 'especies',
+      titulo: 'Las especies que recomendamos',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'El equipo sirve para cultivar hongos comestibles y funcionales. Estas son las que ' +
+            'mejor resultado dan y con las que más acompañamiento tenemos:',
+        },
+        {
+          tipo: 'pasos',
+          items: [
+            'Gírgolas: las más fáciles y las más perdonadoras. Si es tu primera vez, empezá por acá.',
+            'Melena de león: un poco más exigente, muy buscada por su uso funcional.',
+            'Reishi: la más lenta, para quien ya tomó la mano.',
+          ],
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Cada especie tiene su propia ventana de temperatura. El equipo la sostiene, pero el ' +
+            'rango se lo tenés que indicar vos según lo que cultives. Está en la guía «Las dos ' +
+            'cosas que definen el resultado».',
+        },
+      ],
+    },
+    {
+      id: 'rinde',
+      titulo: '¿Cuánto rinde y cuánto tarda?',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'Depende de la especie y del material con el que arranques, pero la regla de los ' +
+            'tiempos es pareja: cada etapa lleva entre dos y tres semanas. Del armado a la ' +
+            'cosecha, contá varias semanas, no días.',
+        },
+        {
+          tipo: 'faq',
+          items: [
+            {
+              p: '¿Sirve si nunca cultivé nada?',
+              r: 'Sí. La mayoría de nuestros clientes arrancó sin experiencia. Empezando por gírgolas y siguiendo las guías, se llega. Lo importante son las dos cosas de siempre: sanidad y temperatura.',
+            },
+            {
+              p: '¿Puedo cultivar todo el año?',
+              r: 'Sí, esa es la idea del equipo: mantiene las condiciones aunque afuera cambie el clima. En verano, si tu zona pasa de 30 °C sostenidos, escribinos antes (el INC101 calienta, no refrigera).',
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  relacionadas: ['los-dos-vitales', 'donde-conseguir-insumos'],
+}
+
+const problemas: Guia = {
+  slug: 'solucion-de-problemas',
+  titulo: 'Cuando algo va mal',
+  eyebrow: 'Diagnóstico',
+  resumen:
+    'Los tres problemas más comunes y qué hacer con cada uno: contaminación, el equipo que no ' +
+    'levanta temperatura y la condensación. Diagnóstico directo, sin vueltas.',
+  intencion: 'informacional',
+  actualizado: '2026-07-21',
+  mensajesQueResuelve: 40,
+  secciones: [
+    {
+      id: 'contaminacion',
+      titulo: 'Se contaminó',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'Si aparece moho verde, negro o rosado, o un olor feo, el cultivo está contaminado. ' +
+            'Es la causa número uno de los cultivos que se pierden, y es honesto decirlo: cuando ' +
+            'la contaminación se ve, ya no se revierte. Ese cultivo se descarta.',
+        },
+        {
+          tipo: 'aviso',
+          tono: 'cuidado',
+          texto:
+            'Lo que importa no es salvar ese intento, es entender por qué pasó para que no se ' +
+            'repita. Casi siempre es sanidad (algo entró sin estar limpio) o temperatura fuera de ' +
+            'rango demasiado tiempo. Si te pasó, escribinos con los días desde el armado, la ' +
+            'temperatura del equipo y tu zona, y lo vemos con tu caso.',
+        },
+      ],
+    },
+    {
+      id: 'no-calienta',
+      titulo: 'El equipo no levanta temperatura',
+      bloques: [
+        {
+          tipo: 'pasos',
+          items: [
+            'Confirmá que esté bien enchufado y encendido, y que la temperatura objetivo esté por encima de la del ambiente.',
+            'Verificá que la sonda de temperatura esté colocada donde indica el manual: si mide mal, regula mal.',
+            'Dale tiempo: levantar temperatura no es instantáneo, sobre todo en un día frío.',
+          ],
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Si hiciste todo esto y sigue sin calentar, puede ser una falla del equipo. Escribinos: ' +
+            'tenés 12 meses de garantía de fábrica y después servicio técnico oficial y repuestos ' +
+            'de por vida.',
+        },
+      ],
+    },
+    {
+      id: 'condensacion',
+      titulo: 'Se junta mucha agua (condensación)',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'Algo de condensación es normal en el proceso. Se vuelve un problema cuando es tanta ' +
+            'que gotea sobre el cultivo y favorece la contaminación. Suele pasar más en zonas frías ' +
+            'o húmedas, donde la diferencia de temperatura con el ambiente es mayor.',
+        },
+        {
+          tipo: 'faq',
+          items: [
+            {
+              p: '¿Cómo la manejo?',
+              r: 'PENDIENTE: Nahuel, indicá el procedimiento concreto (ventilación, posición de recipientes, ajuste del booster) para no dar un consejo genérico. Está en el manual pero conviene resumir los 2-3 pasos clave acá.',
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  relacionadas: ['los-dos-vitales'],
+}
+
+const comprar: Guia = {
+  slug: 'como-comprar',
+  titulo: 'Cómo comprar',
+  eyebrow: 'Tu compra',
+  resumen:
+    'Medios de pago, cuotas y la diferencia por transferencia. El precio actualizado siempre ' +
+    'está en la tienda.',
+  intencion: 'comercial',
+  actualizado: '2026-07-21',
+  mensajesQueResuelve: 78,
+  secciones: [
+    {
+      id: 'donde',
+      titulo: 'Dónde se compra',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'La compra es en nuestra tienda oficial, infomicelium.com.ar. Ahí está siempre el ' +
+            'precio vigente y el stock real; por eso no ponemos el número acá, para que no te ' +
+            'encuentres con un valor viejo.',
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Comprás directo a la fábrica. No somos revendedores: el equipo lo diseñamos y lo ' +
+            'hacemos nosotros, y por eso el soporte y los repuestos salen de la misma mano.',
+        },
+      ],
+    },
+    {
+      id: 'pagos',
+      titulo: 'Formas de pago',
+      bloques: [
+        {
+          tipo: 'faq',
+          items: [
+            {
+              p: '¿Con qué puedo pagar?',
+              r: 'Con Mercado Pago (tarjeta de crédito, débito o dinero en cuenta) y por transferencia bancaria.',
+            },
+            {
+              p: '¿Hay cuotas?',
+              r: 'PENDIENTE: Nahuel, confirmá cuántas cuotas y si son sin interés, para responderlo con precisión (aparece mucho: «no me da la opción de 6 cuotas»).',
+            },
+            {
+              p: '¿Conviene pagar por transferencia?',
+              r: 'PENDIENTE: confirmar el porcentaje de descuento por transferencia para poder decirlo con el número exacto.',
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  relacionadas: ['envios-y-seguimiento', 'como-funciona-la-incubadora'],
+}
+
+const envios: Guia = {
+  slug: 'envios-y-seguimiento',
+  titulo: 'Envíos y seguimiento',
+  eyebrow: 'Tu envío',
+  resumen:
+    'Cómo despachamos, a dónde llegamos y cómo seguir tu pedido. Y qué hacer si el seguimiento ' +
+    'no se mueve.',
+  intencion: 'informacional',
+  actualizado: '2026-07-21',
+  mensajesQueResuelve: 57,
+  secciones: [
+    {
+      id: 'como',
+      titulo: 'Cómo y a dónde enviamos',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'Enviamos a todo el país por Andreani. Apenas despachamos tu pedido te llega el número ' +
+            'de seguimiento para que veas dónde está en cada momento.',
+        },
+        {
+          tipo: 'faq',
+          items: [
+            {
+              p: '¿Cuánto tarda en llegar?',
+              r: 'PENDIENTE: Nahuel, indicá el rango de días hábiles típico (varía por zona) para no prometer algo que no se cumpla.',
+            },
+            {
+              p: '¿Cuánto cuesta el envío?',
+              r: 'PENDIENTE: confirmar si es gratis, con cargo, o según zona; el costo exacto figura en la tienda al finalizar la compra.',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'seguimiento',
+      titulo: 'Si el seguimiento no se mueve',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'A veces el estado de Andreani queda unos días sin actualizarse aunque el paquete esté ' +
+            'en camino. No es lo ideal, pero pasa y en general se destraba solo.',
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Si ya pasaron varios días sin movimiento, escribinos con tu número de pedido o de ' +
+            'seguimiento y hacemos el reclamo por vos. No tenés que quedarte esperando sin ' +
+            'respuesta.',
+        },
+      ],
+    },
+  ],
+  relacionadas: ['como-comprar'],
+}
+
+const sobre: Guia = {
+  slug: 'sobre-micelium',
+  titulo: 'Quiénes somos',
+  eyebrow: 'Micelium',
+  resumen:
+    'Somos una fábrica argentina de equipos de cultivo. Qué significa eso para vos, antes y ' +
+    'después de comprar.',
+  intencion: 'informacional',
+  actualizado: '2026-07-21',
+  mensajesQueResuelve: 5,
+  secciones: [
+    {
+      id: 'quienes',
+      titulo: 'Una fábrica, no una reventa',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'Diseñamos y fabricamos nosotros mismos las incubadoras. No revendemos un producto de ' +
+            'otro: cada equipo sale de nuestro trabajo, y eso cambia todo lo que viene después de ' +
+            'la compra.',
+        },
+        {
+          tipo: 'pasos',
+          items: [
+            'El soporte lo da quien hizo el equipo, no un intermediario que no lo conoce.',
+            'Los repuestos existen y van a seguir existiendo: garantía de 12 meses y servicio técnico oficial de por vida.',
+            'El acompañamiento del cultivo es parte de la compra, no un extra que se cobra aparte.',
+          ],
+        },
+      ],
+    },
+    {
+      id: 'confianza',
+      titulo: 'Por qué lo contamos así',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'Sabemos que comprar algo así por internet da un poco de vértigo. Por eso preferimos ' +
+            'ser claros de entrada: qué hace el equipo, qué necesitás además, qué pasa si algo ' +
+            'sale mal. Toda esta información es pública justamente para que decidas con datos, no ' +
+            'con promesas.',
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Cualquier duda, el asistente responde al instante y, si hace falta, te pasa con una ' +
+            'persona del equipo.',
+        },
+      ],
+    },
+  ],
+  relacionadas: ['como-funciona-la-incubadora', 'como-comprar'],
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Orden deliberado: primero lo que evita que un cultivo se pierda. */
-export const GUIAS: Guia[] = [vitales, insumos, equipo]
+/**
+ * Orden deliberado: de "conocer" a "operar". Sirve al visitante frío (funciona → qué cultivar
+ * → qué necesita → comprar → envío) y al comprador (vitales, problemas). Lo esencial primero.
+ */
+export const GUIAS: Guia[] = [
+  vitales,
+  equipo,
+  cultivar,
+  insumos,
+  comprar,
+  envios,
+  problemas,
+  sobre,
+]
 
 export function getGuia(slug: string): Guia | undefined {
   return GUIAS.find(g => g.slug === slug)
@@ -326,7 +663,18 @@ export function guiasParaPrompt(): string {
             partes.push(`(${b.tono === 'cuidado' ? 'IMPORTANTE' : 'Nota'}) ${b.texto}`)
             break
           case 'faq':
-            partes.push(b.items.map(it => `P: ${it.p}\nR: ${it.r}`).join('\n'))
+            partes.push(
+              b.items
+                .map(it => {
+                  // Las respuestas marcadas PENDIENTE son notas internas para Nahuel, no
+                  // contenido: el asistente NO debe leerlas ni repetirlas. Se le indica derivar.
+                  const r = it.r.startsWith('PENDIENTE')
+                    ? '(dato aún no confirmado — si preguntan esto, derivá al equipo por WhatsApp, no inventes)'
+                    : it.r
+                  return `P: ${it.p}\nR: ${r}`
+                })
+                .join('\n'),
+            )
             break
           case 'datos':
             partes.push(b.filas.map(f => `${f.clave}: ${f.verificar ? '(sin confirmar)' : f.valor}`).join('\n'))
