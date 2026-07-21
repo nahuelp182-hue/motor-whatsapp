@@ -9,6 +9,7 @@ import {
 import { getEstadoAndreani } from '@/lib/andreani'
 import { notifyNahuelAdjunto } from '@/lib/notify'
 import { prisma } from '@/lib/prisma'
+import { verificarFirmaMeta } from '@/lib/meta-signature'
 
 // Ventana de "debounce": si el cliente manda varios mensajes seguidos, esperamos este
 // tiempo y solo la última invocación responde (a toda la ráfaga junta). Evita respuestas
@@ -580,7 +581,17 @@ export async function POST(req: NextRequest) {
     }>
   }
 
-  try { body = await req.json() } catch { return NextResponse.json({ ok: true }) }
+  // Verificación de firma ANTES de tocar el contenido. Sin esto, cualquiera que conozca la
+  // URL puede inyectar un mensaje falso: el bot lo procesa, gasta tokens de Claude y ENVÍA
+  // un WhatsApp desde el número oficial al destinatario que elija el atacante (riesgo de
+  // baneo del WABA). La firma es sobre los bytes crudos, así que no se puede usar req.json().
+  const firma = await verificarFirmaMeta(req, process.env.WHATSAPP_APP_SECRET)
+  if (!firma.ok) {
+    console.error('[wa] webhook rechazado:', firma.motivo)
+    return NextResponse.json({ error: firma.motivo }, { status: firma.status })
+  }
+
+  try { body = JSON.parse(firma.body) } catch { return NextResponse.json({ ok: true }) }
   if (body.object !== 'whatsapp_business_account') return NextResponse.json({ ok: true })
 
   // Todo el trabajo pesado (debounce, Claude, Tiendanube, envíos) corre DESPUÉS de

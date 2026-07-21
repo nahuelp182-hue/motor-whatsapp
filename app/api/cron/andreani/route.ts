@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getEstadoAndreani } from '@/lib/andreani'
+import { chequearCron } from '@/lib/cron-auth'
 
 export const runtime = 'nodejs'
 
@@ -8,10 +9,8 @@ export const runtime = 'nodejs'
 // bloqueada). Vercel sí llega. Protegido con CRON_SECRET.
 // curl -H "Authorization: Bearer $CRON_SECRET" ".../api/cron/andreani?numero=360003034254330"
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const noAuth = chequearCron(req)
+  if (noAuth) return noAuth
   const numero = req.nextUrl.searchParams.get('numero')
   if (!numero || !/^\d{6,}$/.test(numero)) {
     return NextResponse.json({ error: 'numero inválido' }, { status: 400 })

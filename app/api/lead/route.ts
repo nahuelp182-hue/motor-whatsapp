@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { promises as dns } from 'dns'
+import { consumirLimite, ipDe, limpiarVencidos, respuesta429 } from '@/lib/ratelimit'
 
 export const runtime = 'nodejs'
 
@@ -14,16 +15,29 @@ const TN_STORE = process.env.TN_STORE_ID ?? ''
 const TN_UA = 'MiceliumApp (nahuelp182@gmail.com)'
 const PDF_URL = 'https://mw-micelium.vercel.app/guia-primer-cultivo.pdf'
 
-const CORS: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+// Solo el storefront puede llamar acá. Antes era `*`, así que cualquier página podía usar
+// este endpoint como relay de correo saliente desde la casilla de Micelium.
+const ORIGENES = [
+  'https://infomicelium.com.ar',
+  'https://www.infomicelium.com.ar',
+  'https://micelium2.mitiendanube.com', // dominio original de Tiendanube: sigue sirviendo la tienda
+  'https://mw-micelium.vercel.app',
+]
+
+function cors(req: NextRequest): Record<string, string> {
+  const origen = req.headers.get('origin') ?? ''
+  return {
+    'Access-Control-Allow-Origin': ORIGENES.includes(origen) ? origen : ORIGENES[0],
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    Vary: 'Origin',
+  }
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS })
+export async function OPTIONS(req: NextRequest) {
+  return new NextResponse(null, { status: 204, headers: cors(req) })
 }
 
 async function domainHasMx(email: string): Promise<boolean> {
@@ -82,13 +96,29 @@ async function sendGuide(email: string): Promise<void> {
 }
 
 export async function POST(req: NextRequest) {
+  const CORS = cors(req)
   try {
+    // Doble tope: por IP (evita el loop de un atacante) y por casilla (evita que alguien
+    // use el endpoint para bombardear a un tercero con mails desde nuestro dominio).
+    const porIp = await consumirLimite(`lead:ip:${ipDe(req)}`, 5, 60 * 60)
+    if (!porIp.permitido) return respuesta429(porIp, CORS)
+    void limpiarVencidos()
+
     const body = await req.json().catch(() => ({}))
     const email = String(body?.email ?? '').trim().toLowerCase()
 
-    if (!EMAIL_RE.test(email)) {
+    // Honeypot: campo oculto que un humano nunca completa y un bot sí.
+    if (String(body?.website ?? '').trim() !== '') {
+      return NextResponse.json({ ok: true }, { headers: CORS }) // silencioso a propósito
+    }
+
+    if (!EMAIL_RE.test(email) || email.length > 160) {
       return NextResponse.json({ ok: false, error: 'formato' }, { status: 400, headers: CORS })
     }
+
+    const porEmail = await consumirLimite(`lead:em:${email}`, 2, 24 * 60 * 60)
+    if (!porEmail.permitido) return respuesta429(porEmail, CORS)
+
     if (!(await domainHasMx(email))) {
       return NextResponse.json({ ok: false, error: 'dominio' }, { status: 400, headers: CORS })
     }

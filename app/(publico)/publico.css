@@ -1,0 +1,220 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   CAPA PÚBLICA — sistema de diseño de Micelium
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Todo va scopeado bajo `.mic` porque globals.css (el dashboard) impone fondo
+   oscuro y `font-family: ... !important` sobre `*`. Un selector con clase gana
+   por especificidad, así que la capa pública puede tener su propia identidad
+   sin tocar el dashboard ni arriesgar una regresión ahí.
+
+   Criterio: papel antes que pantalla. Medida de lectura corta, jerarquía por
+   tamaño y color en vez de por cajas, y una sola nota de color (terracota) que
+   se usa poco para que signifique algo cuando aparece.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.mic {
+  /* Paleta de marca: tierra desaturada. Nada saturado, nada chillón. */
+  --crema: #f4f2eb;
+  --papel: #faf9f5;
+  --tinta: #1f1c17;
+  --tinta-suave: #56504a;
+  --tinta-tenue: #8a8179;
+  --sage: #6f8a5f;
+  --verde-hondo: #3f4f38;
+  --terracota: #b0341d;
+  --linea: #e2ded2;
+  --linea-fuerte: #cec8b8;
+
+  --medida: 34rem; /* ~68 caracteres: la línea de lectura cómoda */
+  --serif: var(--font-fraunces), 'Iowan Old Style', Georgia, serif;
+  --sans: var(--font-inter), system-ui, sans-serif;
+
+  background: var(--papel);
+  color: var(--tinta);
+  min-height: 100vh;
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mic *,
+.mic *::before,
+.mic *::after {
+  font-family: inherit !important; /* vence el `*` con !important de globals.css */
+  box-sizing: border-box;
+}
+
+.mic h1, .mic h2, .mic h3, .mic .serif {
+  font-family: var(--serif) !important;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
+/* Textura sutil de papel: dos gradientes, cero imágenes, cero requests. */
+.mic-fondo {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(111, 138, 95, 0.07), transparent 60%),
+    linear-gradient(180deg, var(--crema) 0%, var(--papel) 22%);
+}
+
+/* ── Estructura ─────────────────────────────────────────────────────────── */
+
+.mic-ancho { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem; }
+.mic-lectura { max-width: var(--medida); }
+
+.mic-header {
+  border-bottom: 1px solid var(--linea);
+  padding: 1.5rem 0;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 2rem;
+}
+.mic-marca {
+  font-family: var(--serif) !important;
+  font-size: 1.1rem; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--verde-hondo); text-decoration: none;
+}
+.mic-nav { display: flex; gap: 1.75rem; font-size: 0.82rem; letter-spacing: 0.04em; }
+.mic-nav a { color: var(--tinta-suave); text-decoration: none; padding-bottom: 2px; }
+.mic-nav a:hover { color: var(--terracota); border-bottom: 1px solid var(--terracota); }
+
+.mic-footer {
+  border-top: 1px solid var(--linea);
+  margin-top: 6rem; padding: 2.5rem 0 4rem;
+  font-size: 0.8rem; color: var(--tinta-tenue);
+  display: flex; justify-content: space-between; gap: 2rem; flex-wrap: wrap;
+}
+
+/* ── Tipografía editorial ───────────────────────────────────────────────── */
+
+.mic-eyebrow {
+  font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--sage); margin-bottom: 1.25rem;
+}
+
+.mic-titulo {
+  font-size: clamp(2.1rem, 5.5vw, 3.4rem);
+  line-height: 1.06; margin: 0 0 1.25rem;
+  text-wrap: balance;
+}
+
+.mic-bajada {
+  font-size: 1.14rem; line-height: 1.65; color: var(--tinta-suave);
+  max-width: var(--medida); text-wrap: pretty;
+}
+
+.mic-p { font-size: 1.02rem; line-height: 1.78; margin: 0 0 1.4rem; text-wrap: pretty; }
+
+.mic-h2 {
+  font-size: 1.6rem; margin: 3.5rem 0 1.25rem; line-height: 1.2;
+  padding-top: 1.5rem; border-top: 1px solid var(--linea);
+}
+
+/* Regla fina como respiro entre bloques, en vez de más espacio vacío. */
+.mic-regla { width: 3rem; height: 2px; background: var(--terracota); margin: 2rem 0; }
+
+/* ── Los 2 vitales: el bloque que tiene que pesar distinto ──────────────── */
+
+.mic-vital {
+  display: grid; grid-template-columns: auto 1fr; gap: 1.5rem;
+  padding: 1.75rem 0; border-top: 1px solid var(--linea-fuerte);
+}
+.mic-vital:last-of-type { border-bottom: 1px solid var(--linea-fuerte); }
+.mic-vital-num {
+  font-family: var(--serif) !important;
+  font-size: 2.6rem; line-height: 1; color: var(--terracota);
+  font-variant-numeric: lining-nums;
+}
+.mic-vital-titulo { font-size: 1.2rem; margin: 0 0 0.5rem; }
+.mic-vital-texto { font-size: 0.98rem; line-height: 1.7; color: var(--tinta-suave); margin: 0; }
+
+/* ── Avisos ─────────────────────────────────────────────────────────────── */
+
+.mic-aviso {
+  border-left: 2px solid var(--sage);
+  padding: 0.2rem 0 0.2rem 1.4rem;
+  margin: 2rem 0; font-size: 0.95rem; line-height: 1.7; color: var(--tinta-suave);
+}
+.mic-aviso[data-tono='cuidado'] { border-left-color: var(--terracota); }
+
+/* ── Pasos ──────────────────────────────────────────────────────────────── */
+
+.mic-pasos { list-style: none; padding: 0; margin: 1.5rem 0; counter-reset: paso; }
+.mic-pasos li {
+  counter-increment: paso; position: relative; padding-left: 2.6rem;
+  margin-bottom: 1.1rem; line-height: 1.7; font-size: 1rem;
+}
+.mic-pasos li::before {
+  content: counter(paso); position: absolute; left: 0; top: 0.05rem;
+  font-family: var(--serif) !important; font-size: 0.95rem; color: var(--sage);
+  border: 1px solid var(--linea-fuerte); border-radius: 50%;
+  width: 1.7rem; height: 1.7rem; display: grid; place-items: center;
+}
+
+/* ── FAQ y datos ────────────────────────────────────────────────────────── */
+
+.mic-faq { border-top: 1px solid var(--linea); margin: 2rem 0; }
+.mic-faq > div { border-bottom: 1px solid var(--linea); padding: 1.25rem 0; }
+.mic-faq dt { font-weight: 500; margin-bottom: 0.45rem; font-size: 1rem; }
+.mic-faq dd { margin: 0; color: var(--tinta-suave); line-height: 1.7; font-size: 0.95rem; }
+
+.mic-datos { width: 100%; border-collapse: collapse; margin: 1.75rem 0; font-size: 0.95rem; }
+.mic-datos tr { border-bottom: 1px solid var(--linea); }
+.mic-datos th {
+  text-align: left; font-weight: 400; color: var(--tinta-suave);
+  padding: 0.85rem 1rem 0.85rem 0; width: 45%;
+}
+.mic-datos td { padding: 0.85rem 0; font-variant-numeric: tabular-nums; }
+
+/* Marca de dato sin confirmar. Preferimos que se vea el hueco antes que inventar. */
+.mic-pendiente {
+  display: inline-block; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--terracota); border: 1px dashed currentColor;
+  padding: 0.1rem 0.5rem; border-radius: 2px;
+}
+
+/* ── Índice de guías ────────────────────────────────────────────────────── */
+
+.mic-lista { list-style: none; padding: 0; margin: 3rem 0 0; }
+.mic-item { border-top: 1px solid var(--linea); }
+.mic-item:last-child { border-bottom: 1px solid var(--linea); }
+.mic-item a {
+  display: grid; grid-template-columns: 2.5rem 1fr; gap: 1.5rem;
+  padding: 2rem 0; text-decoration: none; color: inherit;
+  transition: background-color 0.18s ease, padding-left 0.18s ease;
+}
+.mic-item a:hover { background: rgba(111, 138, 95, 0.05); padding-left: 0.75rem; }
+.mic-item-num {
+  font-family: var(--serif) !important; font-size: 0.9rem; color: var(--tinta-tenue);
+  padding-top: 0.35rem; font-variant-numeric: tabular-nums;
+}
+.mic-item-titulo { font-family: var(--serif) !important; font-size: 1.45rem; margin: 0 0 0.5rem; line-height: 1.25; }
+.mic-item-resumen { color: var(--tinta-suave); line-height: 1.65; margin: 0; font-size: 0.97rem; max-width: 42rem; }
+.mic-item-meta { font-size: 0.75rem; color: var(--tinta-tenue); margin-top: 0.85rem; letter-spacing: 0.03em; }
+
+/* ── Índice lateral del artículo ────────────────────────────────────────── */
+
+.mic-articulo { display: grid; grid-template-columns: 1fr; gap: 3rem; margin-top: 3.5rem; }
+@media (min-width: 62rem) {
+  .mic-articulo { grid-template-columns: minmax(0, var(--medida)) 1fr; gap: 5rem; }
+}
+.mic-toc { position: sticky; top: 2.5rem; align-self: start; font-size: 0.85rem; }
+.mic-toc p { font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--tinta-tenue); margin: 0 0 1rem; }
+.mic-toc a { display: block; color: var(--tinta-suave); text-decoration: none; padding: 0.4rem 0 0.4rem 0.9rem; border-left: 1px solid var(--linea); line-height: 1.45; }
+.mic-toc a:hover { color: var(--terracota); border-left-color: var(--terracota); }
+
+/* ── Cierre / derivación ────────────────────────────────────────────────── */
+
+.mic-cierre {
+  margin-top: 4.5rem; padding: 2.5rem; background: var(--crema);
+  border: 1px solid var(--linea); border-radius: 3px;
+}
+.mic-cierre h3 { font-size: 1.3rem; margin: 0 0 0.75rem; }
+.mic-cierre p { color: var(--tinta-suave); line-height: 1.7; margin: 0 0 1.5rem; font-size: 0.97rem; }
+.mic-boton {
+  display: inline-block; background: var(--verde-hondo); color: var(--papel);
+  text-decoration: none; padding: 0.85rem 1.75rem; border-radius: 2px;
+  font-size: 0.9rem; letter-spacing: 0.03em;
+}
+.mic-boton:hover { background: var(--terracota); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mic * { transition: none !important; }
+}

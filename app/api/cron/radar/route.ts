@@ -5,6 +5,7 @@ import {
   minarCategoria, ensureTabla, guardarSnapshot, ultimosDos, analizar,
   youtubeNicho, ensureTablaYT, guardarYT,
 } from '@/lib/radar'
+import { chequearCron } from '@/lib/cron-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,10 +29,8 @@ function getPool(): pg.Pool | null {
 }
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const noAuth = chequearCron(req)
+  if (noAuth) return noAuth
   const p = getPool()
   if (!p) return NextResponse.json({ ok: false, error: 'DB no configurada' })
 
