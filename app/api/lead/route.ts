@@ -20,6 +20,7 @@ const PDF_URL = 'https://mw-micelium.vercel.app/guia-primer-cultivo.pdf'
 const ORIGENES = [
   'https://infomicelium.com.ar',
   'https://www.infomicelium.com.ar',
+  'https://micelium2.mitiendanube.com', // dominio original de Tiendanube: sigue sirviendo la tienda
   'https://mw-micelium.vercel.app',
 ]
 
