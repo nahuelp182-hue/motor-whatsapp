@@ -139,6 +139,68 @@ export async function textosDeLaRafaga(sender: string): Promise<string[]> {
   }
 }
 
+/**
+ * Dedupe de entregas repetidas del webhook: Meta reintenta el POST si no le devolvemos
+ * 200 rápido, y el MISMO mensaje se procesaba (y contestaba) dos veces. Inserta el wamid
+ * en `wa_procesado` y devuelve true solo la primera vez. Ante error devuelve true
+ * (fail-open: contestar de más es peor, pero no contestar es mucho peor).
+ */
+export async function wamidEsNuevo(wamid: string): Promise<boolean> {
+  try {
+    const p = getPool()
+    if (!p || !wamid) return true
+    const r = await p.query(
+      'INSERT INTO wa_procesado (wamid) VALUES ($1) ON CONFLICT (wamid) DO NOTHING',
+      [wamid],
+    )
+    return (r.rowCount ?? 0) > 0
+  } catch (e) {
+    console.error('wamidEsNuevo error:', e)
+    return true
+  }
+}
+
+/**
+ * ¿Cuándo fue la última derivación al equipo de este sender? Sirve de "handoff lock":
+ * si el chat ya está en manos de una persona, el bot no vuelve a derivar ni repite.
+ * Devuelve null si no hubo (o si falla).
+ */
+export async function ultimaDerivacion(sender: string, horas = 6): Promise<Date | null> {
+  try {
+    const p = getPool()
+    if (!p) return null
+    const r = await p.query(
+      `SELECT ts FROM ig_diag
+        WHERE sender = $1 AND kind = 'pensado'
+          AND detail->>'ch' = 'wa' AND detail->>'derivar' = 'true'
+          AND ts > now() - ($2 || ' hours')::interval
+        ORDER BY id DESC LIMIT 1`,
+      [sender, String(horas)],
+    )
+    return r.rows[0]?.ts ?? null
+  } catch (e) {
+    console.error('ultimaDerivacion error:', e)
+    return null
+  }
+}
+
+/** ¿Ya mandamos un evento de este kind a este sender en las últimas N horas? */
+export async function huboAvisoReciente(sender: string, kind: string, horas: number): Promise<boolean> {
+  try {
+    const p = getPool()
+    if (!p) return false
+    const r = await p.query(
+      `SELECT 1 FROM ig_diag WHERE sender = $1 AND kind = $2
+         AND ts > now() - ($3 || ' hours')::interval LIMIT 1`,
+      [sender, kind, String(horas)],
+    )
+    return (r.rowCount ?? 0) > 0
+  } catch (e) {
+    console.error('huboAvisoReciente error:', e)
+    return false
+  }
+}
+
 export type Turno = { role: 'user' | 'assistant'; content: string }
 
 /**

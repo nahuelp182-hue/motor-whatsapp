@@ -1,8 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
-import { diag, getHistorial, logClaudeUsage, hayMensajePosterior, textosDeLaRafaga, type Turno } from '@/lib/diag'
+import {
+  diag, getHistorial, logClaudeUsage, hayMensajePosterior, textosDeLaRafaga,
+  wamidEsNuevo, ultimaDerivacion, huboAvisoReciente, type Turno,
+} from '@/lib/diag'
 import { getEstadoAndreani } from '@/lib/andreani'
 import { notifyNahuelAdjunto } from '@/lib/notify'
 import { prisma } from '@/lib/prisma'
@@ -10,7 +13,11 @@ import { prisma } from '@/lib/prisma'
 // Ventana de "debounce": si el cliente manda varios mensajes seguidos, esperamos este
 // tiempo y solo la última invocación responde (a toda la ráfaga junta). Evita respuestas
 // duplicadas/contradictorias cuando llegan 2-3 mensajes casi simultáneos.
-const DEBOUNCE_MS = 7000
+const DEBOUNCE_MS = 20000
+
+// Una vez que el chat se derivó al equipo, durante estas horas lo maneja una persona:
+// el bot no vuelve a responder (más allá de un recordatorio cada 2 h).
+const HANDOFF_HORAS = 6
 
 const MODELO = 'claude-haiku-4-5-20251001'
 
@@ -147,46 +154,106 @@ function manualesDeProductos(prods: Array<{ name?: unknown }>): ManualId[] {
   return [...set]
 }
 
-// Busca un pedido del cliente por teléfono o por un dato numérico del mensaje
-// (nº de orden o DNI). Incluye pendientes de pago (devuelve `pagado`) para poder
-// avisarle al cliente que su pago figura pendiente en vez de decir "no existe".
-// Excluye órdenes canceladas (no son un pedido válido).
-async function buscarPedido(phone: string, texto: string): Promise<Pedido> {
+type OrdenTN = {
+  number: number; status?: string; payment_status?: string
+  contact_name?: string; contact_phone?: string; contact_identification?: string; products?: Array<{ name?: unknown }>
+  shipping_tracking_number?: string; shipping_option?: string; shipping_pickup_type?: string; shipping_status?: string
+}
+
+const CAMPOS_ORDEN =
+  'number,status,payment_status,contact_name,contact_phone,contact_identification,products,' +
+  'shipping_tracking_number,shipping_option,shipping_pickup_type,shipping_status'
+
+// Normaliza para comparar nombres: sin tildes, sin puntuación, en minúsculas.
+function normalizar(s: string): string {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z\s]/g, ' ').trim()
+}
+
+// Palabras "de nombre" útiles (≥3 letras, sin conectores). "de/la/del" no identifican a nadie.
+function tokensNombre(s: string): string[] {
+  const stop = new Set(['de', 'la', 'del', 'los', 'las', 'soy', 'me', 'llamo', 'nombre'])
+  return normalizar(s).split(/\s+/).filter((t) => t.length >= 3 && !stop.has(t))
+}
+
+// Nombres candidatos: el del perfil de WhatsApp + el que el cliente escribe ("soy Bruno Falco",
+// "a nombre de Ana Pérez"). Muchas compras que entran por Instagram quedan SIN teléfono ni DNI
+// cargado en Tiendanube: el nombre es lo único con que se las puede ubicar.
+function nombresCandidatos(texto: string, perfil?: string): string[] {
+  const out: string[] = []
+  if (perfil) out.push(perfil)
+  const m = texto.match(/(?:soy|me llamo|a nombre de|mi nombre es)\s+([a-zñáéíóúü'\s]{4,40})/i)
+  if (m) out.push(m[1])
+  return out
+}
+
+// ¿La orden es de esta persona? Exigimos DOS palabras del nombre en común (nombre + apellido)
+// para no confundir a dos "Bruno" distintos y mostrarle datos de otro cliente.
+function matcheaNombre(orden: OrdenTN, candidatos: string[]): boolean {
+  const enOrden = new Set(tokensNombre(orden.contact_name ?? ''))
+  if (enOrden.size < 2) return false
+  return candidatos.some((c) => {
+    const t = tokensNombre(c)
+    return t.length >= 2 && t.filter((w) => enOrden.has(w)).length >= 2
+  })
+}
+
+function esDeEsteCliente(o: OrdenTN, tel8: string, tokens: string[], nombres: string[]): boolean {
+  if (o.status === 'cancelled') return false // orden cancelada = no es un pedido válido
+  const oPhone8 = soloDigitos(o.contact_phone ?? '').slice(-8)
+  if (tel8.length >= 8 && oPhone8 === tel8) return true
+  if (tokens.some((t) => String(o.number) === t || soloDigitos(o.contact_identification ?? '') === t)) return true
+  return matcheaNombre(o, nombres)
+}
+
+function aPedido(o: OrdenTN): Pedido {
+  const correo = o.shipping_option ?? ''
+  return {
+    encontrado: true,
+    pagado: o.payment_status === 'paid',
+    manuales: manualesDeProductos(o.products ?? []),
+    numero: o.number,
+    tracking: o.shipping_tracking_number || undefined,
+    correo: correo || undefined,
+    esAndreani: /andreani/i.test(correo),
+    pickup: o.shipping_pickup_type === 'pickup',
+    despachado: o.shipping_status === 'shipped',
+  }
+}
+
+async function ordenesTN(params: string): Promise<OrdenTN[]> {
+  const res = await fetch(`${TN_BASE}/${TN_STORE}/orders?${params}&fields=${CAMPOS_ORDEN}`, {
+    headers: { Authentication: `bearer ${TN_TOKEN}`, 'User-Agent': UA },
+  })
+  if (!res.ok) return [] // 404 = "Last page is 0" (la búsqueda no dio resultados)
+  const data = await res.json()
+  return Array.isArray(data) ? (data as OrdenTN[]) : []
+}
+
+// Busca un pedido del cliente por teléfono, por un dato numérico del mensaje (nº de orden o
+// DNI) o por NOMBRE. Incluye pendientes de pago (devuelve `pagado`) para poder avisarle al
+// cliente que su pago figura pendiente en vez de decir "no existe". Excluye canceladas.
+// Estrategia: primero `q=` (una consulta, ~0,5 s); recién si no hay nada, se pagina.
+async function buscarPedido(phone: string, texto: string, perfil?: string): Promise<Pedido> {
   if (!TN_TOKEN) return { encontrado: false, pagado: false, manuales: [] }
   const tel8 = soloDigitos(phone).slice(-8)
   const tokens = texto.match(/\d{3,9}/g) ?? [] // posible nº orden (4) o DNI (7-8)
+  const nombres = nombresCandidatos(texto, perfil)
   try {
+    // 1) Búsqueda directa de Tiendanube (nº de orden, nombre, mail). Barata y precisa.
+    for (const term of [...tokens, ...nombres]) {
+      const t = term.trim()
+      if (t.length < 3) continue
+      for (const o of await ordenesTN(`status=any&per_page=20&q=${encodeURIComponent(t)}`)) {
+        if (esDeEsteCliente(o, tel8, tokens, nombres)) return aPedido(o)
+      }
+    }
+
+    // 2) Fallback: barrido de las órdenes recientes (cubre el match por teléfono, que `q` no busca).
     for (let page = 1; page <= 6; page++) {
-      const url = `${TN_BASE}/${TN_STORE}/orders?status=any&per_page=50&page=${page}` +
-        `&fields=number,status,payment_status,contact_phone,contact_identification,products,` +
-        `shipping_tracking_number,shipping_option,shipping_pickup_type,shipping_status`
-      const res = await fetch(url, { headers: { Authentication: `bearer ${TN_TOKEN}`, 'User-Agent': UA } })
-      if (!res.ok) break
-      const data = (await res.json()) as Array<{
-        number: number; status?: string; payment_status?: string
-        contact_phone?: string; contact_identification?: string; products?: Array<{ name?: unknown }>
-        shipping_tracking_number?: string; shipping_option?: string; shipping_pickup_type?: string; shipping_status?: string
-      }>
-      if (!Array.isArray(data) || data.length === 0) break
+      const data = await ordenesTN(`status=any&per_page=50&page=${page}`)
+      if (data.length === 0) break
       for (const o of data) {
-        if (o.status === 'cancelled') continue // orden cancelada = no es un pedido válido
-        const oPhone8 = soloDigitos(o.contact_phone ?? '').slice(-8)
-        const matchTel = tel8.length >= 8 && oPhone8 === tel8
-        const matchTok = tokens.some((t) => String(o.number) === t || soloDigitos(o.contact_identification ?? '') === t)
-        if (matchTel || matchTok) {
-          const correo = o.shipping_option ?? ''
-          return {
-            encontrado: true,
-            pagado: o.payment_status === 'paid',
-            manuales: manualesDeProductos(o.products ?? []),
-            numero: o.number,
-            tracking: o.shipping_tracking_number || undefined,
-            correo: correo || undefined,
-            esAndreani: /andreani/i.test(correo),
-            pickup: o.shipping_pickup_type === 'pickup',
-            despachado: o.shipping_status === 'shipped',
-          }
-        }
+        if (esDeEsteCliente(o, tel8, tokens, nombres)) return aPedido(o)
       }
       if (data.length < 50) break
     }
@@ -516,6 +583,11 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() } catch { return NextResponse.json({ ok: true }) }
   if (body.object !== 'whatsapp_business_account') return NextResponse.json({ ok: true })
 
+  // Todo el trabajo pesado (debounce, Claude, Tiendanube, envíos) corre DESPUÉS de
+  // devolverle 200 a Meta con after(). Si tardamos en responder, Meta reintenta el mismo
+  // webhook y el cliente recibía la respuesta duplicada.
+  const tareas: Array<() => Promise<void>> = []
+
   for (const entry of body.entry ?? []) {
     for (const change of entry.changes ?? []) {
       if (change.field !== 'messages') continue
@@ -529,6 +601,14 @@ export async function POST(req: NextRequest) {
         const nombre = value.contacts?.find((c) => c.wa_id === from)?.profile?.name
           ?? value.contacts?.[0]?.profile?.name
 
+        // ─── Dedupe: Meta reentrega el mismo mensaje ante reintentos ───
+        // Se resuelve ANTES de responder 200 (insert atómico), para que dos entregas
+        // simultáneas del mismo wamid no se procesen las dos.
+        if (msg.id && !(await wamidEsNuevo(msg.id))) {
+          await wdiag('wamid_duplicado', from, { wamid: msg.id, type: msg.type })
+          continue
+        }
+
         // ─── Imágenes / documentos (típicamente comprobante de pago) ───
         // No pasan por el cerebro: se acusan y se reenvían a Mateo para verificar.
         // (Se excluyen los números internos: no mandan comprobantes.)
@@ -537,11 +617,14 @@ export async function POST(req: NextRequest) {
             desde10Media !== last10(TIO_WA) && desde10Media !== last10(NAHUEL_WA)) {
           const media = msg.type === 'image' ? msg.image : msg.document
           const mediaId = media?.id
+          const tipo = msg.type as 'image' | 'document'
+          const filename = msg.type === 'document' ? msg.document?.filename : undefined
           if (mediaId) {
-            try {
-              await manejarArchivo(from, nombre, mediaId, msg.type as 'image' | 'document',
-                media?.caption ?? '', msg.type === 'document' ? msg.document?.filename : undefined)
-            } catch (e) { console.error('manejarArchivo error:', e) }
+            tareas.push(async () => {
+              try {
+                await manejarArchivo(from, nombre, mediaId, tipo, media?.caption ?? '', filename)
+              } catch (e) { console.error('manejarArchivo error:', e) }
+            })
           }
           continue
         }
@@ -556,15 +639,17 @@ export async function POST(req: NextRequest) {
         if (desde10 === last10(TIO_WA)) {
           // Respuesta del tío (despachos) → reenviar a Nahuel. Plantilla primero (siempre entrega),
           // email de respaldo. Nunca contesta el bot ni se crea lead.
-          try {
-            await wdiag('reenvio_tio', from, { texto: texto.slice(0, 500), wamid: msg.id, nombre })
-            const limpio = texto.replace(/\s+/g, ' ').slice(0, 600)
-            const ok = await reenviarPlantillaWA(NAHUEL_WA, 'aviso_mensaje_tio', [nombre || 'Tu tío', limpio])
-            if (!ok) await notifyNahuel('📨 Mensaje de tu tío (despachos)', `Tu tío (${from}) escribió:\n\n"${texto}"`)
-          } catch (e) {
-            console.error('reenvío tío error:', e)
-            try { await notifyNahuel('📨 Mensaje de tu tío (despachos)', `Tu tío (${from}) escribió:\n\n"${texto}"`) } catch {}
-          }
+          tareas.push(async () => {
+            try {
+              await wdiag('reenvio_tio', from, { texto: texto.slice(0, 500), wamid: msg.id, nombre })
+              const limpio = texto.replace(/\s+/g, ' ').slice(0, 600)
+              const ok = await reenviarPlantillaWA(NAHUEL_WA, 'aviso_mensaje_tio', [nombre || 'Tu tío', limpio])
+              if (!ok) await notifyNahuel('📨 Mensaje de tu tío (despachos)', `Tu tío (${from}) escribió:\n\n"${texto}"`)
+            } catch (e) {
+              console.error('reenvío tío error:', e)
+              try { await notifyNahuel('📨 Mensaje de tu tío (despachos)', `Tu tío (${from}) escribió:\n\n"${texto}"`) } catch {}
+            }
+          })
           continue
         }
         if (desde10 === last10(NAHUEL_WA)) {
@@ -573,6 +658,7 @@ export async function POST(req: NextRequest) {
           continue
         }
 
+        tareas.push(async () => {
         try {
           // 'recibido'/'pensado' son los kinds que getHistorial() consulta para reconstruir el hilo
           await wdiag('recibido', from, { texto: texto.slice(0, 300), wamid: msg.id, nombre })
@@ -580,16 +666,33 @@ export async function POST(req: NextRequest) {
           // Auto-responder de otro negocio/bot (ej. APIDAN) → no responder, cortar el loop.
           if (esAutoRespuesta(texto)) {
             await wdiag('auto_ignorado', from, { texto: texto.slice(0, 200) })
-            continue
+            return
           }
 
           await capturarResenaSiCorresponde(from, texto)
+
+          // ─── Handoff lock ───
+          // Si el chat ya se derivó al equipo, lo tiene una persona: el bot NO vuelve a
+          // pensar ni a re-derivar (antes repetía el mismo "no encontré tu compra 👇"
+          // una y otra vez). Como mucho, un recordatorio cada 2 h de que ya está avisado.
+          const derivadoEn = await ultimaDerivacion(from, HANDOFF_HORAS)
+          if (derivadoEn) {
+            const yaAvisado = await huboAvisoReciente(from, 'handoff_activo', 2)
+            if (!yaAvisado) {
+              await enviarMensajeWA(from,
+                'Ya le pasé tu caso al equipo y lo están viendo 🙌 Te responden por acá o al número que te compartí. Perdón por la demora.')
+            }
+            await wdiag('handoff_activo', from, {
+              texto: texto.slice(0, 200), desde: derivadoEn.toISOString(), aviso: !yaAvisado,
+            })
+            return
+          }
 
           // ─── Debounce de ráfagas ───
           // Esperamos un momento; si llegó un mensaje más nuevo de este mismo número,
           // dejamos que la ÚLTIMA invocación responda por toda la ráfaga (esta se retira).
           await sleep(DEBOUNCE_MS)
-          if (await hayMensajePosterior(from, msg.id ?? '')) continue
+          if (await hayMensajePosterior(from, msg.id ?? '')) return
           const rafaga = await textosDeLaRafaga(from)
           const mensajeUsuario = rafaga.length > 1 ? rafaga.join('\n') : texto
 
@@ -604,7 +707,7 @@ export async function POST(req: NextRequest) {
           if (seguimiento) {
             // Estado REAL del envío (Tiendanube + Andreani). Nunca inventa: si no hay dato
             // certero, deriva al equipo.
-            const pedido = await buscarPedido(from, mensajeUsuario)
+            const pedido = await buscarPedido(from, mensajeUsuario, nombre)
             if (pedido.encontrado && !pedido.pagado) {
               // La compra existe pero figura pendiente de pago → no hay envío que rastrear.
               // Le pedimos el comprobante acá mismo y avisamos a Mateo (verifica y marca en TN).
@@ -649,7 +752,7 @@ export async function POST(req: NextRequest) {
             }
           } else if (manual) {
             // Comprador pidió material → verificar compra por teléfono o dato numérico.
-            const pedido = await buscarPedido(from, mensajeUsuario)
+            const pedido = await buscarPedido(from, mensajeUsuario, nombre)
             if (pedido.encontrado && !pedido.pagado) {
               // Compró pero el pago aún no está confirmado → no mandamos material todavía.
               outText = mensajePendientePago(pedido.numero)
@@ -732,9 +835,15 @@ export async function POST(req: NextRequest) {
             await enviarMensajeWA(from, '¡Hola! 👋 Gracias por escribirnos, en un ratito te respondemos 🍄')
           } catch {}
         }
+        })
       }
     }
   }
+
+  // 200 inmediato a Meta; el procesamiento sigue en segundo plano.
+  after(async () => {
+    for (const tarea of tareas) await tarea()
+  })
 
   return NextResponse.json({ ok: true })
 }
