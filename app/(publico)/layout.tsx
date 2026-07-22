@@ -41,7 +41,15 @@ export default function PublicoLayout({ children }: { children: React.ReactNode 
         </a>
       </div>
 
-      <div className="mic-anuncio">Fabricamos los equipos. Envíos a todo el país · Garantía y soporte real.</div>
+      {/* Barra de anuncio rotativa. Los tres mensajes están en el DOM desde el servidor y
+          rotan con una animación CSS pura: sin JS, sin hidratación, y los buscadores leen
+          los tres. Van apilados en la misma celda de grid, así la barra toma la altura del
+          más alto y no salta al cambiar. */}
+      <div className="mic-anuncio">
+        <span>Cada semana subimos contenido nuevo para tu cultivo</span>
+        <span>Fabricación argentina · Fabricamos cada equipo Micelium®</span>
+        <span>Envíos a todo el país · Garantía y soporte directo con quien lo fabricó</span>
+      </div>
 
       <header className="mic-header">
         <div className="mic-header-in">

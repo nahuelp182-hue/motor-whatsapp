@@ -109,11 +109,40 @@
   .mic-barra-logo { height: 40px; }
 }
 
-/* Barra de anuncio: la misma que corona la tienda (verde hoja). */
+/* Barra de anuncio. Va en sage, no en verde acción: el verde acción es el color de los
+   botones y si lo usa también una franja decorativa deja de significar "acá se hace clic".
+   El sage además baja el contraste entre la barra negra de arriba y el header oscuro de
+   abajo, que juntos se leían como un bloque pesado. */
 .mic-anuncio {
-  background: var(--verde-accion); color: #fff;
+  background: var(--sage); color: #fff;
   text-align: center; font-size: 0.8rem; letter-spacing: 0.02em;
   padding: 0.5rem 1rem;
+  display: grid; /* los mensajes se apilan en la misma celda: altura = la del más alto */
+  overflow: hidden;
+}
+.mic-anuncio > span {
+  grid-area: 1 / 1;
+  opacity: 0;
+  animation: mic-anuncio-ciclo 21s infinite;
+}
+/* Delays negativos: los tres arrancan ya desfasados, sin esperar el primer ciclo. */
+.mic-anuncio > span:nth-child(2) { animation-delay: -14s; }
+.mic-anuncio > span:nth-child(3) { animation-delay: -7s; }
+
+/* 7 s visible de cada 21: entra, se queda quieto la mayor parte del tramo, y sale. */
+@keyframes mic-anuncio-ciclo {
+  0%   { opacity: 0; transform: translateY(0.25rem); }
+  3%   { opacity: 1; transform: translateY(0); }
+  30%  { opacity: 1; transform: translateY(0); }
+  33%  { opacity: 0; transform: translateY(-0.25rem); }
+  100% { opacity: 0; transform: translateY(-0.25rem); }
+}
+
+/* Sin movimiento: se muestra sólo el primero, fijo. Una barra que parpadea es de las cosas
+   que más molestan a quien pidió reducir animaciones. */
+@media (prefers-reduced-motion: reduce) {
+  .mic-anuncio > span { animation: none; }
+  .mic-anuncio > span:first-child { opacity: 1; }
 }
 
 /* Header verde oscuro, calcado de la tienda: logo en cápsula blanca + nav claro. */
@@ -614,6 +643,46 @@
 }
 .mic-crono-que { margin: 0; font-size: 0.97rem; line-height: 1.65; }
 .mic-crono-ojo { margin: 0.4rem 0 0; font-size: 0.88rem; line-height: 1.6; color: var(--tinta-tenue); }
+
+/* ── Fichas de especie ──────────────────────────────────────────────────── */
+
+/* Cada especie es una ficha y no una fila de tabla: en el celular una tabla de cuatro
+   columnas obliga a scroll horizontal, y el rango térmico es justamente el dato que el
+   lector viene a comparar. */
+.mic-especies { margin: 2rem 0; display: flex; flex-direction: column; gap: 1rem; }
+.mic-especie {
+  padding: 1.35rem 1.5rem;
+  background: var(--papel); border: 1px solid var(--linea); border-radius: 14px;
+}
+.mic-especie-cab { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.mic-especie-nombre {
+  margin: 0; font-family: var(--serif) !important; font-size: 1.2rem;
+  font-weight: 400; color: var(--tinta);
+}
+.mic-especie-cientifico { font-size: 0.9rem; color: var(--tinta-tenue); }
+.mic-especie-nivel {
+  margin-left: auto; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.18rem 0.65rem; border-radius: 999px; border: 1px solid currentColor;
+}
+.mic-especie-nivel[data-nivel='inicial'] { color: var(--verde-accion); }
+.mic-especie-nivel[data-nivel='intermedia'] { color: var(--sage); }
+.mic-especie-nivel[data-nivel='avanzada'] { color: var(--tinta-tenue); }
+
+.mic-especie-params {
+  margin: 1rem 0 0; padding: 0.9rem 0 0; border-top: 1px solid var(--linea);
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0.9rem;
+}
+.mic-especie-params dt {
+  font-size: 0.68rem; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--tinta-tenue);
+}
+.mic-especie-params dd {
+  margin: 0.2rem 0 0; font-size: 0.95rem; color: var(--tinta);
+  font-variant-numeric: lining-nums;
+}
+.mic-especie-nota {
+  margin: 0.9rem 0 0; font-size: 0.92rem; line-height: 1.65; color: var(--tinta-suave);
+}
 
 /* ── Acceso al área de cliente ──────────────────────────────────────────── */
 
