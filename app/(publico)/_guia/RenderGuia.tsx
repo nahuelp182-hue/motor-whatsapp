@@ -4,6 +4,7 @@
 import Link from 'next/link'
 import { getGuia, type Bloque, type Guia } from '@/lib/guias'
 import { formatearPesos, precioProducto } from '@/lib/tienda'
+import CapturaEmail from './CapturaEmail'
 
 /** Precio leído de Tiendanube al renderizar (componente async de servidor). */
 async function BloquePrecio() {
@@ -180,6 +181,10 @@ export function ArticuloGuia({ g, base = '/guia' }: { g: Guia; base?: string }) 
           <p className="mic-item-meta" style={{ marginTop: '3rem' }}>
             Última revisión: {fecha}
           </p>
+
+          {/* Solo en las públicas: a quien ya compró no tiene sentido pedirle el mail a
+              cambio de una guía de introducción. */}
+          {!g.privada && <CapturaEmail />}
 
           {g.relacionadas && g.relacionadas.length > 0 && (
             <div className="mic-cierre">

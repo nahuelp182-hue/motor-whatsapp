@@ -98,10 +98,27 @@
   margin-top: 6rem;
 }
 .mic-footer-in {
-  max-width: 72rem; margin: 0 auto; padding: 2.5rem 1.5rem 3rem;
-  font-size: 0.8rem;
-  display: flex; justify-content: space-between; gap: 2rem; flex-wrap: wrap;
+  max-width: 72rem; margin: 0 auto; padding: 2.75rem 1.5rem 3rem;
+  font-size: 0.83rem; line-height: 1.7;
+  display: flex; justify-content: space-between; gap: 2.5rem; flex-wrap: wrap;
 }
+.mic-footer-in p { margin: 0; }
+.mic-footer-marca {
+  font-family: var(--serif) !important; font-size: 1rem;
+  color: var(--sobre-oscuro); margin-bottom: 0.3rem !important;
+}
+.mic-footer-links { display: flex; flex-direction: column; gap: 0.45rem; }
+.mic-footer-links a { color: var(--sobre-oscuro-tenue); text-decoration: none; }
+.mic-footer-links a:hover { color: #fff; }
+
+.mic-redes { display: flex; gap: 0.6rem; align-items: flex-start; }
+.mic-redes a {
+  display: grid; place-items: center; width: 38px; height: 38px;
+  border-radius: 999px; color: var(--sobre-oscuro);
+  border: 1px solid rgba(232, 237, 228, 0.22);
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.mic-redes a:hover { background: var(--verde-accion); border-color: var(--verde-accion); color: #fff; }
 
 /* ── Tipografía editorial ───────────────────────────────────────────────── */
 
@@ -301,6 +318,31 @@
 .mic-chat-enviar:disabled { opacity: 0.45; cursor: default; }
 .mic-chat-nota { font-size: 0.78rem; color: var(--tinta-tenue); margin-top: 1rem; line-height: 1.6; }
 
+/* ── Captura de email ───────────────────────────────────────────────────── */
+
+.mic-captura {
+  margin-top: 3.5rem; padding: 2rem 2.25rem;
+  background: var(--verde-oscuro); color: var(--sobre-oscuro);
+  border-radius: 16px;
+}
+.mic-captura h3 {
+  font-size: 1.3rem; margin: 0 0 0.6rem; color: #fff;
+}
+.mic-captura p { margin: 0 0 1.35rem; font-size: 0.95rem; line-height: 1.65; color: var(--sobre-oscuro-tenue); }
+.mic-captura-form { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.mic-captura-form input {
+  flex: 1 1 16rem; padding: 0.8rem 1.1rem; font-size: 1rem;
+  background: rgba(255, 255, 255, 0.06); color: #fff;
+  border: 1px solid rgba(232, 237, 228, 0.28); border-radius: var(--radio-boton);
+  outline: none; font-family: var(--sans) !important;
+}
+.mic-captura-form input::placeholder { color: var(--sobre-oscuro-tenue); }
+.mic-captura-form input:focus { border-color: var(--sage); background: rgba(255, 255, 255, 0.1); }
+.mic-captura-form .mic-boton { border: none; cursor: pointer; }
+.mic-captura-form .mic-boton:disabled { opacity: 0.55; cursor: default; }
+.mic-captura-nota { margin: 1rem 0 0 !important; font-size: 0.78rem; }
+.mic-captura .mic-acceso-error { color: #ffb4a2; border-left-color: #ffb4a2; margin-top: 1rem; }
+
 /* ── Precio en vivo ─────────────────────────────────────────────────────── */
 
 .mic-precio {
@@ -352,11 +394,14 @@
 .mic-acceso { margin-top: 2.5rem; max-width: 26rem; display: flex; flex-direction: column; gap: 1.5rem; }
 .mic-campo { display: flex; flex-direction: column; gap: 0.4rem; }
 .mic-campo > span { font-size: 0.9rem; color: var(--tinta-suave); }
-.mic-campo input {
+.mic-campo input,
+.mic-campo textarea {
   padding: 0.85rem 1.1rem; font-size: 1rem; background: var(--papel);
-  border: 1px solid var(--linea-fuerte); border-radius: 10px; color: var(--tinta); outline: none;
+  border: 1px solid var(--linea-fuerte); border-radius: 12px; color: var(--tinta); outline: none;
+  font-family: var(--sans) !important; line-height: 1.6; resize: vertical;
 }
-.mic-campo input:focus { border-color: var(--sage); }
+.mic-campo input:focus,
+.mic-campo textarea:focus { border-color: var(--sage); }
 .mic-campo small { font-size: 0.78rem; color: var(--tinta-tenue); }
 .mic-acceso-error {
   color: var(--verde-accion); font-size: 0.9rem; line-height: 1.6;
