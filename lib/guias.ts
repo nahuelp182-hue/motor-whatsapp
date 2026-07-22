@@ -22,6 +22,9 @@ export type Bloque =
       tipo: 'cronograma'
       filas: Array<{ etapa: string; dias: string; que: string; ojo?: string }>
     }
+  // Precio leído de Tiendanube al renderizar. Nunca se escribe a mano: se ajusta 2 veces por
+  // mes y un número viejo en una guía genera un reclamo.
+  | { tipo: 'precio' }
 
 export type Seccion = { id: string; titulo: string; bloques: Bloque[] }
 
@@ -438,13 +441,20 @@ const problemas: Guia = {
             'o húmedas, donde la diferencia de temperatura con el ambiente es mayor.',
         },
         {
-          tipo: 'faq',
+          tipo: 'pasos',
           items: [
-            {
-              p: '¿Cómo la manejo?',
-              r: 'PENDIENTE: Nahuel, indicá el procedimiento concreto (ventilación, posición de recipientes, ajuste del booster) para no dar un consejo genérico. Está en el manual pero conviene resumir los 2-3 pasos clave acá.',
-            },
+            'Revisá la cúpula: un poco de vaho es normal, el problema son las gotas cayendo sobre el sustrato.',
+            'Si hay agua en exceso, escurrí el recipiente de cultivo.',
+            'Secá la base de la incubadora, que es donde se junta el agua que baja.',
+            'No destapes ni rocíes para "ventilar": la ventilación es pasiva, por los orificios con cinta Micropore.',
           ],
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Pasa más en zonas frías o húmedas, donde la diferencia con la temperatura ambiente ' +
+            'es mayor. Si se repite seguido, escribinos y lo vemos con tu caso.',
         },
       ],
     },
@@ -457,8 +467,8 @@ const comprar: Guia = {
   titulo: 'Cómo comprar',
   eyebrow: 'Tu compra',
   resumen:
-    'Medios de pago, cuotas y la diferencia por transferencia. El precio actualizado siempre ' +
-    'está en la tienda.',
+    'El precio de hoy, los medios de pago y las opciones de envío. Todo se lee de la tienda en ' +
+    'el momento, así que es lo que vas a pagar.',
   intencion: 'comercial',
   actualizado: '2026-07-21',
   mensajesQueResuelve: 78,
@@ -470,9 +480,9 @@ const comprar: Guia = {
         {
           tipo: 'parrafo',
           texto:
-            'La compra es en nuestra tienda oficial, infomicelium.com.ar. Ahí está siempre el ' +
-            'precio vigente y el stock real; por eso no ponemos el número acá, para que no te ' +
-            'encuentres con un valor viejo.',
+            'La compra se hace en nuestra tienda oficial, infomicelium.com.ar. El precio que ves ' +
+            'más abajo se lee de ahí en el momento, así que nunca vas a encontrar un valor viejo ' +
+            'en esta página.',
         },
         {
           tipo: 'aviso',
@@ -484,23 +494,45 @@ const comprar: Guia = {
       ],
     },
     {
+      id: 'precio',
+      titulo: 'Precio de hoy',
+      bloques: [
+        { tipo: 'precio' },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Este precio se lee de la tienda en el momento, así que es el que vas a pagar. Si ves ' +
+            'un valor distinto en otro lado, el que vale es el de la tienda.',
+        },
+      ],
+    },
+    {
       id: 'pagos',
       titulo: 'Formas de pago',
       bloques: [
         {
+          tipo: 'datos',
+          filas: [
+            { clave: 'Mercado Pago', valor: 'Tarjeta de crédito, débito y efectivo (Rapipago / Pago Fácil)' },
+            { clave: 'Transferencia o depósito', valor: 'Bancario, directo a nuestra cuenta' },
+            { clave: 'PayPal', valor: 'Para compras desde el exterior' },
+          ],
+        },
+        {
           tipo: 'faq',
           items: [
             {
-              p: '¿Con qué puedo pagar?',
-              r: 'Con Mercado Pago (tarjeta de crédito, débito o dinero en cuenta) y por transferencia bancaria.',
-            },
-            {
-              p: '¿Hay cuotas?',
-              r: 'PENDIENTE: Nahuel, confirmá cuántas cuotas y si son sin interés, para responderlo con precisión (aparece mucho: «no me da la opción de 6 cuotas»).',
+              p: '¿En cuántas cuotas puedo pagar?',
+              r: 'Las cuotas y los planes vigentes los pone Mercado Pago según tu tarjeta y el banco, y cambian seguido. Los vas a ver en pantalla al momento de pagar, antes de confirmar la compra.',
             },
             {
               p: '¿Conviene pagar por transferencia?',
               r: 'PENDIENTE: confirmar el porcentaje de descuento por transferencia para poder decirlo con el número exacto.',
+            },
+            {
+              p: '¿Y si me arrepiento?',
+              r: 'Tenés 30 días de devolución. Somos los fabricantes, así que la garantía y el soporte los damos nosotros directamente.',
             },
           ],
         },
@@ -528,19 +560,33 @@ const envios: Guia = {
         {
           tipo: 'parrafo',
           texto:
-            'Enviamos a todo el país por Andreani. Apenas despachamos tu pedido te llega el número ' +
-            'de seguimiento para que veas dónde está en cada momento.',
+            'Enviamos a todo el país. Podés elegir entre estas opciones al finalizar la compra, y ' +
+            'apenas despachamos te llega el número de seguimiento.',
+        },
+        {
+          tipo: 'datos',
+          filas: [
+            { clave: 'Andreani', valor: 'A domicilio o a sucursal' },
+            { clave: 'Correo Argentino', valor: 'A domicilio o a sucursal' },
+            { clave: 'Retiro en Córdoba', valor: 'FONOPACK — Terminal de Ómnibus, Bv. Perón 380, Centro' },
+          ],
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Retiro en Córdoba: de lunes a viernes de 9 a 18 h, y sábados de 9 a 12 h.',
         },
         {
           tipo: 'faq',
           items: [
             {
-              p: '¿Cuánto tarda en llegar?',
-              r: 'PENDIENTE: Nahuel, indicá el rango de días hábiles típico (varía por zona) para no prometer algo que no se cumpla.',
+              p: '¿Cuánto cuesta el envío?',
+              r: 'El costo exacto depende de tu código postal y de la opción que elijas: lo ves en pantalla al finalizar la compra, antes de pagar. En varias promociones el envío va bonificado.',
             },
             {
-              p: '¿Cuánto cuesta el envío?',
-              r: 'PENDIENTE: confirmar si es gratis, con cargo, o según zona; el costo exacto figura en la tienda al finalizar la compra.',
+              p: '¿Cuánto tarda en llegar?',
+              r: 'PENDIENTE: Nahuel, indicá el rango de días hábiles típico (varía por zona) para no prometer algo que no se cumpla.',
             },
           ],
         },

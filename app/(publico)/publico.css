@@ -301,6 +301,22 @@
 .mic-chat-enviar:disabled { opacity: 0.45; cursor: default; }
 .mic-chat-nota { font-size: 0.78rem; color: var(--tinta-tenue); margin-top: 1rem; line-height: 1.6; }
 
+/* ── Precio en vivo ─────────────────────────────────────────────────────── */
+
+.mic-precio {
+  margin: 1.75rem 0; padding: 1.75rem 2rem;
+  background: var(--crema); border: 1px solid var(--linea); border-radius: 16px;
+}
+.mic-precio-antes {
+  font-size: 1.05rem; color: var(--tinta-tenue); text-decoration: line-through;
+  margin-right: 0.75rem;
+}
+.mic-precio-hoy {
+  font-family: var(--serif) !important; font-size: 2.2rem; color: var(--tinta);
+  font-variant-numeric: lining-nums;
+}
+.mic-precio-nota { margin: 0.35rem 0 1.25rem; font-size: 0.9rem; color: var(--tinta-suave); }
+
 /* ── Cronograma del cultivo (guías privadas) ────────────────────────────── */
 
 .mic-crono { margin: 2rem 0; border-left: 2px solid var(--linea-fuerte); }

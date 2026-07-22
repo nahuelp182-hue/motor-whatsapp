@@ -3,6 +3,41 @@
 // que las dos se vean igual y no diverjan.
 import Link from 'next/link'
 import { getGuia, type Bloque, type Guia } from '@/lib/guias'
+import { formatearPesos, precioProducto } from '@/lib/tienda'
+
+/** Precio leído de Tiendanube al renderizar (componente async de servidor). */
+async function BloquePrecio() {
+  const p = await precioProducto()
+
+  // Sin dato confiable no se inventa un número: se manda a la tienda.
+  if (!p || (!p.promocional && !p.lista)) {
+    return (
+      <p className="mic-p">
+        El precio actualizado está en{' '}
+        <a href="https://infomicelium.com.ar" style={{ color: 'var(--verde-accion)' }}>
+          la tienda
+        </a>
+        .
+      </p>
+    )
+  }
+
+  const hoy = p.promocional ?? p.lista!
+  const tachado = p.promocional && p.lista && p.lista > p.promocional ? p.lista : null
+
+  return (
+    <div className="mic-precio">
+      <div>
+        {tachado && <span className="mic-precio-antes">{formatearPesos(tachado)}</span>}
+        <span className="mic-precio-hoy">{formatearPesos(hoy)}</span>
+      </div>
+      <p className="mic-precio-nota">{p.nombre}</p>
+      <a className="mic-boton" href={p.url}>
+        {p.hayStock ? 'Comprar en la tienda' : 'Ver en la tienda'}
+      </a>
+    </div>
+  )
+}
 
 export function RenderBloque({ b }: { b: Bloque }) {
   switch (b.tipo) {
@@ -83,6 +118,9 @@ export function RenderBloque({ b }: { b: Bloque }) {
           ))}
         </div>
       )
+
+    case 'precio':
+      return <BloquePrecio />
   }
 }
 
