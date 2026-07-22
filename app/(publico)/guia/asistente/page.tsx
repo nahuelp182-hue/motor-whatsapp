@@ -5,7 +5,7 @@ import ChatAsistente from './ChatAsistente'
 export const metadata = {
   title: 'Asistente',
   description:
-    'Preguntale al asistente de Micelium sobre el equipo, el cultivo o tu compra. Respuestas ' +
+    'Preguntale al asistente de Micelium® sobre el equipo, el cultivo o tu compra. Respuestas ' +
     'al instante, y si hace falta te pasamos con una persona.',
 }
 

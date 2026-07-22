@@ -14,9 +14,9 @@ function saludoInicial(nombre: string | null): Turno {
   return {
     role: 'assistant',
     content: nombre
-      ? `¡Hola, ${nombre}! Soy el asistente de Micelium. Ya sé qué equipo tenés y cómo viene tu ` +
+      ? `¡Hola, ${nombre}! Soy el asistente de Micelium®. Ya sé qué equipo tenés y cómo viene tu ` +
         'envío, así que preguntame directamente lo que necesites.'
-      : '¡Hola! Soy el asistente de Micelium. Te ayudo con dudas del equipo, el cultivo o tu ' +
+      : '¡Hola! Soy el asistente de Micelium®. Te ayudo con dudas del equipo, el cultivo o tu ' +
         'compra. ¿Qué querés saber?',
   }
 }

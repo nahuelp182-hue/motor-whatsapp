@@ -87,6 +87,26 @@
 .mic-ancho { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem; }
 .mic-lectura { max-width: var(--medida); }
 
+/* ── Barra de marca ─────────────────────────────────────────────────────── */
+
+/* Negra, pegada arriba y siempre visible: es lo primero que se ve y lo único que no se va
+   al scrollear. El logo viene negro sobre transparente — `invert` lo pasa a blanco. */
+.mic-barra-marca {
+  position: sticky; top: 0; z-index: 40;
+  background: #000;
+  display: grid; place-items: center;
+  padding: 0.85rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+.mic-barra-logo {
+  height: 40px; width: auto; display: block;
+  filter: invert(1);
+}
+@media (max-width: 40rem) {
+  .mic-barra-marca { padding: 0.7rem 1rem; }
+  .mic-barra-logo { height: 30px; }
+}
+
 /* Barra de anuncio: la misma que corona la tienda (verde hoja). */
 .mic-anuncio {
   background: var(--verde-accion); color: #fff;
@@ -98,18 +118,16 @@
 .mic-header {
   background: var(--verde-oscuro);
 }
+/* El logo se mudó a la barra negra de arriba, así que la fila del menú queda solo con la
+   navegación: centrada, sin un hueco donde antes estaba la marca. */
 .mic-header-in {
-  max-width: 72rem; margin: 0 auto; padding: 1rem 1.5rem;
-  display: flex; align-items: center; justify-content: space-between; gap: 2rem;
+  max-width: 72rem; margin: 0 auto; padding: 0.9rem 1.5rem;
+  display: flex; align-items: center; justify-content: center; gap: 2rem;
 }
-.mic-marca {
-  display: inline-flex; align-items: center;
-  background: #fff; border-radius: 999px;
-  padding: 0.5rem 1.25rem; text-decoration: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+.mic-nav {
+  display: flex; gap: 1.75rem; font-size: 0.85rem; letter-spacing: 0.02em;
+  align-items: center; flex-wrap: wrap; justify-content: center;
 }
-.mic-marca img { height: 20px; width: auto; display: block; }
-.mic-nav { display: flex; gap: 1.75rem; font-size: 0.85rem; letter-spacing: 0.02em; align-items: center; }
 .mic-nav a { color: var(--sobre-oscuro); text-decoration: none; padding-bottom: 2px; border-bottom: 1px solid transparent; }
 .mic-nav a:hover { color: #fff; border-bottom-color: var(--sage); }
 
@@ -127,6 +145,30 @@
   font-family: var(--serif) !important; font-size: 1rem;
   color: var(--sobre-oscuro); margin-bottom: 0.3rem !important;
 }
+/* Aclaración de marca: hay vendedores de insumos usando "mycelium" y el cliente confunde.
+   Va en el pie, en letra chica: informa sin ponerse a discutir con nadie. */
+.mic-footer-legal {
+  margin-top: 0.9rem !important; font-size: 0.72rem; line-height: 1.6;
+  color: rgba(157, 176, 151, 0.7); max-width: 24rem;
+}
+
+/* ── Nuestros sitios (mismo bloque que en el pie de la tienda) ───────────── */
+
+.mic-sitios { display: flex; flex-direction: column; gap: 0.6rem; }
+.mic-sitios-tit {
+  font-size: 0.68rem !important; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--sobre-oscuro); margin: 0 0 0.35rem !important;
+}
+.mic-sitio {
+  display: flex; flex-direction: column; text-decoration: none;
+  border-left: 1px solid rgba(232, 237, 228, 0.2); padding-left: 0.85rem;
+  transition: border-left-color 0.18s ease;
+}
+.mic-sitio:hover { border-left-color: var(--verde-accion); }
+.mic-sitio-nombre { color: var(--sobre-oscuro); font-size: 0.9rem; }
+.mic-sitio-url { color: var(--sobre-oscuro-tenue); font-size: 0.76rem; }
+.mic-sitio:hover .mic-sitio-nombre { color: #fff; }
+
 .mic-footer-links { display: flex; flex-direction: column; gap: 0.45rem; }
 .mic-footer-links a { color: var(--sobre-oscuro-tenue); text-decoration: none; }
 .mic-footer-links a:hover { color: #fff; }
@@ -371,7 +413,10 @@
 @media (min-width: 62rem) {
   .mic-articulo { grid-template-columns: minmax(0, var(--medida)) 1fr; gap: 5rem; }
 }
-.mic-toc { position: sticky; top: 2.5rem; align-self: start; font-size: 0.85rem; }
+/* Los sticky y los saltos a #ancla descuentan la altura de la barra de marca, si no el
+   título de la sección queda tapado justo cuando hacés clic para ir a él. */
+.mic-seccion { scroll-margin-top: 6rem; }
+.mic-toc { position: sticky; top: 6rem; align-self: start; font-size: 0.85rem; }
 .mic-toc p { font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--tinta-tenue); margin: 0 0 1rem; }
 .mic-toc a {
   display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.15rem;

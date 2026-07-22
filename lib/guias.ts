@@ -616,7 +616,7 @@ const envios: Guia = {
 const sobre: Guia = {
   slug: 'sobre-micelium',
   titulo: 'Quiénes somos',
-  eyebrow: 'Micelium',
+  eyebrow: 'Micelium®',
   resumen:
     'Somos una fábrica argentina de equipos de cultivo. Qué significa eso para vos, antes y ' +
     'después de comprar.',

@@ -19,23 +19,32 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: { default: 'Guías · Micelium', template: '%s · Micelium' },
+  // El ® va siempre pegado al nombre: hay vendedores de insumos que usan "mycelium" y el
+  // cliente confunde marca con palabra genérica. El símbolo es lo que separa una cosa de la otra.
+  title: { default: 'Guías · Micelium®', template: '%s · Micelium®' },
   description:
-    'Guías de cultivo de Micelium Argentina: lo esencial primero, sin relleno. Fabricamos ' +
+    'Guías de cultivo de Micelium® Argentina: lo esencial primero, sin relleno. Fabricamos ' +
     'incubadoras automáticas y acompañamos el cultivo.',
 }
 
 export default function PublicoLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`mic mic-fondo ${fraunces.variable} ${inter.variable}`}>
+      {/* Barra de marca: negra, el logo grande y centrado, y pegada arriba al scrollear.
+          Antes el logo iba apretado dentro de una cápsula de 20 px en la fila del menú y se
+          perdía. La marca es lo que estamos construyendo — tiene que estar siempre a la vista.
+          El logo es negro sobre transparente: `invert` lo pasa a blanco sin necesidad de un
+          segundo archivo. */}
+      <div className="mic-barra-marca">
+        <a href="/guia" aria-label="Micelium® — inicio">
+          <img src="/logo-micelium.webp" alt="Micelium®" className="mic-barra-logo" />
+        </a>
+      </div>
+
       <div className="mic-anuncio">Fabricamos los equipos. Envíos a todo el país · Garantía y soporte real.</div>
 
       <header className="mic-header">
         <div className="mic-header-in">
-          <a href="/guia" className="mic-marca" aria-label="Micelium">
-            {/* Mismo logo de la tienda, en cápsula blanca */}
-            <img src="/logo-micelium.webp" alt="Micelium" />
-          </a>
           <nav className="mic-nav">
             <a href="/guia">Guías</a>
             <a href="/guia/asistente">Asistente</a>
@@ -52,8 +61,26 @@ export default function PublicoLayout({ children }: { children: React.ReactNode 
       <footer className="mic-footer">
         <div className="mic-footer-in">
           <div>
-            <p className="mic-footer-marca">Micelium Argentina</p>
+            <p className="mic-footer-marca">Micelium® Argentina</p>
             <p>Fabricamos los equipos que usás. Córdoba, Argentina.</p>
+            <p className="mic-footer-legal">
+              Micelium® es marca registrada. No tenemos relación con vendedores de insumos que
+              usan nombres parecidos.
+            </p>
+          </div>
+
+          {/* Nuestros dos sitios, juntos y con la misma jerarquía: son las dos mitades de la
+              misma empresa, no un item más del menú. El mismo bloque va en el pie de la tienda. */}
+          <div className="mic-sitios">
+            <p className="mic-sitios-tit">Nuestros sitios</p>
+            <a href="https://infomicelium.com.ar" className="mic-sitio">
+              <span className="mic-sitio-nombre">Tienda</span>
+              <span className="mic-sitio-url">infomicelium.com.ar</span>
+            </a>
+            <a href="https://guias.infomicelium.com.ar" className="mic-sitio">
+              <span className="mic-sitio-nombre">Guías de cultivo</span>
+              <span className="mic-sitio-url">guias.infomicelium.com.ar</span>
+            </a>
           </div>
 
           <nav className="mic-footer-links">

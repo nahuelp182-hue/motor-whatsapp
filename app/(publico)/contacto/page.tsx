@@ -3,7 +3,7 @@ import FormContacto from './FormContacto'
 export const metadata = {
   title: 'Contacto',
   description:
-    'Escribile al equipo de Micelium: dudas del equipo, de tu compra o de tu cultivo. ' +
+    'Escribile al equipo de Micelium®: dudas del equipo, de tu compra o de tu cultivo. ' +
     'Respondemos por correo, normalmente dentro del día.',
 }
 
