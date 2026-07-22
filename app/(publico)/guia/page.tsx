@@ -24,9 +24,9 @@ export default function IndiceGuias() {
         </h1>
         <div className="mic-regla" />
         <p className="mic-bajada">
-          La mayoría de las guías de cultivo tienen el mismo problema: todo parece igual de
-          importante. Estas están ordenadas por lo que realmente cambia el resultado, y no por
-          lo que es más fácil de explicar.
+          La mayoría de las guías de cultivo comparten un defecto: presentan toda la información
+          con el mismo peso. Estas están ordenadas según su incidencia real en el resultado, no
+          según su facilidad de exposición.
         </p>
 
         <div className="mic-meta">
@@ -63,10 +63,10 @@ export default function IndiceGuias() {
       </ol>
 
       <div className="mic-cierre">
-        <h3>¿Tenés una duda puntual?</h3>
+        <h3>¿Tenés una consulta puntual?</h3>
         <p>
-          Preguntale al asistente: responde al instante con la información de estas guías. Y si
-          tu cultivo va mal o hay una falla, te pasa con una persona del equipo.
+          Consultale al asistente: responde de inmediato con la información de estas guías. Ante
+          un cultivo comprometido o una falla del equipo, deriva a una persona del equipo técnico.
         </p>
         <a className="mic-boton" href="/guia/asistente">
           Abrir el asistente

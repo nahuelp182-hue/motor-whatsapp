@@ -158,6 +158,40 @@ export function RenderBloque({ b, capitular }: { b: Bloque; capitular?: boolean 
         </div>
       )
 
+    case 'especies':
+      // Ficha por especie en vez de tabla: los rangos térmicos son el dato que el lector
+      // compara, así que van jerarquizados y no perdidos dentro de un párrafo.
+      return (
+        <div className="mic-especies">
+          {b.filas.map((f, i) => (
+            <article key={i} className="mic-especie">
+              <header className="mic-especie-cab">
+                <h3 className="mic-especie-nombre">{f.nombre}</h3>
+                <em className="mic-especie-cientifico">{f.cientifico}</em>
+                <span className="mic-especie-nivel" data-nivel={f.nivel}>
+                  {f.nivel}
+                </span>
+              </header>
+              <dl className="mic-especie-params">
+                <div>
+                  <dt>Colonización</dt>
+                  <dd>{f.colonizacion}</dd>
+                </div>
+                <div>
+                  <dt>Fructificación</dt>
+                  <dd>{f.fructificacion}</dd>
+                </div>
+                <div>
+                  <dt>Ciclo completo</dt>
+                  <dd>{f.ciclo}</dd>
+                </div>
+              </dl>
+              <p className="mic-especie-nota">{f.nota}</p>
+            </article>
+          ))}
+        </div>
+      )
+
     case 'precio':
       return <BloquePrecio />
   }
