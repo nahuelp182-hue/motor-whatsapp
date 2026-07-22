@@ -153,7 +153,7 @@ export default async function MiEquipo() {
           <a
             className="mic-boton"
             href="https://wa.me/543512145521"
-            style={{ background: 'transparent', color: 'var(--verde-hondo)', border: '1px solid var(--linea-fuerte)' }}
+            style={{ background: 'transparent', color: 'var(--verde-accion)', border: '1px solid var(--linea-fuerte)' }}
           >
             Escribir por WhatsApp
           </a>

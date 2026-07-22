@@ -140,7 +140,7 @@ export default async function PaginaGuia({ params }: { params: Promise<{ slug: s
                   return (
                     <span key={slug}>
                       {i > 0 && ' · '}
-                      <Link href={`/guia/${r.slug}`} style={{ color: 'var(--terracota)' }}>
+                      <Link href={`/guia/${r.slug}`} style={{ color: 'var(--verde-accion)' }}>
                         {r.titulo}
                       </Link>
                     </span>

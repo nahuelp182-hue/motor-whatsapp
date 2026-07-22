@@ -15,6 +15,7 @@ const PUBLICOS = new Set([
   '/leadmagnet.js',           // popup/botón lead magnet
   '/curiosos.js',             // tracker de curiosos
   '/guia-primer-cultivo.pdf', // lead magnet: público a propósito
+  '/logo-micelium.webp',      // logo de la capa pública de guías
 ])
 
 // APIs que por diseño reciben tráfico no autenticado. Cada una valida lo suyo: los webhooks
@@ -87,5 +88,5 @@ export const config = {
   // la exclusión, así que CUALQUIER PDF se servía sin pasar por el middleware. Con manuales
   // de clientes en juego eso es una fuga: los archivos privados se sirven por route handler
   // que valida sesión, y los públicos se listan uno por uno en PUBLICOS.
-  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|.*\\.png|.*\\.svg|.*\\.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|.*\\.png|.*\\.svg|.*\\.ico|.*\\.webp|.*\\.jpg|.*\\.jpeg).*)'],
 }

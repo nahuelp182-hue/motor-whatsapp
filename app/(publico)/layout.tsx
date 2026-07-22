@@ -28,25 +28,32 @@ export const metadata: Metadata = {
 export default function PublicoLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`mic mic-fondo ${fraunces.variable} ${inter.variable}`}>
-      <div className="mic-ancho">
-        <header className="mic-header">
-          <a href="/guia" className="mic-marca">
-            Micelium
+      <div className="mic-anuncio">Fabricamos los equipos. Envíos a todo el país · Garantía y soporte real.</div>
+
+      <header className="mic-header">
+        <div className="mic-header-in">
+          <a href="/guia" className="mic-marca" aria-label="Micelium">
+            {/* Mismo logo de la tienda, en cápsula blanca */}
+            <img src="/logo-micelium.webp" alt="Micelium" />
           </a>
           <nav className="mic-nav">
             <a href="/guia">Guías</a>
             <a href="/guia/asistente">Asistente</a>
             <a href="https://infomicelium.com.ar">Tienda</a>
           </nav>
-        </header>
+        </div>
+      </header>
 
+      <div className="mic-ancho">
         <main>{children}</main>
+      </div>
 
-        <footer className="mic-footer">
+      <footer className="mic-footer">
+        <div className="mic-footer-in">
           <span>Micelium Argentina · Fabricamos los equipos que usás.</span>
           <span>Córdoba, Argentina</span>
-        </footer>
-      </div>
+        </div>
+      </footer>
     </div>
   )
 }

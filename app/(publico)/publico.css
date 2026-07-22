@@ -13,19 +13,30 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .mic {
-  /* Paleta de marca: tierra desaturada. Nada saturado, nada chillón. */
+  /* Paleta CALCADA de la tienda infomicelium.com.ar (tema Tiendanube), para que el portal
+     se sienta la misma web. Verdes muestreados del sitio real:
+       #101a14 = verde casi negro (header/footer/secciones oscuras de marca)
+       #487132 = verde hoja (botones, acción, acentos)
+     Los cremas/tintas son para el cuerpo de lectura (guías largas): coherencia de marca en
+     los bordes, legibilidad en el centro. */
+  --verde-oscuro: #101a14;
+  --verde-oscuro-2: #17251c;
+  --verde-accion: #487132;
+  --verde-accion-hover: #3a5c28;
+  --sage: #6f8a5f;
+
   --crema: #f4f2eb;
   --papel: #faf9f5;
   --tinta: #1f1c17;
   --tinta-suave: #56504a;
   --tinta-tenue: #8a8179;
-  --sage: #6f8a5f;
-  --verde-hondo: #3f4f38;
-  --terracota: #b0341d;
   --linea: #e2ded2;
   --linea-fuerte: #cec8b8;
+  --sobre-oscuro: #e8ede4; /* texto claro sobre fondo verde oscuro */
+  --sobre-oscuro-tenue: #9db097;
 
   --medida: 34rem; /* ~68 caracteres: la línea de lectura cómoda */
+  --radio-boton: 999px; /* botones tipo píldora, redondos como pidió la marca */
   --serif: var(--font-fraunces), 'Iowan Old Style', Georgia, serif;
   --sans: var(--font-inter), system-ui, sans-serif;
 
@@ -49,36 +60,46 @@
   letter-spacing: -0.015em;
 }
 
-/* Textura sutil de papel: dos gradientes, cero imágenes, cero requests. */
-.mic-fondo {
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(111, 138, 95, 0.07), transparent 60%),
-    linear-gradient(180deg, var(--crema) 0%, var(--papel) 22%);
-}
+.mic-fondo { background: var(--papel); }
 
 /* ── Estructura ─────────────────────────────────────────────────────────── */
 
 .mic-ancho { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem; }
 .mic-lectura { max-width: var(--medida); }
 
+/* Barra de anuncio: la misma que corona la tienda (verde hoja). */
+.mic-anuncio {
+  background: var(--verde-accion); color: #fff;
+  text-align: center; font-size: 0.8rem; letter-spacing: 0.02em;
+  padding: 0.5rem 1rem;
+}
+
+/* Header verde oscuro, calcado de la tienda: logo en cápsula blanca + nav claro. */
 .mic-header {
-  border-bottom: 1px solid var(--linea);
-  padding: 1.5rem 0;
-  display: flex; align-items: baseline; justify-content: space-between; gap: 2rem;
+  background: var(--verde-oscuro);
+}
+.mic-header-in {
+  max-width: 72rem; margin: 0 auto; padding: 1rem 1.5rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 2rem;
 }
 .mic-marca {
-  font-family: var(--serif) !important;
-  font-size: 1.1rem; letter-spacing: 0.22em; text-transform: uppercase;
-  color: var(--verde-hondo); text-decoration: none;
+  display: inline-flex; align-items: center;
+  background: #fff; border-radius: 999px;
+  padding: 0.5rem 1.25rem; text-decoration: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
-.mic-nav { display: flex; gap: 1.75rem; font-size: 0.82rem; letter-spacing: 0.04em; }
-.mic-nav a { color: var(--tinta-suave); text-decoration: none; padding-bottom: 2px; }
-.mic-nav a:hover { color: var(--terracota); border-bottom: 1px solid var(--terracota); }
+.mic-marca img { height: 20px; width: auto; display: block; }
+.mic-nav { display: flex; gap: 1.75rem; font-size: 0.85rem; letter-spacing: 0.02em; align-items: center; }
+.mic-nav a { color: var(--sobre-oscuro); text-decoration: none; padding-bottom: 2px; border-bottom: 1px solid transparent; }
+.mic-nav a:hover { color: #fff; border-bottom-color: var(--sage); }
 
 .mic-footer {
-  border-top: 1px solid var(--linea);
-  margin-top: 6rem; padding: 2.5rem 0 4rem;
-  font-size: 0.8rem; color: var(--tinta-tenue);
+  background: var(--verde-oscuro); color: var(--sobre-oscuro-tenue);
+  margin-top: 6rem;
+}
+.mic-footer-in {
+  max-width: 72rem; margin: 0 auto; padding: 2.5rem 1.5rem 3rem;
+  font-size: 0.8rem;
   display: flex; justify-content: space-between; gap: 2rem; flex-wrap: wrap;
 }
 
@@ -108,7 +129,7 @@
 }
 
 /* Regla fina como respiro entre bloques, en vez de más espacio vacío. */
-.mic-regla { width: 3rem; height: 2px; background: var(--terracota); margin: 2rem 0; }
+.mic-regla { width: 3rem; height: 2px; background: var(--verde-accion); margin: 2rem 0; }
 
 /* ── Los 2 vitales: el bloque que tiene que pesar distinto ──────────────── */
 
@@ -119,7 +140,7 @@
 .mic-vital:last-of-type { border-bottom: 1px solid var(--linea-fuerte); }
 .mic-vital-num {
   font-family: var(--serif) !important;
-  font-size: 2.6rem; line-height: 1; color: var(--terracota);
+  font-size: 2.6rem; line-height: 1; color: var(--verde-accion);
   font-variant-numeric: lining-nums;
 }
 .mic-vital-titulo { font-size: 1.2rem; margin: 0 0 0.5rem; }
@@ -132,7 +153,7 @@
   padding: 0.2rem 0 0.2rem 1.4rem;
   margin: 2rem 0; font-size: 0.95rem; line-height: 1.7; color: var(--tinta-suave);
 }
-.mic-aviso[data-tono='cuidado'] { border-left-color: var(--terracota); }
+.mic-aviso[data-tono='cuidado'] { border-left-color: var(--verde-accion); }
 
 /* ── Pasos ──────────────────────────────────────────────────────────────── */
 
@@ -166,7 +187,7 @@
 /* Marca de dato sin confirmar. Preferimos que se vea el hueco antes que inventar. */
 .mic-pendiente {
   display: inline-block; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--terracota); border: 1px dashed currentColor;
+  color: var(--verde-accion); border: 1px dashed currentColor;
   padding: 0.1rem 0.5rem; border-radius: 2px;
 }
 
@@ -198,22 +219,25 @@
 .mic-toc { position: sticky; top: 2.5rem; align-self: start; font-size: 0.85rem; }
 .mic-toc p { font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--tinta-tenue); margin: 0 0 1rem; }
 .mic-toc a { display: block; color: var(--tinta-suave); text-decoration: none; padding: 0.4rem 0 0.4rem 0.9rem; border-left: 1px solid var(--linea); line-height: 1.45; }
-.mic-toc a:hover { color: var(--terracota); border-left-color: var(--terracota); }
+.mic-toc a:hover { color: var(--verde-accion); border-left-color: var(--verde-accion); }
 
 /* ── Cierre / derivación ────────────────────────────────────────────────── */
 
 .mic-cierre {
   margin-top: 4.5rem; padding: 2.5rem; background: var(--crema);
-  border: 1px solid var(--linea); border-radius: 3px;
+  border: 1px solid var(--linea); border-radius: 16px;
 }
 .mic-cierre h3 { font-size: 1.3rem; margin: 0 0 0.75rem; }
 .mic-cierre p { color: var(--tinta-suave); line-height: 1.7; margin: 0 0 1.5rem; font-size: 0.97rem; }
+
+/* Botón píldora verde, igual que la tienda. */
 .mic-boton {
-  display: inline-block; background: var(--verde-hondo); color: var(--papel);
-  text-decoration: none; padding: 0.85rem 1.75rem; border-radius: 2px;
-  font-size: 0.9rem; letter-spacing: 0.03em;
+  display: inline-block; background: var(--verde-accion); color: #fff;
+  text-decoration: none; padding: 0.8rem 1.9rem; border-radius: var(--radio-boton);
+  font-size: 0.92rem; font-weight: 500; letter-spacing: 0.02em;
+  transition: background-color 0.18s ease;
 }
-.mic-boton:hover { background: var(--terracota); }
+.mic-boton:hover { background: var(--verde-accion-hover); }
 
 /* ── Asistente (chat) ───────────────────────────────────────────────────── */
 
@@ -231,7 +255,7 @@
   border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .mic-msg-user .mic-burbuja {
-  background: var(--verde-hondo); color: var(--papel); border-bottom-right-radius: 4px;
+  background: var(--verde-accion); color: var(--papel); border-bottom-right-radius: 4px;
 }
 .mic-msg-assistant .mic-burbuja {
   background: var(--crema); color: var(--tinta);
@@ -243,7 +267,7 @@
   border-bottom: 1px solid transparent;
 }
 .mic-msg-guia { color: var(--sage); }
-.mic-msg-wa { color: var(--terracota); font-weight: 500; }
+.mic-msg-wa { color: var(--verde-accion); font-weight: 500; }
 .mic-msg-guia:hover, .mic-msg-wa:hover { border-bottom-color: currentColor; }
 
 /* Puntitos "escribiendo…" */
@@ -269,11 +293,11 @@
 }
 .mic-chat-input:focus { border-color: var(--sage); }
 .mic-chat-enviar {
-  background: var(--verde-hondo); color: var(--papel); border: none;
-  padding: 0 1.6rem; border-radius: 10px; font-size: 0.9rem; cursor: pointer;
-  letter-spacing: 0.02em;
+  background: var(--verde-accion); color: #fff; border: none;
+  padding: 0 1.7rem; border-radius: var(--radio-boton); font-size: 0.9rem; cursor: pointer;
+  font-weight: 500; letter-spacing: 0.02em;
 }
-.mic-chat-enviar:hover:not(:disabled) { background: var(--terracota); }
+.mic-chat-enviar:hover:not(:disabled) { background: var(--verde-accion); }
 .mic-chat-enviar:disabled { opacity: 0.45; cursor: default; }
 .mic-chat-nota { font-size: 0.78rem; color: var(--tinta-tenue); margin-top: 1rem; line-height: 1.6; }
 
@@ -289,8 +313,8 @@
 .mic-campo input:focus { border-color: var(--sage); }
 .mic-campo small { font-size: 0.78rem; color: var(--tinta-tenue); }
 .mic-acceso-error {
-  color: var(--terracota); font-size: 0.9rem; line-height: 1.6;
-  border-left: 2px solid var(--terracota); padding-left: 1rem; margin: 0;
+  color: var(--verde-accion); font-size: 0.9rem; line-height: 1.6;
+  border-left: 2px solid var(--verde-accion); padding-left: 1rem; margin: 0;
 }
 .mic-acceso .mic-boton { border: none; cursor: pointer; align-self: flex-start; }
 .mic-acceso .mic-boton:disabled { opacity: 0.5; cursor: default; }
@@ -299,7 +323,7 @@
   background: none; border: 1px solid var(--linea-fuerte); color: var(--tinta-suave);
   padding: 0.35rem 0.9rem; border-radius: 8px; font-size: 0.8rem; cursor: pointer;
 }
-.mic-salir:hover { border-color: var(--terracota); color: var(--terracota); }
+.mic-salir:hover { border-color: var(--verde-accion); color: var(--verde-accion); }
 
 @media (prefers-reduced-motion: reduce) {
   .mic * { transition: none !important; animation: none !important; }
