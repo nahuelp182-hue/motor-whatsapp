@@ -98,13 +98,15 @@
   padding: 0.85rem 1.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.09);
 }
+/* El archivo tiene aire arriba y abajo del texto, así que la letra se ve bastante más
+   chica que la altura declarada: por eso 56 px y no 40. */
 .mic-barra-logo {
-  height: 40px; width: auto; display: block;
+  height: 56px; width: auto; display: block;
   filter: invert(1);
 }
 @media (max-width: 40rem) {
-  .mic-barra-marca { padding: 0.7rem 1rem; }
-  .mic-barra-logo { height: 30px; }
+  .mic-barra-marca { padding: 0.5rem 1rem; }
+  .mic-barra-logo { height: 40px; }
 }
 
 /* Barra de anuncio: la misma que corona la tienda (verde hoja). */
