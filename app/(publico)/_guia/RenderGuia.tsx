@@ -186,7 +186,9 @@ export function ArticuloGuia({ g, base = '/guia' }: { g: Guia; base?: string }) 
         {/* Barra de datos: lo que el lector necesita para decidir si entra ahora. */}
         <div className="mic-meta">
           <span className="mic-chip">{minutos} min de lectura</span>
-          <span className="mic-chip">{g.secciones.length} secciones</span>
+          <span className="mic-chip">
+            {g.secciones.length} {g.secciones.length === 1 ? 'sección' : 'secciones'}
+          </span>
           <span className="mic-chip">Revisada el {fecha}</span>
         </div>
       </header>

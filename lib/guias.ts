@@ -554,9 +554,7 @@ const envios: Guia = {
   slug: 'envios-y-seguimiento',
   titulo: 'Envíos y seguimiento',
   eyebrow: 'Tu envío',
-  resumen:
-    'Cómo despachamos, a dónde llegamos y cómo seguir tu pedido. Y qué hacer si el seguimiento ' +
-    'no se mueve.',
+  resumen: 'Cómo despachamos, a dónde llegamos y cómo seguir tu pedido.',
   intencion: 'informacional',
   actualizado: '2026-07-21',
   mensajesQueResuelve: 57,
@@ -585,6 +583,17 @@ const envios: Guia = {
           texto:
             'Retiro en Córdoba: de lunes a viernes de 9 a 18 h, y sábados de 9 a 12 h.',
         },
+        // El seguimiento lo miramos nosotros. Antes acá había una sección entera titulada
+        // "Si el seguimiento no se mueve": le plantaba al que todavía no compró un problema
+        // que probablemente no va a tener. La información útil (que gestionamos el reclamo)
+        // se queda, dicha como compromiso nuestro y no como advertencia.
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Seguimos tu envío nosotros: si en el camino se demora, lo gestionamos con el correo ' +
+            'y te avisamos. No tenés que estar atrás del seguimiento.',
+        },
         {
           tipo: 'faq',
           items: [
@@ -597,26 +606,6 @@ const envios: Guia = {
               r: 'Entre 4 y 5 días una vez despachado. Puede variar un poco según la zona y el momento del año.',
             },
           ],
-        },
-      ],
-    },
-    {
-      id: 'seguimiento',
-      titulo: 'Si el seguimiento no se mueve',
-      bloques: [
-        {
-          tipo: 'parrafo',
-          texto:
-            'A veces el estado de Andreani queda unos días sin actualizarse aunque el paquete esté ' +
-            'en camino. No es lo ideal, pero pasa y en general se destraba solo.',
-        },
-        {
-          tipo: 'aviso',
-          tono: 'dato',
-          texto:
-            'Si ya pasaron varios días sin movimiento, escribinos con tu número de pedido o de ' +
-            'seguimiento y hacemos el reclamo por vos. No tenés que quedarte esperando sin ' +
-            'respuesta.',
         },
       ],
     },
