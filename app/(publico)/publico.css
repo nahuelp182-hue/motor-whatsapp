@@ -60,7 +60,27 @@
   letter-spacing: -0.015em;
 }
 
-.mic-fondo { background: var(--papel); }
+/* Papel, no pantalla: un grano finísimo y una tinta sage que se disuelve arriba. Los dos
+   están al borde de lo perceptible a propósito — no se ven, se sienten como textura. El
+   grano va en un SVG inline (sin request, sin imagen que cargar). */
+.mic-fondo {
+  background-color: var(--papel);
+  background-image:
+    radial-gradient(120% 70% at 50% -10%, rgba(111, 138, 95, 0.09), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, repeat;
+}
+
+/* ── Progreso de lectura ────────────────────────────────────────────────── */
+
+/* Escala con transform sobre una variable que escribe el JS: no toca layout en el scroll. */
+.mic-progreso {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 50;
+  background: linear-gradient(90deg, var(--sage), var(--verde-accion));
+  transform: scaleX(var(--mic-progreso, 0));
+  transform-origin: 0 50%;
+  will-change: transform;
+}
 
 /* ── Estructura ─────────────────────────────────────────────────────────── */
 
@@ -122,9 +142,38 @@
 
 /* ── Tipografía editorial ───────────────────────────────────────────────── */
 
+/* Cabecera de página. La marca de agua es el único ornamento del sistema: una circunferencia
+   enorme y casi transparente que le da profundidad al blanco sin competir con el texto. */
+/* `overflow: hidden` a propósito: el arco se recorta contra el borde del hero en vez de
+   empujar la página a lo ancho. En pantallas chicas queda apenas una curva asomando. */
+.mic-hero { position: relative; padding-top: 4.5rem; overflow: hidden; }
+.mic-hero::before {
+  content: ''; position: absolute; z-index: 0; pointer-events: none;
+  top: -4rem; right: -8rem; width: 28rem; height: 28rem; border-radius: 50%;
+  border: 1px solid rgba(72, 113, 50, 0.13);
+  background: radial-gradient(circle at 30% 30%, rgba(111, 138, 95, 0.08), transparent 62%);
+}
+.mic-hero > * { position: relative; z-index: 1; }
+.mic-hero-portada { padding-top: 5rem; }
+
 .mic-eyebrow {
+  display: inline-flex; align-items: center; gap: 0.6rem;
   font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
   color: var(--sage); margin-bottom: 1.25rem;
+}
+/* Guioncito antes de la volanta: la despega del borde y la marca como etiqueta, no título. */
+.mic-eyebrow::before {
+  content: ''; width: 1.75rem; height: 1px; background: currentColor; opacity: 0.55;
+}
+
+/* ── Chips de metadatos ─────────────────────────────────────────────────── */
+
+.mic-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.75rem; }
+.mic-chip {
+  font-size: 0.75rem; letter-spacing: 0.04em; color: var(--tinta-suave);
+  background: rgba(111, 138, 95, 0.09);
+  border: 1px solid rgba(111, 138, 95, 0.22);
+  padding: 0.3rem 0.8rem; border-radius: 999px; white-space: nowrap;
 }
 
 .mic-titulo {
@@ -140,9 +189,29 @@
 
 .mic-p { font-size: 1.02rem; line-height: 1.78; margin: 0 0 1.4rem; text-wrap: pretty; }
 
+/* Capitular: entrada del artículo. Solo en el primer párrafo — repetida deja de significar. */
+.mic-capitular::first-letter {
+  font-family: var(--serif); font-size: 3.6rem; line-height: 0.82;
+  float: left; padding: 0.35rem 0.6rem 0 0; color: var(--verde-accion);
+}
+
 .mic-h2 {
   font-size: 1.6rem; margin: 3.5rem 0 1.25rem; line-height: 1.2;
   padding-top: 1.5rem; border-top: 1px solid var(--linea);
+  display: grid; grid-template-columns: 2.5rem 1fr; align-items: baseline;
+}
+/* Número de sección tenue: da el conteo "voy por la 3 de 6" de un vistazo. Fuera de la
+   medida de lectura en pantallas anchas, para no meterse en la columna de texto. */
+.mic-h2-num {
+  font-family: var(--serif) !important; font-size: 0.85rem;
+  color: var(--tinta-tenue); font-variant-numeric: tabular-nums; letter-spacing: 0.06em;
+}
+/* Recién a 76rem hay margen suficiente (contenedor 72rem + padding) para sacar el número
+   fuera de la columna sin que se corte contra el borde de la ventana. */
+@media (min-width: 76rem) {
+  .mic-h2 { grid-template-columns: 1fr; }
+  .mic-h2-num { position: absolute; margin-left: -3.25rem; }
+  .mic-seccion { position: relative; }
 }
 
 /* Regla fina como respiro entre bloques, en vez de más espacio vacío. */
@@ -151,55 +220,99 @@
 /* ── Los 2 vitales: el bloque que tiene que pesar distinto ──────────────── */
 
 .mic-vital {
-  display: grid; grid-template-columns: auto 1fr; gap: 1.5rem;
+  display: grid; grid-template-columns: 3.25rem 1fr; gap: 1.5rem;
   padding: 1.75rem 0; border-top: 1px solid var(--linea-fuerte);
+  transition: background-color 0.18s ease;
 }
 .mic-vital:last-of-type { border-bottom: 1px solid var(--linea-fuerte); }
 .mic-vital-num {
   font-family: var(--serif) !important;
   font-size: 2.6rem; line-height: 1; color: var(--verde-accion);
   font-variant-numeric: lining-nums;
+  /* Disco tenue detrás del número: lo convierte en objeto gráfico, no en un dígito suelto. */
+  display: grid; place-items: center; width: 3.25rem; height: 3.25rem;
+  border-radius: 50%; background: rgba(72, 113, 50, 0.08);
 }
 .mic-vital-titulo { font-size: 1.2rem; margin: 0 0 0.5rem; }
 .mic-vital-texto { font-size: 0.98rem; line-height: 1.7; color: var(--tinta-suave); margin: 0; }
 
 /* ── Avisos ─────────────────────────────────────────────────────────────── */
 
+/* El aviso deja de ser un párrafo con raya y pasa a ser un bloque con ícono y fondo: es lo
+   que hace que se lo lea aunque el ojo esté escaneando y salteando párrafos. */
 .mic-aviso {
+  display: grid; grid-template-columns: 1.35rem 1fr; gap: 0.9rem; align-items: start;
   border-left: 2px solid var(--sage);
-  padding: 0.2rem 0 0.2rem 1.4rem;
+  background: rgba(111, 138, 95, 0.06);
+  border-radius: 0 10px 10px 0;
+  padding: 1.1rem 1.25rem 1.1rem 1.25rem;
   margin: 2rem 0; font-size: 0.95rem; line-height: 1.7; color: var(--tinta-suave);
 }
-.mic-aviso[data-tono='cuidado'] { border-left-color: var(--verde-accion); }
+.mic-aviso p { margin: 0; }
+.mic-aviso-icono { color: var(--sage); display: block; }
+.mic-aviso-icono svg { width: 1.35rem; height: 1.35rem; display: block; }
+.mic-aviso[data-tono='cuidado'] {
+  border-left-color: var(--verde-accion);
+  background: rgba(72, 113, 50, 0.07);
+}
+.mic-aviso[data-tono='cuidado'] .mic-aviso-icono { color: var(--verde-accion); }
 
 /* ── Pasos ──────────────────────────────────────────────────────────────── */
 
 .mic-pasos { list-style: none; padding: 0; margin: 1.5rem 0; counter-reset: paso; }
 .mic-pasos li {
-  counter-increment: paso; position: relative; padding-left: 2.6rem;
-  margin-bottom: 1.1rem; line-height: 1.7; font-size: 1rem;
+  counter-increment: paso; position: relative; padding-left: 2.9rem;
+  padding-bottom: 1.1rem; line-height: 1.7; font-size: 1rem;
 }
+.mic-pasos li:last-child { padding-bottom: 0; }
 .mic-pasos li::before {
-  content: counter(paso); position: absolute; left: 0; top: 0.05rem;
-  font-family: var(--serif) !important; font-size: 0.95rem; color: var(--sage);
-  border: 1px solid var(--linea-fuerte); border-radius: 50%;
+  content: counter(paso); position: absolute; left: 0; top: 0.05rem; z-index: 1;
+  font-family: var(--serif) !important; font-size: 0.9rem; color: #fff;
+  background: var(--verde-accion); border-radius: 50%;
   width: 1.7rem; height: 1.7rem; display: grid; place-items: center;
 }
+/* Hilo que une los pasos: convierte una lista en una secuencia. Se corta en el último. */
+.mic-pasos li::after {
+  content: ''; position: absolute; left: 0.83rem; top: 1.85rem; bottom: 0.1rem;
+  width: 1px; background: var(--linea-fuerte);
+}
+.mic-pasos li:last-child::after { display: none; }
 
 /* ── FAQ y datos ────────────────────────────────────────────────────────── */
 
 .mic-faq { border-top: 1px solid var(--linea); margin: 2rem 0; }
-.mic-faq > div { border-bottom: 1px solid var(--linea); padding: 1.25rem 0; }
-.mic-faq dt { font-weight: 500; margin-bottom: 0.45rem; font-size: 1rem; }
+.mic-faq > div {
+  border-bottom: 1px solid var(--linea); padding: 1.25rem 0 1.25rem 1.6rem;
+  transition: padding-left 0.18s ease, background-color 0.18s ease;
+}
+.mic-faq > div:hover { background: rgba(111, 138, 95, 0.05); padding-left: 2rem; }
+.mic-faq dt {
+  position: relative; font-weight: 500; margin-bottom: 0.45rem; font-size: 1rem;
+}
+/* Marca de pregunta: da el punto de anclaje para el ojo que baja escaneando el FAQ. */
+.mic-faq dt::before {
+  content: '?'; position: absolute; left: -1.6rem; top: 0;
+  font-family: var(--serif) !important; color: var(--sage); font-size: 1rem;
+}
 .mic-faq dd { margin: 0; color: var(--tinta-suave); line-height: 1.7; font-size: 0.95rem; }
 
-.mic-datos { width: 100%; border-collapse: collapse; margin: 1.75rem 0; font-size: 0.95rem; }
+/* Ficha técnica: filas alternadas y el valor en negrita. Una tabla de datos se consulta,
+   no se lee — el contraste entre clave tenue y valor firme es lo que la hace consultable. */
+.mic-datos {
+  width: 100%; border-collapse: collapse; margin: 1.75rem 0; font-size: 0.95rem;
+  border: 1px solid var(--linea); border-radius: 12px; overflow: hidden;
+}
 .mic-datos tr { border-bottom: 1px solid var(--linea); }
+.mic-datos tr:last-child { border-bottom: none; }
+.mic-datos tr:nth-child(odd) { background: rgba(226, 222, 210, 0.28); }
 .mic-datos th {
   text-align: left; font-weight: 400; color: var(--tinta-suave);
-  padding: 0.85rem 1rem 0.85rem 0; width: 45%;
+  padding: 0.85rem 1rem; width: 45%;
 }
-.mic-datos td { padding: 0.85rem 0; font-variant-numeric: tabular-nums; }
+.mic-datos td {
+  padding: 0.85rem 1rem; font-variant-numeric: tabular-nums;
+  font-weight: 500; color: var(--tinta);
+}
 
 /* Marca de dato sin confirmar. Preferimos que se vea el hueco antes que inventar. */
 .mic-pendiente {
@@ -214,18 +327,43 @@
 .mic-item { border-top: 1px solid var(--linea); }
 .mic-item:last-child { border-bottom: 1px solid var(--linea); }
 .mic-item a {
-  display: grid; grid-template-columns: 2.5rem 1fr; gap: 1.5rem;
-  padding: 2rem 0; text-decoration: none; color: inherit;
+  display: grid; grid-template-columns: 3rem 1fr; gap: 1.5rem;
+  padding: 2rem 0.75rem; text-decoration: none; color: inherit;
+  position: relative;
   transition: background-color 0.18s ease, padding-left 0.18s ease;
 }
-.mic-item a:hover { background: rgba(111, 138, 95, 0.05); padding-left: 0.75rem; }
+/* Barra verde que crece desde el borde: dice "acá estás" sin mover el texto de lugar. */
+.mic-item a::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--verde-accion); transform: scaleY(0); transform-origin: 50% 0;
+  transition: transform 0.22s ease;
+}
+.mic-item a:hover { background: rgba(111, 138, 95, 0.06); padding-left: 1.5rem; }
+.mic-item a:hover::before { transform: scaleY(1); }
 .mic-item-num {
-  font-family: var(--serif) !important; font-size: 0.9rem; color: var(--tinta-tenue);
-  padding-top: 0.35rem; font-variant-numeric: tabular-nums;
+  font-family: var(--serif) !important; font-size: 1.9rem; color: var(--linea-fuerte);
+  line-height: 1; padding-top: 0.15rem; font-variant-numeric: tabular-nums;
+  transition: color 0.18s ease;
+}
+.mic-item a:hover .mic-item-num { color: var(--sage); }
+.mic-item-eyebrow {
+  font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--sage); margin: 0 0 0.6rem;
 }
 .mic-item-titulo { font-family: var(--serif) !important; font-size: 1.45rem; margin: 0 0 0.5rem; line-height: 1.25; }
 .mic-item-resumen { color: var(--tinta-suave); line-height: 1.65; margin: 0; font-size: 0.97rem; max-width: 42rem; }
-.mic-item-meta { font-size: 0.75rem; color: var(--tinta-tenue); margin-top: 0.85rem; letter-spacing: 0.03em; }
+.mic-item-meta {
+  font-size: 0.75rem; color: var(--tinta-tenue); margin-top: 0.85rem; letter-spacing: 0.03em;
+  display: flex; align-items: center; gap: 1rem;
+}
+.mic-item-flecha {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  color: var(--verde-accion); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+  opacity: 0; transform: translateX(-6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.mic-item-flecha svg { width: 1rem; height: 1rem; }
+.mic-item a:hover .mic-item-flecha { opacity: 1; transform: translateX(0); }
 
 /* ── Índice lateral del artículo ────────────────────────────────────────── */
 
@@ -235,8 +373,20 @@
 }
 .mic-toc { position: sticky; top: 2.5rem; align-self: start; font-size: 0.85rem; }
 .mic-toc p { font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--tinta-tenue); margin: 0 0 1rem; }
-.mic-toc a { display: block; color: var(--tinta-suave); text-decoration: none; padding: 0.4rem 0 0.4rem 0.9rem; border-left: 1px solid var(--linea); line-height: 1.45; }
-.mic-toc a:hover { color: var(--verde-accion); border-left-color: var(--verde-accion); }
+.mic-toc a {
+  display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.15rem;
+  color: var(--tinta-suave); text-decoration: none;
+  padding: 0.45rem 0 0.45rem 0.9rem; border-left: 1px solid var(--linea); line-height: 1.45;
+  transition: color 0.18s ease, border-left-color 0.18s ease;
+}
+.mic-toc-num { font-variant-numeric: tabular-nums; color: var(--tinta-tenue); font-size: 0.72rem; }
+.mic-toc a:hover { color: var(--verde-accion); border-left-color: var(--sage); }
+/* Sección activa: el índice deja de ser una lista de links y pasa a ser un mapa de posición. */
+.mic-toc a[data-activa] {
+  color: var(--tinta); border-left: 2px solid var(--verde-accion);
+  padding-left: calc(0.9rem - 1px);
+}
+.mic-toc a[data-activa] .mic-toc-num { color: var(--verde-accion); }
 
 /* ── Cierre / derivación ────────────────────────────────────────────────── */
 
@@ -246,6 +396,30 @@
 }
 .mic-cierre h3 { font-size: 1.3rem; margin: 0 0 0.75rem; }
 .mic-cierre p { color: var(--tinta-suave); line-height: 1.7; margin: 0 0 1.5rem; font-size: 0.97rem; }
+
+/* ── Tarjetas de guías relacionadas ─────────────────────────────────────── */
+
+.mic-relacionadas {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.9rem; margin: 0 0 1.75rem;
+}
+.mic-tarjeta {
+  display: flex; flex-direction: column; gap: 0.4rem;
+  background: var(--papel); border: 1px solid var(--linea);
+  border-radius: 12px; padding: 1.15rem 1.25rem; text-decoration: none; color: inherit;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.mic-tarjeta:hover {
+  border-color: var(--sage); transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(31, 28, 23, 0.06);
+}
+.mic-tarjeta-eyebrow {
+  font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--sage);
+}
+.mic-tarjeta-titulo {
+  font-family: var(--serif) !important; font-size: 1.08rem; line-height: 1.3; color: var(--tinta);
+}
+.mic-tarjeta-meta { font-size: 0.75rem; color: var(--tinta-tenue); margin-top: 0.25rem; }
 
 /* Botón píldora verde, igual que la tienda. */
 .mic-boton {
@@ -372,12 +546,17 @@
 
 /* ── Cronograma del cultivo (guías privadas) ────────────────────────────── */
 
-.mic-crono { margin: 2rem 0; border-left: 2px solid var(--linea-fuerte); }
-.mic-crono-fila { position: relative; padding: 0 0 1.75rem 1.75rem; }
-.mic-crono-fila::before {
-  content: ''; position: absolute; left: -6px; top: 0.45rem;
-  width: 10px; height: 10px; border-radius: 50%;
-  background: var(--verde-accion); border: 2px solid var(--papel);
+/* Línea de tiempo con hitos numerados: el cliente que ya compró usa esto para saber si su
+   cultivo va en horario. El número es la referencia contra la que compara. */
+.mic-crono { margin: 2rem 0 2rem 0.9rem; border-left: 1px solid var(--linea-fuerte); }
+.mic-crono-fila { position: relative; padding: 0 0 1.9rem 2.25rem; }
+.mic-crono-punto {
+  position: absolute; left: -0.9rem; top: 0;
+  width: 1.8rem; height: 1.8rem; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--papel); border: 1px solid var(--verde-accion);
+  color: var(--verde-accion); font-family: var(--serif) !important; font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
 }
 .mic-crono-cab { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
 .mic-crono-etapa { font-family: var(--serif) !important; font-size: 1.1rem; color: var(--tinta); }

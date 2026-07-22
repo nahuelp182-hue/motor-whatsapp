@@ -2,9 +2,30 @@
 // privada (/mi-equipo/guia/[slug], dinámica y detrás de sesión). Una sola implementación para
 // que las dos se vean igual y no diverjan.
 import Link from 'next/link'
-import { getGuia, type Bloque, type Guia } from '@/lib/guias'
+import { getGuia, minutosLectura, type Bloque, type Guia } from '@/lib/guias'
 import { formatearPesos, precioProducto } from '@/lib/tienda'
 import CapturaEmail from './CapturaEmail'
+import IndiceLateral from './IndiceLateral'
+import ProgresoLectura from './ProgresoLectura'
+
+/* Íconos en SVG inline y monocromo (heredan `currentColor`): sin requests, nítidos en
+   cualquier pantalla y siempre en el color del bloque que los contiene. */
+const ICONOS = {
+  cuidado: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <path d="M12 3.5 21.5 20h-19L12 3.5Z" strokeLinejoin="round" />
+      <path d="M12 10v4.5" strokeLinecap="round" />
+      <circle cx="12" cy="17.4" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  dato: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5.5" strokeLinecap="round" />
+      <circle cx="12" cy="7.8" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+}
 
 /** Precio leído de Tiendanube al renderizar (componente async de servidor). */
 async function BloquePrecio() {
@@ -51,10 +72,12 @@ async function BloquePrecio() {
   )
 }
 
-export function RenderBloque({ b }: { b: Bloque }) {
+export function RenderBloque({ b, capitular }: { b: Bloque; capitular?: boolean }) {
   switch (b.tipo) {
     case 'parrafo':
-      return <p className="mic-p">{b.texto}</p>
+      // La capitular solo en el primer párrafo de la guía: marca dónde empieza el texto y
+      // le da al artículo un ancla visual sin necesidad de una foto de portada.
+      return <p className={capitular ? 'mic-p mic-capitular' : 'mic-p'}>{b.texto}</p>
 
     case 'vital':
       return (
@@ -78,9 +101,10 @@ export function RenderBloque({ b }: { b: Bloque }) {
 
     case 'aviso':
       return (
-        <p className="mic-aviso" data-tono={b.tono}>
-          {b.texto}
-        </p>
+        <aside className="mic-aviso" data-tono={b.tono}>
+          <span className="mic-aviso-icono">{ICONOS[b.tono]}</span>
+          <p>{b.texto}</p>
+        </aside>
       )
 
     case 'faq':
@@ -120,6 +144,9 @@ export function RenderBloque({ b }: { b: Bloque }) {
         <div className="mic-crono">
           {b.filas.map((f, i) => (
             <div key={i} className="mic-crono-fila">
+              <span className="mic-crono-punto" aria-hidden="true">
+                {i + 1}
+              </span>
               <div className="mic-crono-cab">
                 <span className="mic-crono-etapa">{f.etapa}</span>
                 <span className="mic-crono-dias">{f.dias}</span>
@@ -136,20 +163,6 @@ export function RenderBloque({ b }: { b: Bloque }) {
   }
 }
 
-function Indice({ g }: { g: Guia }) {
-  if (g.secciones.length < 2) return null
-  return (
-    <aside className="mic-toc">
-      <p>En esta guía</p>
-      {g.secciones.map(s => (
-        <a key={s.id} href={`#${s.id}`}>
-          {s.titulo}
-        </a>
-      ))}
-    </aside>
-  )
-}
-
 /** Cuerpo completo del artículo. `base` define a dónde apuntan las guías relacionadas. */
 export function ArticuloGuia({ g, base = '/guia' }: { g: Guia; base?: string }) {
   const fecha = new Date(g.actualizado + 'T12:00:00').toLocaleDateString('es-AR', {
@@ -158,22 +171,38 @@ export function ArticuloGuia({ g, base = '/guia' }: { g: Guia; base?: string }) 
     year: 'numeric',
   })
 
+  const minutos = minutosLectura(g)
+
   return (
     <article>
-      <header style={{ paddingTop: '4.5rem' }}>
+      <ProgresoLectura />
+
+      <header className="mic-hero">
         <p className="mic-eyebrow">{g.eyebrow}</p>
         <h1 className="mic-titulo">{g.titulo}</h1>
         <div className="mic-regla" />
         <p className="mic-bajada">{g.resumen}</p>
+
+        {/* Barra de datos: lo que el lector necesita para decidir si entra ahora. */}
+        <div className="mic-meta">
+          <span className="mic-chip">{minutos} min de lectura</span>
+          <span className="mic-chip">{g.secciones.length} secciones</span>
+          <span className="mic-chip">Revisada el {fecha}</span>
+        </div>
       </header>
 
       <div className="mic-articulo">
         <div className="mic-lectura">
-          {g.secciones.map(s => (
-            <section key={s.id} id={s.id}>
-              <h2 className="mic-h2">{s.titulo}</h2>
+          {g.secciones.map((s, si) => (
+            <section key={s.id} id={s.id} className="mic-seccion">
+              <h2 className="mic-h2">
+                <span className="mic-h2-num" aria-hidden="true">
+                  {String(si + 1).padStart(2, '0')}
+                </span>
+                {s.titulo}
+              </h2>
               {s.bloques.map((b, i) => (
-                <RenderBloque key={i} b={b} />
+                <RenderBloque key={i} b={b} capitular={si === 0 && i === 0} />
               ))}
             </section>
           ))}
@@ -189,22 +218,25 @@ export function ArticuloGuia({ g, base = '/guia' }: { g: Guia; base?: string }) 
           {g.relacionadas && g.relacionadas.length > 0 && (
             <div className="mic-cierre">
               <h3>Seguí por acá</h3>
-              <p>
-                {g.relacionadas.map((slug, i) => {
+
+              {/* Tarjetas en vez de una línea de links separados por puntos: la guía que
+                  sigue tiene que verse como un destino, no como una nota al pie. */}
+              <div className="mic-relacionadas">
+                {g.relacionadas.map(slug => {
                   const r = getGuia(slug)
                   if (!r) return null
                   // Cada guía se linkea a su propia zona: las privadas dentro de /mi-equipo.
                   const href = r.privada ? `/mi-equipo/guia/${r.slug}` : `/guia/${r.slug}`
                   return (
-                    <span key={slug}>
-                      {i > 0 && ' · '}
-                      <Link href={href} style={{ color: 'var(--verde-accion)' }}>
-                        {r.titulo}
-                      </Link>
-                    </span>
+                    <Link key={slug} href={href} className="mic-tarjeta">
+                      <span className="mic-tarjeta-eyebrow">{r.eyebrow}</span>
+                      <span className="mic-tarjeta-titulo">{r.titulo}</span>
+                      <span className="mic-tarjeta-meta">{minutosLectura(r)} min</span>
+                    </Link>
                   )
                 })}
-              </p>
+              </div>
+
               <a className="mic-boton" href="https://wa.me/543512145521">
                 Consultar por WhatsApp
               </a>
@@ -212,7 +244,7 @@ export function ArticuloGuia({ g, base = '/guia' }: { g: Guia; base?: string }) 
           )}
         </div>
 
-        <Indice g={g} />
+        <IndiceLateral secciones={g.secciones.map(s => ({ id: s.id, titulo: s.titulo }))} />
       </div>
     </article>
   )

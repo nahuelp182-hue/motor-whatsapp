@@ -1200,6 +1200,42 @@ export function guiasParaPrompt(incluirPrivadas = false): string {
   return partes.join('\n')
 }
 
+/**
+ * Minutos de lectura estimados. Sirve como señal de escaneabilidad: el lector decide si
+ * entra ahora o vuelve después, en vez de abandonar a mitad. 200 palabras/minuto es el
+ * promedio aceptado para lectura de pantalla en castellano.
+ */
+export function minutosLectura(g: Guia): number {
+  let palabras = g.resumen.split(/\s+/).length
+  for (const s of g.secciones) {
+    palabras += s.titulo.split(/\s+/).length
+    for (const b of s.bloques) {
+      switch (b.tipo) {
+        case 'parrafo':
+        case 'aviso':
+          palabras += b.texto.split(/\s+/).length
+          break
+        case 'vital':
+          palabras += (b.titulo + ' ' + b.texto).split(/\s+/).length
+          break
+        case 'pasos':
+          palabras += b.items.join(' ').split(/\s+/).length
+          break
+        case 'faq':
+          palabras += b.items.map(i => i.p + ' ' + i.r).join(' ').split(/\s+/).length
+          break
+        case 'datos':
+          palabras += b.filas.map(f => f.clave + ' ' + f.valor).join(' ').split(/\s+/).length
+          break
+        case 'cronograma':
+          palabras += b.filas.map(f => f.etapa + ' ' + f.que + ' ' + (f.ojo ?? '')).join(' ').split(/\s+/).length
+          break
+      }
+    }
+  }
+  return Math.max(1, Math.round(palabras / 200))
+}
+
 export function tienePendientes(g: Guia): boolean {
   return g.secciones.some(s =>
     s.bloques.some(
