@@ -23,6 +23,7 @@ model Store {
   gclidSessions GclidSession[]
   reviews       Review[]
   visitors      Visitor[]
+  widgets       Widget[]
 }
 
 model Customer {
@@ -210,4 +211,58 @@ model RateLimit {
   contador       Int      @default(0)
 
   @@index([ventana_inicio])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOTOR DE WIDGETS
+//
+// Un widget es SOLO datos: tipo + config JSON. El código no sabe qué dice un widget,
+// solo cómo dibujar cada tipo (lib/widgets/tipos.ts declara los campos, public/mic.js
+// los renderiza). Cambiar un texto, prender o apagar algo se hace desde /dashboard/widgets
+// sin tocar código ni desplegar. Esa es toda la razón de ser de estas tablas.
+
+model Widget {
+  id       String @id @default(cuid())
+  store_id String
+
+  tipo     String  // slug del tipo, ver lib/widgets/tipos.ts
+  nombre   String  // etiqueta interna, para reconocerlo en la lista del panel
+  contexto String  // guias | tienda | producto
+  config   Json    // valores de los campos declarados por el tipo
+  reglas   Json?   // dónde/cuándo aparece: rutas, dispositivo, ventana de fechas
+
+  activo Boolean @default(false) // nace apagado: nada sale a producción sin un clic explícito
+  orden  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store  Store         @relation(fields: [store_id], references: [id])
+  events WidgetEvent[]
+
+  @@index([store_id, contexto, activo])
+}
+
+model WidgetEvent {
+  id        String   @id @default(cuid())
+  widget_id String
+  tipo      String   // impresion | interaccion | conversion
+  vid       String?  // visitante de primera parte, para cruzar con Visitor
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  widget Widget @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+
+  @@index([widget_id, tipo, createdAt])
+}
+
+model WidgetLead {
+  id        String   @id @default(cuid())
+  widget_id String
+  email     String
+  dato      Json?    // lo que pidiera el widget además del email
+  createdAt DateTime @default(now())
+
+  @@unique([widget_id, email])
+  @@index([createdAt])
 }

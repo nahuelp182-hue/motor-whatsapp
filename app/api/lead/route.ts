@@ -22,6 +22,8 @@ const ORIGENES = [
   'https://www.infomicelium.com.ar',
   'https://micelium2.mitiendanube.com', // dominio original de Tiendanube: sigue sirviendo la tienda
   'https://mw-micelium.vercel.app',
+  'https://guias.infomicelium.com.ar', // capa pública de guías: de ahí llama el widget de captura
+  'https://guia.infomicelium.com.ar',
 ]
 
 function cors(req: NextRequest): Record<string, string> {
