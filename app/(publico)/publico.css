@@ -315,7 +315,18 @@
   font-family: var(--serif) !important; font-size: 2.2rem; color: var(--tinta);
   font-variant-numeric: lining-nums;
 }
-.mic-precio-nota { margin: 0.35rem 0 1.25rem; font-size: 0.9rem; color: var(--tinta-suave); }
+.mic-precio-nota { margin: 0.35rem 0 0; font-size: 0.9rem; color: var(--tinta-suave); }
+
+/* Precio por transferencia: el más bajo, se destaca en verde de marca. */
+.mic-precio-transf {
+  margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px solid var(--linea-fuerte);
+  display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap;
+}
+.mic-precio-transf-monto {
+  font-family: var(--serif) !important; font-size: 1.55rem; color: var(--verde-accion);
+  font-variant-numeric: lining-nums;
+}
+.mic-precio-transf-label { font-size: 0.88rem; color: var(--tinta-suave); }
 
 /* ── Cronograma del cultivo (guías privadas) ────────────────────────────── */
 

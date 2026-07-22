@@ -10,10 +10,19 @@ const UA = 'MiceliumApp (nahuelp182@gmail.com)'
 /** ID del pack INC101 en Tiendanube. */
 export const ID_INC101 = 105201706
 
+/**
+ * Descuento por transferencia/depósito. Vive acá para que el portal y el bot digan SIEMPRE el
+ * mismo número: el webhook de Instagram lo importa de este módulo. Si cambia, se cambia una
+ * sola vez. (Tiendanube no expone este dato por API: /payment_providers devuelve 403.)
+ */
+export const DESCUENTO_TRANSFERENCIA = 0.13
+
 export type PrecioProducto = {
   nombre: string
   lista: number | null
   promocional: number | null
+  /** Precio final pagando por transferencia, sobre el precio vigente. */
+  transferencia: number | null
   hayStock: boolean
   url: string
 }
@@ -48,10 +57,15 @@ export async function precioProducto(id = ID_INC101): Promise<PrecioProducto | n
     const lista = v.price ? Number(v.price) : null
     const promo = v.promotional_price ? Number(v.promotional_price) : null
     const nombre = typeof p.name === 'string' ? p.name : (p.name?.es ?? 'Incubadora INC101')
+    // El descuento por transferencia se aplica sobre el precio VIGENTE (el promocional si hay).
+    const vigente = (Number.isFinite(promo as number) ? promo : lista) ?? null
+    const transferencia =
+      vigente === null ? null : Math.round(vigente * (1 - DESCUENTO_TRANSFERENCIA))
     return {
       nombre,
       lista: Number.isFinite(lista) ? lista : null,
       promocional: Number.isFinite(promo as number) ? promo : null,
+      transferencia,
       // stock null en Tiendanube = sin control de stock (siempre disponible)
       hayStock: v.stock === null || v.stock === undefined || v.stock > 0,
       url: p.canonical_url ?? 'https://infomicelium.com.ar',

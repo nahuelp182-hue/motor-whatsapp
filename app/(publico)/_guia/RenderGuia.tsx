@@ -27,12 +27,23 @@ async function BloquePrecio() {
 
   return (
     <div className="mic-precio">
+      <p className="mic-precio-nota" style={{ margin: '0 0 0.75rem' }}>
+        {p.nombre}
+      </p>
       <div>
         {tachado && <span className="mic-precio-antes">{formatearPesos(tachado)}</span>}
         <span className="mic-precio-hoy">{formatearPesos(hoy)}</span>
       </div>
-      <p className="mic-precio-nota">{p.nombre}</p>
-      <a className="mic-boton" href={p.url}>
+      <p className="mic-precio-nota">Con tarjeta, en la tienda</p>
+
+      {p.transferencia && (
+        <div className="mic-precio-transf">
+          <span className="mic-precio-transf-monto">{formatearPesos(p.transferencia)}</span>
+          <span className="mic-precio-transf-label">pagando por transferencia o depósito</span>
+        </div>
+      )}
+
+      <a className="mic-boton" href={p.url} style={{ marginTop: '1.35rem' }}>
         {p.hayStock ? 'Comprar en la tienda' : 'Ver en la tienda'}
       </a>
     </div>

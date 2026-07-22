@@ -4,6 +4,7 @@ import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
 import { diag, getHistorial, logClaudeUsage, comentarioYaRespondido, type Turno } from '@/lib/diag'
 import { verificarFirmaMeta } from '@/lib/meta-signature'
+import { DESCUENTO_TRANSFERENCIA } from '@/lib/tienda'
 
 const MODELO = 'claude-haiku-4-5-20251001'
 
@@ -18,7 +19,8 @@ const TN_STORE = process.env.TN_STORE_ID    ?? '1957278'
 const TN_TOKEN = process.env.TN_ACCESS_TOKEN ?? ''
 const TN_BASE  = 'https://api.tiendanube.com/v1'
 const UA       = 'Micelium/1.0 (nahuelp182@gmail.com)'
-const TRANSFER_DISCOUNT = 0.13
+// Importado de lib/tienda para que el bot y el portal digan SIEMPRE el mismo precio.
+const TRANSFER_DISCOUNT = DESCUENTO_TRANSFERENCIA
 
 // WhatsApp de la empresa (a donde se deriva a los clientes de Instagram). Configurable por env.
 const EMPRESA_WA = process.env.WA_EMPRESA ?? '5493525623546'

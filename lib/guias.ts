@@ -258,9 +258,13 @@ const equipo: Guia = {
               clave: 'Cuánto entra',
               valor: '15 frascos, o 4 recipientes tipo bandeja de 1,5 litros (dos columnas de dos)',
             },
-            { clave: 'Consumo eléctrico', valor: '20 a 30 W (el máximo, en clima muy frío)' },
-            { clave: 'Rango de temperatura', valor: 'Mantiene entre 10 °C y 30 °C' },
-            { clave: 'Humedad', valor: 'Booster de humedad regulable (paso a paso en el manual)' },
+            { clave: 'Consumo eléctrico', valor: '25 W promedio por hora' },
+            {
+              clave: 'Temperatura de cultivo',
+              valor: 'Mantiene el ambiente entre 10 °C y 30 °C, que es el rango útil para cultivar',
+            },
+            { clave: 'Calor máximo', valor: 'El equipo puede calentar hasta 42 °C' },
+            { clave: 'Humedad', valor: 'Hasta 85 % con el booster de humedad' },
             { clave: 'Renovación de aire', valor: 'Renovación pasiva por aire caliente' },
             {
               clave: 'Garantía',
@@ -287,11 +291,15 @@ const equipo: Guia = {
           items: [
             {
               p: '¿Anda con energía solar?',
-              r: 'Sí. Consume entre 20 y 30 W, así que es de los equipos que un sistema solar hogareño puede sostener sin problema, incluso funcionando las 24 horas.',
+              r: 'Sí. Consume unos 25 W promedio por hora, así que un sistema solar hogareño lo sostiene sin problema, incluso funcionando las 24 horas.',
             },
             {
               p: '¿Enfría o solo calienta?',
-              r: 'El INC101 solo calienta: sostiene la temperatura por encima de la del ambiente, hasta 30 °C. No refrigera. Si estás en una zona donde en verano se pasa de 30 °C de forma sostenida, escribinos antes de comprar y lo hablamos con tu caso.',
+              r: 'El INC101 solo calienta: sostiene la temperatura por encima de la del ambiente. No refrigera. Si estás en una zona donde en verano se pasa de 30 °C de forma sostenida, escribinos antes de comprar y lo hablamos con tu caso.',
+            },
+            {
+              p: '¿Hasta cuántos grados llega?',
+              r: 'El equipo puede calentar hasta 42 °C, pero el rango que vas a usar para cultivar es de 10 a 30 °C: por encima de eso el cultivo se inhibe. Los 42 °C sirven, por ejemplo, para el modo deshidratador.',
             },
             {
               p: '¿Viene con material para empezar?',
@@ -528,7 +536,7 @@ const comprar: Guia = {
             },
             {
               p: '¿Conviene pagar por transferencia?',
-              r: 'PENDIENTE: confirmar el porcentaje de descuento por transferencia para poder decirlo con el número exacto.',
+              r: 'Sí: pagando por transferencia o depósito tenés un 13 % de descuento sobre el precio vigente. Es el precio más bajo al que conseguís el equipo. Arriba está el monto exacto de hoy.',
             },
             {
               p: '¿Y si me arrepiento?',
@@ -586,7 +594,7 @@ const envios: Guia = {
             },
             {
               p: '¿Cuánto tarda en llegar?',
-              r: 'PENDIENTE: Nahuel, indicá el rango de días hábiles típico (varía por zona) para no prometer algo que no se cumpla.',
+              r: 'Entre 4 y 5 días una vez despachado. Puede variar un poco según la zona y el momento del año.',
             },
           ],
         },
