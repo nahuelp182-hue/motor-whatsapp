@@ -61,8 +61,15 @@ export default function FormContacto() {
       </label>
 
       <label className="mic-campo">
-        <span>Tu consulta</span>
-        <textarea name="mensaje" rows={6} maxLength={3000} required minLength={10} />
+        <span>Tu mensaje</span>
+        <textarea
+          name="mensaje"
+          rows={6}
+          maxLength={3000}
+          required
+          minLength={10}
+          placeholder="Escribinos lo que quieras preguntarnos…"
+        />
       </label>
 
       {/* Honeypot: invisible para personas, tentador para bots. */}

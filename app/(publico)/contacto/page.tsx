@@ -15,9 +15,8 @@ export default function PaginaContacto() {
         <h1 className="mic-titulo">Escribinos</h1>
         <div className="mic-regla" />
         <p className="mic-bajada">
-          Contanos qué necesitás y te respondemos por correo, normalmente dentro del día. Si tu
-          cultivo va mal, sumá cuántos días pasaron desde que armaste, qué temperatura marca el
-          equipo y en qué zona estás: con esos tres datos se resuelve casi siempre.
+          Dejanos tu consulta y te respondemos por correo, normalmente dentro del día. Cualquier
+          tema: una duda antes de comprar, algo de tu pedido, o lo que necesites preguntarnos.
         </p>
       </section>
 
