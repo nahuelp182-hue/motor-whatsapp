@@ -14,6 +14,7 @@ const PUBLICOS = new Set([
   '/ldschema.js',             // JSON-LD schema.org
   '/leadmagnet.js',           // popup/botón lead magnet
   '/curiosos.js',             // tracker de curiosos
+  '/sitios.js',               // bloque "Nuestros sitios" en el pie de la tienda
   '/guia-primer-cultivo.pdf', // lead magnet: público a propósito
   '/logo-micelium.webp',      // logo de la capa pública de guías
 ])
