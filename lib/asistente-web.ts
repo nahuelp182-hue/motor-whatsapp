@@ -70,7 +70,11 @@ donde-conseguir-insumos, como-funciona-la-incubadora), o "-" si ninguna aplica.
 [WHATSAPP] si / no  (si corresponde escalar a una persona)
 `.trim()
 
-  const contextoGuias = `CONTENIDO DE LAS GUÍAS PÚBLICAS (fuente de verdad):\n${guiasParaPrompt()}`
+  // En modo cliente el asistente SÍ ve el material de los manuales (el cliente ya lo pagó);
+  // en modo frío solo las guías públicas.
+  const contextoGuias = ctx
+    ? `CONTENIDO DE LAS GUÍAS Y MANUALES (fuente de verdad; el cliente tiene acceso a todo esto):\n${guiasParaPrompt(true)}`
+    : `CONTENIDO DE LAS GUÍAS PÚBLICAS (fuente de verdad):\n${guiasParaPrompt(false)}`
 
   const bloques: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [
     // Cacheado: KB + reglas + guías viajan una vez y se reusan (respuestas ~10x más baratas).

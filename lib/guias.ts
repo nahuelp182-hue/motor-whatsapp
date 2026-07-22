@@ -16,6 +16,12 @@ export type Bloque =
   | { tipo: 'aviso'; tono: 'cuidado' | 'dato'; texto: string }
   | { tipo: 'faq'; items: Array<{ p: string; r: string }> }
   | { tipo: 'datos'; filas: Array<{ clave: string; valor: string; verificar?: boolean }> }
+  // Cronograma del cultivo: qué pasa cada día. Es lo que más pide el cliente que ya compró,
+  // porque convierte la ansiedad ("¿esto va bien?") en una referencia contra la que comparar.
+  | {
+      tipo: 'cronograma'
+      filas: Array<{ etapa: string; dias: string; que: string; ojo?: string }>
+    }
 
 export type Seccion = { id: string; titulo: string; bloques: Bloque[] }
 
@@ -30,6 +36,12 @@ export type Guia = {
   actualizado: string
   /** Cuántos mensajes reales de WhatsApp resuelve esta página (de la medición 21/07/2026). */
   mensajesQueResuelve: number
+  /**
+   * PRIVADA = solo para quien compró (requiere sesión de cliente). No se indexa, no aparece
+   * en el índice público y el asistente en modo frío ni la ve. Acá va el material detallado
+   * de los manuales: es parte de lo que el cliente pagó, no contenido de captación.
+   */
+  privada?: boolean
   secciones: Seccion[]
   relacionadas?: string[]
 }
@@ -615,6 +627,439 @@ const sobre: Guia = {
   relacionadas: ['como-funciona-la-incubadora', 'como-comprar'],
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// GUÍAS PRIVADAS — solo para clientes verificados. Contenido de los manuales reales
+// (MANUAL DE USUARIO INC101 2026 + GUIA DE CULTIVO INC101). Este material es parte de lo
+// que el cliente pagó: no se indexa ni se muestra al público.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const manualEquipo: Guia = {
+  slug: 'manual-inc101',
+  titulo: 'Manual de uso del INC101',
+  eyebrow: 'Tu equipo · Manual',
+  resumen:
+    'Todo el funcionamiento del equipo, paso a paso: qué viene en la caja, cómo armarlo, ' +
+    'cómo configurar la temperatura, cómo usar el booster y qué NO hacer nunca.',
+  intencion: 'informacional',
+  actualizado: '2026-07-22',
+  mensajesQueResuelve: 97,
+  privada: true,
+  secciones: [
+    {
+      id: 'caja',
+      titulo: '1. Qué hay en la caja',
+      bloques: [
+        { tipo: 'parrafo', texto: 'Al abrir el paquete vas a encontrar tres elementos:' },
+        {
+          tipo: 'pasos',
+          items: [
+            'Cúpula transparente (la tapa).',
+            'Base de la incubadora (la parte negra con la pantalla).',
+            'Booster de humedad (bolsa negra tipo sobre).',
+          ],
+        },
+      ],
+    },
+    {
+      id: 'montaje',
+      titulo: '2. Montaje paso a paso',
+      bloques: [
+        { tipo: 'parrafo', texto: 'Seguí este orden para evitar errores:' },
+        {
+          tipo: 'pasos',
+          items: [
+            'Ubicación: colocá la base sobre una superficie nivelada, seca y limpia.',
+            'Sonda: fijá la sonda de temperatura (leé la alerta de abajo antes de seguir).',
+            'Cúpula: colocá la cúpula sobre la base, con los orificios de ventilación hacia atrás.',
+            'Energía: conectá la incubadora a la red eléctrica.',
+            'Configuración: establecé la temperatura que necesites.',
+          ],
+        },
+      ],
+    },
+    {
+      id: 'sonda',
+      titulo: '3. La sonda: lo más importante de todo',
+      bloques: [
+        {
+          tipo: 'aviso',
+          tono: 'cuidado',
+          texto:
+            'Leé esto con atención: de acá depende la vida de tu equipo y de tu cultivo. La sonda ' +
+            'de temperatura es el cerebro que le dice al equipo cuándo dejar de calentar.',
+        },
+        {
+          tipo: 'vital',
+          numero: 1,
+          titulo: 'La sonda va SIEMPRE pegada a la base',
+          texto:
+            'Adherida a la base, dentro de la bandeja, con cinta adhesiva. Nunca colgando ni al ' +
+            'aire. Si está mal colocada, el equipo no sabe qué temperatura hay: calienta sin ' +
+            'parar y puede quemar el equipo o tu cultivo.',
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Cada vez que muevas el cultivo o coloques el booster, verificá que la sonda siga en ' +
+            'su lugar. Es el error más caro y el más fácil de evitar.',
+        },
+      ],
+    },
+    {
+      id: 'temperatura',
+      titulo: '4. Control de temperatura',
+      bloques: [
+        {
+          tipo: 'aviso',
+          tono: 'cuidado',
+          texto:
+            'El equipo CALIENTA y mantiene la temperatura, pero NO ENFRÍA. Si en tu casa hay ' +
+            '28 °C, la incubadora no puede bajar de esa temperatura.',
+        },
+        { tipo: 'parrafo', texto: 'Cómo configurarla, desde el menú F1:' },
+        {
+          tipo: 'pasos',
+          items: [
+            'Mantené presionado el botón SET unos segundos, hasta que aparezca «F1».',
+            'Presioná SET otra vez y usá las flechas ▲ ▼ para elegir la temperatura.',
+            'Para guardar, presioná el botón de encendido.',
+            'Dejá F2, F3 y F4 como vienen de fábrica: no hace falta tocarlos.',
+          ],
+        },
+      ],
+    },
+    {
+      id: 'booster',
+      titulo: '5. Uso del booster de humedad',
+      bloques: [
+        {
+          tipo: 'aviso',
+          tono: 'cuidado',
+          texto:
+            'El booster se usa SOLO en la etapa de fructificación. Durante la incubación ' +
+            '(colonización) NO se usa.',
+        },
+        {
+          tipo: 'pasos',
+          items: [
+            'Preparación del agua: en un recipiente con agua, agregá 3 gotas de lavandina por cada litro. El cloro sanitiza el booster y previene contaminaciones.',
+            'Sumergí el booster en esa agua durante 15 a 20 minutos.',
+            'Escurrí apretando suavemente, hasta que deje de chorrear.',
+            'Colocá el booster sobre la base negra, y tu cultivo encima del booster.',
+          ],
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Al colocar el booster, controlá de nuevo que la sonda haya quedado en su lugar.',
+        },
+        {
+          tipo: 'faq',
+          items: [
+            {
+              p: '¿Cada cuánto lo rehidrato?',
+              r: 'Cada 6 o 7 días, para sostener la humedad en el rango de fructificación.',
+            },
+            {
+              p: '¿Puedo abrirlo o esterilizarlo con calor?',
+              r: 'No. Nunca abras la bolsa del booster, y bajo ningún concepto lo pongas en microondas ni en horno: lo destruís.',
+            },
+            {
+              p: '¿Cómo lo guardo cuando termino el cultivo?',
+              r: 'Dejalo secar al sol antes de guardarlo. Si lo guardás húmedo, atrae contaminantes para el próximo uso.',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'ventilacion',
+      titulo: '6. Ventilación',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'Los orificios (que van hacia atrás) se cubren con cinta Micropore. La ventilación ' +
+            'del cultivo es pasiva: no hace falta destapar ni abrir el recipiente.',
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Mantenimiento: cambiá la cinta solo si después de varios meses la ves cargada de ' +
+            'polvo o pelusa.',
+        },
+      ],
+    },
+    {
+      id: 'extras',
+      titulo: '7. Modo deshidratador y limpieza',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto: 'El equipo también seca tus setas. Para usarlo como deshidratador:',
+        },
+        {
+          tipo: 'pasos',
+          items: [
+            'Pegá bien la sonda a la base con cinta.',
+            'Cubrí la bandeja con servilletas de papel.',
+            'Colocá las setas encima.',
+            'Configurá la temperatura a 40 °C.',
+          ],
+        },
+        {
+          tipo: 'faq',
+          items: [
+            { p: 'Limpieza del equipo', r: 'Desconectá SIEMPRE antes de limpiar. Usá un trapo apenas húmedo. Nunca viertas agua directamente sobre la base negra.' },
+            { p: 'Limpieza de la cúpula', r: 'Se puede limpiar con alcohol o detergente suave, y secar con papel.' },
+          ],
+        },
+      ],
+    },
+  ],
+  relacionadas: ['cultivo-paso-a-paso', 'solucion-de-problemas'],
+}
+
+const cultivoDetallado: Guia = {
+  slug: 'cultivo-paso-a-paso',
+  titulo: 'Cultivo paso a paso',
+  eyebrow: 'Tu equipo · Cultivo',
+  resumen:
+    'El proceso completo con tiempos, temperaturas y cantidades exactas: preparación, montaje, ' +
+    'colonización, fructificación y cómo sacarle hasta tres cosechas al mismo sustrato.',
+  intencion: 'informacional',
+  actualizado: '2026-07-22',
+  mensajesQueResuelve: 40,
+  privada: true,
+  secciones: [
+    {
+      id: 'antes',
+      titulo: '1. Antes de empezar',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'El cultivo tiene tres etapas: colonización (el micelio cubre el sustrato), ' +
+            'fructificación (aparecen los hongos) y cosecha, que se puede repetir varias veces ' +
+            'con el mismo sustrato.',
+        },
+        {
+          tipo: 'parrafo',
+          texto:
+            'Elegí un lugar limpio, tranquilo y sin corrientes de aire, con una superficie lisa ' +
+            'y fácil de limpiar (una mesa de cocina sirve).',
+        },
+        {
+          tipo: 'pasos',
+          items: [
+            'Materiales: frascos de sustrato y micelio, cuchara, tenedor, servilletas de papel y guantes descartables.',
+            'Desinfectantes: alcohol al 70 % y solución de lavandina al 10 % (1 parte de lavandina, 9 de agua).',
+            'Un recipiente amplio para mezclar (bandeja o tupper grande) y un atomizador de agua.',
+          ],
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Si todavía no vas a usar el kit, guardá los frascos de micelio y sustrato en la ' +
+            'heladera, entre 3 y 5 °C, y no los abras hasta el momento de armar.',
+        },
+      ],
+    },
+    {
+      id: 'higiene',
+      titulo: '2. Higiene: donde se gana o se pierde',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'El cultivo es muy sensible a la contaminación, y casi todos los que fracasan ' +
+            'fracasan acá. El orden importa:',
+        },
+        {
+          tipo: 'pasos',
+          items: [
+            'Lavate las manos con jabón antibacterial y poné guantes descartables.',
+            'Limpiá utensilios y superficies con solución de lavandina al 10 %.',
+            'Después rociá alcohol al 70 % sobre las áreas y utensilios: elimina esporas que la lavandina no alcanza.',
+            'Dejá actuar los desinfectantes al menos 5 minutos antes de empezar.',
+          ],
+        },
+      ],
+    },
+    {
+      id: 'colonizacion',
+      titulo: '3. Colonización',
+      bloques: [
+        {
+          tipo: 'datos',
+          filas: [
+            { clave: 'Temperatura', valor: '27 a 28 °C' },
+            { clave: 'Luz', valor: 'Oscuridad total' },
+            { clave: 'Duración', valor: '7 a 15 días (puede estirarse según condiciones)' },
+            { clave: 'Booster', valor: 'NO se usa en esta etapa' },
+          ],
+        },
+        {
+          tipo: 'parrafo',
+          texto:
+            'Colocá el recipiente en la incubadora y no lo muevas. El micelio va cubriendo el ' +
+            'sustrato de blanco, de a poco y de forma pareja.',
+        },
+        {
+          tipo: 'aviso',
+          tono: 'cuidado',
+          texto:
+            'Señales de que algo va mal: manchas verdes, negras o rosadas, o mal olor. Eso es ' +
+            'contaminación y ese cultivo no se recupera. Retiralo, limpiá bien el área y ' +
+            'escribinos para revisar qué pasó antes del próximo intento.',
+        },
+      ],
+    },
+    {
+      id: 'fructificacion',
+      titulo: '4. Fructificación',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'Cuando el sustrato está completamente colonizado (blanco y denso), se pasa a la ' +
+            'etapa donde aparecen los hongos. Arranca con un shock térmico.',
+        },
+        {
+          tipo: 'pasos',
+          items: [
+            'Shock térmico: llevá el recipiente cerrado a la heladera, entre 3 y 5 °C, durante 24 horas. Simula el cambio de estación y despierta la fructificación.',
+            'Hidratá el booster y colocalo sobre la base, con el cultivo encima.',
+            'Colocá el recipiente bajo la cúpula, sin tapa.',
+            'Ajustá la temperatura y dejá que el equipo trabaje.',
+          ],
+        },
+        {
+          tipo: 'datos',
+          filas: [
+            { clave: 'Temperatura', valor: '20 a 27 °C — ideal 24 °C' },
+            { clave: 'Humedad', valor: '80 a 90 % (la sostiene el booster)' },
+            { clave: 'Luz', valor: '12 h de luz indirecta y 12 h de oscuridad (no necesita ser exacto)' },
+            { clave: 'Ventilación', valor: 'Pasiva, por los orificios con Micropore' },
+            { clave: 'Rehidratar booster', valor: 'Cada 6 a 7 días' },
+          ],
+        },
+        {
+          tipo: 'aviso',
+          tono: 'cuidado',
+          texto:
+            'No pases de 27 °C: por encima de esa temperatura la formación de setas se inhibe. Y ' +
+            'no rocíes agua ni destapes el recipiente para ventilar — el equipo ya lo resuelve solo.',
+        },
+        {
+          tipo: 'faq',
+          items: [
+            {
+              p: '¿Cuándo aparecen los primeros hongos?',
+              r: 'Entre los días 10 y 15 de esta etapa aparecen los pines (puntitos blancos) y después los primordios (setas bebé). No manipules el cultivo mientras tanto.',
+            },
+            {
+              p: 'Se junta mucha agua en la cúpula, ¿está mal?',
+              r: 'Algo de condensación es normal. Si ves gotas en exceso sobre el sustrato, escurrí el recipiente y secá la base de la incubadora, que retiene agua.',
+            },
+            {
+              p: '¿Cuándo cosecho?',
+              r: 'Cuando el sombrero se abre y el velo se despega. Cosechá una por una, girando suavemente desde la base. No uses cuchillo: dañás el micelio que todavía tiene que darte más cosechas.',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'cronograma',
+      titulo: '5. Cronograma: qué esperar cada día',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'Esta es la referencia para saber si vas bien. Si tu cultivo está dentro de estos ' +
+            'rangos, andá tranquilo aunque parezca que no pasa nada.',
+        },
+        {
+          tipo: 'cronograma',
+          filas: [
+            {
+              etapa: 'Armado',
+              dias: 'Día 1',
+              que: 'Mezclás sustrato y micelio con todo desinfectado.',
+              ojo: 'Anotá la fecha y sacá una foto. Te va a servir para comparar.',
+            },
+            {
+              etapa: 'Colonización',
+              dias: 'Días 2 a 20',
+              que: 'El recipiente va a la incubadora a 27-28 °C, en oscuridad. No lo muevas.',
+              ojo: 'Foto cada 5 días. El blanco avanza parejo.',
+            },
+            {
+              etapa: 'Shock térmico',
+              dias: 'Día 21',
+              que: 'Recipiente cerrado a la heladera (3-5 °C) por 24 horas.',
+              ojo: 'Es lo que activa la fructificación.',
+            },
+            {
+              etapa: 'Fructificación',
+              dias: 'Días 22 a 35',
+              que: 'Vuelve a la incubadora con el booster hidratado, 24 °C y 80-90 % de humedad.',
+              ojo: 'Los pines aparecen entre el día 10 y 15 de esta etapa.',
+            },
+            {
+              etapa: 'Primera cosecha',
+              dias: 'Días 35 a 40',
+              que: 'Cosechás cuando el sombrero abre y el velo se despega.',
+              ojo: 'De a una, girando desde la base.',
+            },
+            {
+              etapa: 'Siguientes cosechas',
+              dias: 'Días 41 a 50',
+              que: 'Rehidratás el sustrato y repetís el shock térmico.',
+              ojo: 'Un cultivo sano da hasta 3 cosechas.',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'flushes',
+      titulo: '6. Cómo sacar más cosechas del mismo sustrato',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'Después de la primera cosecha, el micelio sigue vivo y puede darte hasta tres ' +
+            'oleadas. La clave es rehidratarlo bien.',
+        },
+        {
+          tipo: 'pasos',
+          items: [
+            'Preparación: herví agua y dejala enfriar. Agregá 1 ml de agua oxigenada por cada litro.',
+            'Volcá esa mezcla sobre el sustrato hasta que el pan flote completamente.',
+            'Tapá el recipiente y llevalo a la heladera (3-5 °C) por 24 horas.',
+            'Sacalo, eliminá el exceso de agua y escurrí unos minutos hasta que deje de gotear.',
+            'Volvé a las condiciones de fructificación: 24 °C, booster hidratado, luz 12/12.',
+          ],
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Se puede repetir para cada oleada. En general un cultivo saludable rinde hasta 3 ' +
+            'cosechas; después el sustrato se agota y conviene arrancar uno nuevo.',
+        },
+      ],
+    },
+  ],
+  relacionadas: ['manual-inc101', 'solucion-de-problemas'],
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -630,7 +1075,16 @@ export const GUIAS: Guia[] = [
   envios,
   problemas,
   sobre,
+  // Privadas (solo clientes verificados), al final: no se listan en el índice público.
+  manualEquipo,
+  cultivoDetallado,
 ]
+
+/** Las que ve cualquiera: índice público, sitemap, asistente en modo frío. */
+export const GUIAS_PUBLICAS = GUIAS.filter(g => !g.privada)
+
+/** Las del cliente: material de los manuales, detrás de sesión. */
+export const GUIAS_PRIVADAS = GUIAS.filter(g => g.privada)
 
 export function getGuia(slug: string): Guia | undefined {
   return GUIAS.find(g => g.slug === slug)
@@ -641,9 +1095,10 @@ export function getGuia(slug: string): Guia | undefined {
  * en el prompt (cache_control), así que este texto viaja una vez y las siguientes respuestas
  * salen ~10x más baratas. A esta escala (3 guías) no hace falta base vectorial: entra entero.
  */
-export function guiasParaPrompt(): string {
+export function guiasParaPrompt(incluirPrivadas = false): string {
   const partes: string[] = []
-  for (const g of GUIAS) {
+  // En modo frío el asistente NO recibe el material de los manuales: es contenido del cliente.
+  for (const g of incluirPrivadas ? GUIAS : GUIAS_PUBLICAS) {
     partes.push(`\n═══ GUÍA: ${g.titulo} (URL: /guia/${g.slug}) ═══`)
     partes.push(g.resumen)
     for (const s of g.secciones) {
@@ -678,6 +1133,11 @@ export function guiasParaPrompt(): string {
             break
           case 'datos':
             partes.push(b.filas.map(f => `${f.clave}: ${f.verificar ? '(sin confirmar)' : f.valor}`).join('\n'))
+            break
+          case 'cronograma':
+            partes.push(
+              b.filas.map(f => `${f.etapa} (${f.dias}): ${f.que}${f.ojo ? ` — ${f.ojo}` : ''}`).join('\n'),
+            )
             break
         }
       }

@@ -16,12 +16,13 @@ const NOMBRE_EQUIPO: Record<EquipoId, string> = {
   otro: 'Tu compra',
 }
 
-// Qué guías le sirven según lo que compró. La INC101 lleva a las guías del equipo.
+// Material completo del cliente: primero los manuales detallados (privados), después las
+// guías generales. El orden importa: lo que compró está arriba.
 function guiasDe(equipos: string[]): string[] {
   if (equipos.includes('inc101')) {
-    return ['los-dos-vitales', 'como-funciona-la-incubadora', 'solucion-de-problemas']
+    return ['manual-inc101', 'cultivo-paso-a-paso', 'los-dos-vitales', 'solucion-de-problemas']
   }
-  return ['los-dos-vitales', 'solucion-de-problemas']
+  return ['manual-inc101', 'los-dos-vitales', 'solucion-de-problemas']
 }
 
 function BloqueEnvio({
@@ -114,14 +115,19 @@ export default async function MiEquipo() {
       </section>
 
       <section id="guias">
-        <h2 className="mic-h2">Tus guías</h2>
+        <h2 className="mic-h2">Tus manuales y guías</h2>
+        <p className="mic-p" style={{ color: 'var(--tinta-suave)' }}>
+          El material completo de tu equipo, con los tiempos, temperaturas y cantidades exactas.
+          Está siempre acá: no hace falta que busques el mail.
+        </p>
         <ul className="mic-lista" style={{ marginTop: '1rem' }}>
           {guias.map((slug, i) => {
             const g = getGuia(slug)
             if (!g) return null
+            const href = g.privada ? `/mi-equipo/guia/${g.slug}` : `/guia/${g.slug}`
             return (
               <li key={slug} className="mic-item">
-                <Link href={`/guia/${g.slug}`}>
+                <Link href={href}>
                   <span className="mic-item-num">{String(i + 1).padStart(2, '0')}</span>
                   <span>
                     <h3 className="mic-item-titulo">{g.titulo}</h3>

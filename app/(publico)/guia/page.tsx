@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { GUIAS } from '@/lib/guias'
+import { GUIAS_PUBLICAS as GUIAS } from '@/lib/guias'
 
 // Estática: se sirve desde el CDN, sin tocar la base. Es lo que hace que la capa pública
 // escale sin costo por visita.

@@ -301,6 +301,25 @@
 .mic-chat-enviar:disabled { opacity: 0.45; cursor: default; }
 .mic-chat-nota { font-size: 0.78rem; color: var(--tinta-tenue); margin-top: 1rem; line-height: 1.6; }
 
+/* ── Cronograma del cultivo (guías privadas) ────────────────────────────── */
+
+.mic-crono { margin: 2rem 0; border-left: 2px solid var(--linea-fuerte); }
+.mic-crono-fila { position: relative; padding: 0 0 1.75rem 1.75rem; }
+.mic-crono-fila::before {
+  content: ''; position: absolute; left: -6px; top: 0.45rem;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--verde-accion); border: 2px solid var(--papel);
+}
+.mic-crono-cab { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
+.mic-crono-etapa { font-family: var(--serif) !important; font-size: 1.1rem; color: var(--tinta); }
+.mic-crono-dias {
+  font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--verde-accion); background: rgba(72, 113, 50, 0.09);
+  padding: 0.15rem 0.6rem; border-radius: 999px;
+}
+.mic-crono-que { margin: 0; font-size: 0.97rem; line-height: 1.65; }
+.mic-crono-ojo { margin: 0.4rem 0 0; font-size: 0.88rem; line-height: 1.6; color: var(--tinta-tenue); }
+
 /* ── Acceso al área de cliente ──────────────────────────────────────────── */
 
 .mic-acceso { margin-top: 2.5rem; max-width: 26rem; display: flex; flex-direction: column; gap: 1.5rem; }
