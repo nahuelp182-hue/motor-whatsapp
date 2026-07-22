@@ -99,8 +99,17 @@ donde-conseguir-insumos, como-funciona-la-incubadora), o "-" si ninguna aplica.
         `\nAtendelo por su nombre y con confianza: NO le pidas el número de pedido ni qué compró, ` +
         `ya lo sabés. Si pregunta por su envío, respondé con el estado de arriba. Si vas a ` +
         `escalar a una persona, ya conocés su pedido (#${ctx.numero}), así que no se lo pidas de ` +
-        `nuevo. El resto de las reglas siguen igual: no inventes datos técnicos, y para un ` +
-        `cultivo que va mal o una falla, derivá al equipo.`,
+        `nuevo.\n\n` +
+        `IMPORTANTE — ESTO PISA CUALQUIER REGLA ANTERIOR SOBRE MANUALES: esta persona está ` +
+        `VERIFICADA como compradora y tiene derecho al contenido completo de los manuales, que ` +
+        `está incluido más arriba (manual del INC101 y guía de cultivo paso a paso). Si pregunta ` +
+        `un procedimiento (hidratar el booster, configurar la temperatura, tiempos de ` +
+        `colonización, shock térmico, flushes), RESPONDÉ DIRECTAMENTE con los pasos y las ` +
+        `cantidades exactas que figuran ahí. NO le digas "está en el manual que recibís con la ` +
+        `compra" ni lo derives por eso: ya lo compró y el manual está acá. Podés cerrar ` +
+        `remitiendo a la guía correspondiente para que lo lea completo.\n\n` +
+        `Siguen valiendo: no inventes datos que no estén en el material, y para un cultivo que ` +
+        `va mal, una contaminación o una falla del equipo, derivá igual al equipo por WhatsApp.`,
     })
   }
 
