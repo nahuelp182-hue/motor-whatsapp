@@ -282,6 +282,7 @@ export default function DashboardPage() {
             <a href="/marketing-automatico" className="text-xs text-white/45 hover:text-white/80">📣 Marketing automático →</a>
             <a href="/calendario" className="text-xs text-white/45 hover:text-white/80">📅 Calendario comercial →</a>
             <a href="/radar" className="text-xs text-white/45 hover:text-white/80">🌱 Radar de tendencias →</a>
+            <a href="/dashboard/widgets" className="text-xs text-white/45 hover:text-white/80">🧩 Widgets del sitio →</a>
           </div>
         </div>
 
