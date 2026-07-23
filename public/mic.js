@@ -19,7 +19,12 @@
   if (window.__micInit) return;
   window.__micInit = true;
 
-  var BASE = 'https://mw-micelium.vercel.app';
+  // Dominio propio, no el de Vercel: mw-micelium.vercel.app queda detrás del desafío
+  // anti-bots de Vercel ante cualquier ráfaga de pedidos, y un desafío que un navegador
+  // resuelve solo NO lo resuelve un fetch entre orígenes. Verificado el 23/07/26: el host
+  // de Vercel devolvía 403 con X-Vercel-Mitigated: challenge mientras el dominio propio
+  // servía todo con 200.
+  var BASE = 'https://guias.infomicelium.com.ar';
   var script = document.currentScript;
   var CTX = (script && script.getAttribute('data-ctx')) || 'guias';
 
