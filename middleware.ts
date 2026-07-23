@@ -25,7 +25,7 @@ const PUBLICOS = new Set([
 // OJO: el prefijo se compara con startsWith. Por eso acá van las dos rutas concretas del
 // motor de widgets y NO '/api/widgets': ese prefijo dejaría abierto también
 // /api/widgets/admin, que es el CRUD del panel.
-const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks', '/api/asistente', '/api/acceso', '/api/contacto', '/api/widgets/config', '/api/widgets/evento']
+const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks', '/api/asistente', '/api/acceso', '/api/contacto', '/api/widgets/config', '/api/widgets/evento', '/api/presencia']
 
 // Capa pública de contenido: indexable y sin login a propósito. El conocimiento general es
 // lo que construye confianza antes de la compra; lo privado (manuales del equipo, pedidos)
@@ -38,9 +38,13 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // En el subdominio de guías, la raíz lleva directo al índice de guías (no a la home del
-  // proyecto). Así guia.infomicelium.com.ar/ es la portada de contenido, no la plantilla.
+  // proyecto). Así guias.infomicelium.com.ar/ es la portada de contenido, no la plantilla.
+  //
+  // Contempla las dos formas: el dominio en uso es `guias.` (con ese) y la comparación
+  // anterior solo aceptaba `guia.`, de modo que la raíz del subdominio real nunca redirigía.
   const host = request.headers.get('host') ?? ''
-  if (host.startsWith('guia.') && (pathname === '/' || pathname === '')) {
+  const esSubdominioGuias = host.startsWith('guia.') || host.startsWith('guias.')
+  if (esSubdominioGuias && (pathname === '/' || pathname === '')) {
     return NextResponse.redirect(new URL('/guia', request.url))
   }
 
