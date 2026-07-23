@@ -132,3 +132,57 @@ export async function verificarSesionCliente(
 
 export const COOKIE_CLIENTE_NOMBRE = COOKIE_CLIENTE
 export const MAX_AGE_CLIENTE = DIAS_CLIENTE * 86400
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOKEN DE ENTRADA (link pre-autenticado)
+//
+// Es el mecanismo que elimina el login: el cliente recibe en su mail un enlace que ya trae
+// la identidad firmada, lo abre y queda dentro. Nunca escribe un número de pedido.
+//
+// Vida corta (7 días por defecto) y de un solo uso: lo que dura 30 días es la COOKIE que el
+// enlace instala, no el enlace. Así, si el mail se reenvía o queda en una casilla
+// compartida, el link ya no sirve. El `jti` es lo que permite quemarlo (ver /e/[token]).
+
+const DIAS_ENTRADA = 7
+
+export type TokenEntrada = {
+  num: number
+  nom: string
+  eq: string[]
+  jti: string // identificador único: es lo que se marca como consumido
+  exp: number
+}
+
+export async function crearTokenEntrada(
+  datos: { num: number; nom: string; eq: string[] },
+  secreto: string,
+  dias = DIAS_ENTRADA,
+): Promise<string> {
+  const t: TokenEntrada = {
+    ...datos,
+    jti: crypto.randomUUID(),
+    exp: Math.floor(Date.now() / 1000) + dias * 86400,
+  }
+  const payload = b64url(enc.encode(JSON.stringify(t)))
+  return `${payload}.${await firmar(payload, secreto)}`
+}
+
+export async function verificarTokenEntrada(
+  valor: string | undefined,
+  secreto: string,
+): Promise<TokenEntrada | null> {
+  if (!valor) return null
+  const punto = valor.lastIndexOf('.')
+  if (punto < 1) return null
+  const payload = valor.slice(0, punto)
+  const firma = valor.slice(punto + 1)
+  if (!igualSeguro(firma, await firmar(payload, secreto))) return null
+  try {
+    const t = JSON.parse(desdeB64url(payload)) as TokenEntrada
+    if (typeof t.exp !== 'number' || t.exp < Math.floor(Date.now() / 1000)) return null
+    if (typeof t.num !== 'number' || !t.jti) return null
+    return t
+  } catch {
+    return null
+  }
+}

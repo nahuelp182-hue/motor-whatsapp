@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic'
 const NOMBRE_EQUIPO: Record<EquipoId, string> = {
   inc101: 'Incubadora INC101',
   pc400: 'Tableta térmica',
+  ebook: 'Guía digital',
   otro: 'Tu compra',
 }
 

@@ -30,7 +30,9 @@ const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/
 // Capa pública de contenido: indexable y sin login a propósito. El conocimiento general es
 // lo que construye confianza antes de la compra; lo privado (manuales del equipo, pedidos)
 // va en rutas aparte que sí piden sesión.
-const PREFIJOS_PUBLICOS = ['/guia', '/acceso', '/contacto']
+// '/e' es la entrada pre-autenticada: llega sin sesión por definición (el token ES la
+// credencial) y se valida sola, así que no puede quedar detrás de la contraseña del panel.
+const PREFIJOS_PUBLICOS = ['/guia', '/acceso', '/contacto', '/e']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl

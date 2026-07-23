@@ -404,6 +404,263 @@
     }
   };
 
+  /* ── Precio de la página ──
+     Los widgets de precio NUNCA guardan un número propio: lo leen de lo que la página ya
+     muestra. Así no existe el caso de un precio viejo pegado en un widget que nadie
+     recuerda que está prendido. */
+  function precioPagina() {
+    var sel = ['.js-price-display', '[data-store="product-price"]', '.price', '[itemprop="price"]'];
+    for (var i = 0; i < sel.length; i++) {
+      var el = document.querySelector(sel[i]);
+      if (!el) continue;
+      var txt = el.getAttribute('content') || el.textContent || '';
+      // Formato argentino: el punto separa miles y la coma los decimales.
+      var limpio = txt.replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');
+      var n = parseFloat(limpio);
+      if (n > 0) return n;
+    }
+    return 0;
+  }
+
+  function pesos(n) {
+    try { return '$' + n.toLocaleString('es-AR', { maximumFractionDigits: 0 }); }
+    catch (e) { return '$' + Math.round(n); }
+  }
+
+  R.cuotas = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var total = precioPagina();
+    if (!total) return; // sin precio en la página no se inventa uno
+    var n = Math.max(2, Number(c.cuotas) || 3);
+    var sh = montar(w, false); if (!sh) return;
+    pintar(sh,
+      '.c{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;background:' + p.suave + ';' +
+      'border-radius:10px;padding:14px 18px;margin:16px 0}' +
+      'b{font-size:20px;color:' + p.bg + '}' +
+      'span{font-size:13px;color:#5a534a}',
+      '<div class="c"><b>' + n + ' cuotas de ' + esc(pesos(total / n)) + '</b>' +
+      '<span>' + esc(c.texto || '') + '</span></div>');
+    verUnaVez(sh, w.id);
+  };
+
+  R.envio_estimado = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var sh = montar(w, false); if (!sh) return;
+
+    // Solo días hábiles, y si ya pasó la hora de corte la cuenta arranca mañana. Es la
+    // misma lógica que usa cualquier tienda grande, y es lo que hace creíble la fecha.
+    function habiles(desde, dias) {
+      var d = new Date(desde), sumados = 0;
+      while (sumados < dias) {
+        d.setDate(d.getDate() + 1);
+        var dia = d.getDay();
+        if (dia !== 0 && dia !== 6) sumados++;
+      }
+      return d;
+    }
+    var base = new Date();
+    if (base.getHours() >= (Number(c.corte) || 15)) base.setDate(base.getDate() + 1);
+
+    var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    function fmt(d) { return d.getDate() + ' de ' + MESES[d.getMonth()]; }
+
+    var a = habiles(base, Math.max(1, Number(c.dias_min) || 3));
+    var b = habiles(base, Math.max(Number(c.dias_min) || 3, Number(c.dias_max) || 7));
+
+    pintar(sh,
+      '.e{display:flex;gap:11px;align-items:center;background:' + p.suave + ';border-radius:10px;padding:14px 18px;margin:16px 0}' +
+      '.i{font-size:20px}' +
+      'span{font-size:14.5px;color:#3a352e;line-height:1.5}b{color:' + p.bg + '}',
+      '<div class="e"><span class="i">🚚</span><span>' + esc(c.texto || 'Llega entre el') +
+      ' <b>' + esc(fmt(a)) + '</b> y el <b>' + esc(fmt(b)) + '</b></span></div>');
+    verUnaVez(sh, w.id);
+  };
+
+  R.pasos = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var sh = montar(w, false); if (!sh) return;
+    var items = (c.items || []).map(function (i, n) {
+      return '<li><span class="n">' + (n + 1) + '</span><div><b>' + esc(i.titulo) + '</b>' +
+        '<span>' + esc(i.texto) + '</span></div></li>';
+    }).join('');
+    pintar(sh,
+      'h3{margin:0 0 16px;font-size:20px;color:#2a2620}' +
+      'ol{list-style:none;margin:24px 0;padding:0;display:grid;gap:16px}' +
+      'li{display:flex;gap:14px;align-items:flex-start}' +
+      '.n{flex:0 0 30px;height:30px;border-radius:999px;background:' + p.bg + ';color:' + p.texto + ';' +
+      'display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}' +
+      'b{display:block;font-size:15.5px;color:#2a2620;margin-bottom:2px}' +
+      'span{font-size:14px;line-height:1.55;color:#5a534a}',
+      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') + '<ol>' + items + '</ol>');
+    verUnaVez(sh, w.id);
+  };
+
+  R.barra_confianza = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var sh = montar(w, false); if (!sh) return;
+    var items = (c.items || []).map(function (i) {
+      return '<div class="it"><span class="e">' + esc(i.icono || '•') + '</span>' +
+        '<b>' + esc(i.titulo) + '</b><span class="t">' + esc(i.texto) + '</span></div>';
+    }).join('');
+    pintar(sh,
+      '.g{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));' +
+      'background:' + p.suave + ';border-radius:10px;padding:18px;margin:20px 0}' +
+      '.it{text-align:center}' +
+      '.e{display:block;font-size:22px;margin-bottom:5px}' +
+      'b{display:block;font-size:13.5px;color:#2a2620;margin-bottom:2px}' +
+      '.t{font-size:12px;line-height:1.45;color:#6a6157}',
+      '<div class="g">' + items + '</div>');
+    verUnaVez(sh, w.id);
+  };
+
+  R.comparador = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var sh = montar(w, false); if (!sh) return;
+    var filas = (c.items || []).map(function (i) {
+      return '<tr><th>' + esc(i.tema) + '</th><td>' + esc(i.a) + '</td><td class="b">' + esc(i.b) + '</td></tr>';
+    }).join('');
+    pintar(sh,
+      'h3{margin:0 0 16px;font-size:20px;color:#2a2620}' +
+      '.w{overflow-x:auto;margin:20px 0}' +
+      'table{width:100%;border-collapse:collapse;font-size:14px;min-width:420px}' +
+      'thead th{padding:10px;text-align:left;font-size:13px;color:#6a6157;font-weight:600}' +
+      'thead th.b{color:' + p.bg + '}' +
+      'th{text-align:left;padding:11px 10px;color:#2a2620;font-weight:600;vertical-align:top;width:26%}' +
+      'td{padding:11px 10px;color:#5a534a;line-height:1.5;vertical-align:top;border-top:1px solid #e6e2da}' +
+      'td.b{background:' + p.suave + ';color:#2a2620}',
+      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
+      '<div class="w"><table><thead><tr><th></th><th>' + esc(c.col_a) + '</th>' +
+      '<th class="b">' + esc(c.col_b) + '</th></tr></thead><tbody>' + filas + '</tbody></table></div>');
+    verUnaVez(sh, w.id);
+  };
+
+  R.especificaciones = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var sh = montar(w, false); if (!sh) return;
+    var filas = (c.items || []).map(function (i) {
+      return '<div class="f"><dt>' + esc(i.dato) + '</dt><dd>' + esc(i.valor) + '</dd></div>';
+    }).join('');
+    pintar(sh,
+      'h3{margin:0 0 14px;font-size:20px;color:#2a2620}' +
+      'dl{margin:20px 0;padding:0}' +
+      '.f{display:flex;gap:14px;padding:10px 0;border-bottom:1px solid #e6e2da}' +
+      'dt{flex:0 0 42%;margin:0;font-size:14px;color:#6a6157}' +
+      'dd{margin:0;font-size:14px;color:#2a2620;font-weight:500}' +
+      'h3{color:' + p.bg + '}',
+      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') + '<dl>' + filas + '</dl>');
+    verUnaVez(sh, w.id);
+  };
+
+  R.banner_anuncio = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var items = (c.items || []).filter(function (i) { return i.texto; });
+    if (!items.length) return;
+    var clave = '__mic_ban_' + w.id;
+    try { if (c.cerrable && sessionStorage.getItem(clave) === '1') return; } catch (e) {}
+
+    var sh = montar(w, true); if (!sh) return;
+    pintar(sh,
+      '.b{position:fixed;top:0;left:0;right:0;z-index:99996;background:' + p.bg + ';color:' + p.texto + ';' +
+      'display:flex;align-items:center;justify-content:center;gap:10px;padding:9px 34px;' +
+      'font-size:13.5px;text-align:center;line-height:1.35}' +
+      '.m{opacity:0;transition:opacity .4s}.m.on{opacity:1}' +
+      '.x{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;' +
+      'color:inherit;font-size:19px;opacity:.75;line-height:1}',
+      '<div class="b"><span class="m on">' + esc(items[0].texto) + '</span>' +
+      (c.cerrable ? '<button class="x" aria-label="Cerrar">×</button>' : '') + '</div>');
+
+    // Empuja el contenido para no tapar el encabezado del sitio.
+    var alto = sh.querySelector('.b').offsetHeight || 36;
+    document.documentElement.style.setProperty('scroll-padding-top', alto + 'px');
+    document.body.style.paddingTop = alto + 'px';
+
+    var m = sh.querySelector('.m'), n = 0;
+    if (items.length > 1) {
+      setInterval(function () {
+        m.classList.remove('on');
+        setTimeout(function () {
+          n = (n + 1) % items.length;
+          m.textContent = items[n].texto;
+          m.classList.add('on');
+        }, 400);
+      }, Math.max(2, Number(c.segundos) || 5) * 1000);
+    }
+    var x = sh.querySelector('.x');
+    if (x) x.addEventListener('click', function () {
+      document.body.style.paddingTop = '';
+      sh.host.remove();
+      try { sessionStorage.setItem(clave, '1'); } catch (e) {}
+    });
+    evento(w.id, 'impresion');
+  };
+
+  R.cuenta_regresiva = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var fin = Date.parse(String(c.hasta || '').replace(' ', 'T'));
+    if (!fin || fin <= Date.now()) return; // vencida: desaparece sola, sin que nadie la apague
+    var sh = montar(w, false); if (!sh) return;
+    pintar(sh,
+      '.c{background:' + p.suave + ';border-radius:10px;padding:18px 20px;margin:20px 0;text-align:center}' +
+      'b{display:block;font-size:15px;color:#2a2620;margin-bottom:10px}' +
+      '.r{display:flex;justify-content:center;gap:10px}' +
+      '.u{background:' + p.bg + ';color:' + p.texto + ';border-radius:8px;padding:8px 12px;min-width:56px}' +
+      '.u i{display:block;font-style:normal;font-size:20px;font-weight:700;line-height:1.1}' +
+      '.u s{display:block;text-decoration:none;font-size:10.5px;opacity:.85}' +
+      '.t{margin:10px 0 0;font-size:13px;color:#5a534a}',
+      '<div class="c"><b>' + esc(c.titulo) + '</b><div class="r"></div>' +
+      (c.texto ? '<p class="t">' + esc(c.texto) + '</p>' : '') + '</div>');
+
+    var r = sh.querySelector('.r');
+    function tic() {
+      var falta = fin - Date.now();
+      if (falta <= 0) { sh.host.remove(); return; }
+      var s = Math.floor(falta / 1000);
+      var partes = [
+        [Math.floor(s / 86400), 'días'],
+        [Math.floor(s / 3600) % 24, 'horas'],
+        [Math.floor(s / 60) % 60, 'min'],
+        [s % 60, 'seg']
+      ];
+      r.innerHTML = partes.map(function (u) {
+        return '<div class="u"><i>' + u[0] + '</i><s>' + u[1] + '</s></div>';
+      }).join('');
+    }
+    tic();
+    setInterval(tic, 1000);
+    verUnaVez(sh, w.id);
+  };
+
+  R.video = function (w) {
+    var c = w.config, p = paleta(c.color);
+    // Acepta la dirección como se copia de YouTube, larga o corta.
+    var m = String(c.youtube || '').match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/);
+    if (!m) return;
+    var id = m[1];
+    var sh = montar(w, false); if (!sh) return;
+    pintar(sh,
+      'h3{margin:0 0 12px;font-size:20px;color:' + p.bg + '}' +
+      '.v{position:relative;margin:20px 0;border-radius:12px;overflow:hidden;background:#000;' +
+      'aspect-ratio:16/9;cursor:pointer}' +
+      'img{width:100%;height:100%;object-fit:cover;display:block}' +
+      'iframe{width:100%;height:100%;border:0;display:block}' +
+      '.p{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}' +
+      '.p span{width:62px;height:62px;border-radius:999px;background:rgba(0,0,0,.65);color:#fff;' +
+      'display:flex;align-items:center;justify-content:center;font-size:22px;padding-left:4px}',
+      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
+      '<div class="v"><img loading="lazy" src="https://i.ytimg.com/vi/' + id + '/hqdefault.jpg" alt="">' +
+      '<div class="p"><span>▶</span></div></div>');
+
+    // El iframe recién se crea al tocar: cargarlo de entrada suma medio megabyte y varios
+    // pedidos a Google en una página que quizá nadie mire.
+    var caja = sh.querySelector('.v');
+    caja.addEventListener('click', function () {
+      caja.innerHTML = '<iframe allowfullscreen allow="accelerometer;autoplay;encrypted-media;picture-in-picture" ' +
+        'src="https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1"></iframe>';
+      evento(w.id, 'interaccion');
+    }, { once: true });
+    verUnaVez(sh, w.id);
+  };
+
   /* ══════════════ ARRANQUE ══════════════ */
   function arrancar(lista) {
     for (var i = 0; i < lista.length; i++) {
