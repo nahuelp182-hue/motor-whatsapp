@@ -756,7 +756,12 @@
 
   R.pack_complementarios = function (w) {
     var c = w.config, p = paleta(c.color);
-    var items = w.datos || [];
+    // Los datos salen del catálogo resuelto por el servidor, no de la config: el widget
+    // guarda solo ids y el precio se lee siempre del catálogo real.
+    var items = (c.items || []).map(function (i) {
+      var pr = prod(w, i.producto);
+      return pr ? { id: pr.id, nombre: pr.nombre, precio: pr.precio, imagen: pr.imagen, nota: i.nota || '' } : null;
+    }).filter(Boolean);
     if (!items.length) return;
     var sh = montar(w, false); if (!sh) return;
 
@@ -919,6 +924,222 @@
     latir();
     setInterval(latir, 45000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) latir(); });
+  };
+
+  /* ── Productos ──
+     La config guarda solo ids; nombre, precio e imagen llegan resueltos en `w.catalogo`.
+     Así un cambio de precio en Tiendanube se ve sin tocar el widget. */
+  function prod(w, id) {
+    return (w.catalogo && w.catalogo[String(id)]) || null;
+  }
+
+  /* Agrega un producto al carrito de Tiendanube y espera a que termine. */
+  function agregarAlCarrito(id) {
+    var fd = new FormData();
+    fd.append('add_to_cart', String(id));
+    fd.append('quantity', '1');
+    return fetch('/comprar/', { method: 'POST', body: fd, credentials: 'same-origin' });
+  }
+
+  /* Ids de producto que ya están en el carrito. Sirve para no ofrecer algo que la persona
+     ya eligió, que es la forma más rápida de que un cross-sell parezca automático y tonto. */
+  function idsEnCarrito() {
+    try {
+      var items = (window.LS && window.LS.cart && window.LS.cart.items) || [];
+      return items.map(function (i) {
+        return String(i.product_id != null ? i.product_id : i.id);
+      });
+    } catch (e) { return []; }
+  }
+
+  R.upsell_upgrade = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var sup = prod(w, c.producto);
+    if (!sup) return;
+
+    var actual = precioPagina();
+    // Sin precio en la página no hay diferencia que mostrar, y el widget entero se apoya en
+    // esa diferencia. Antes de mostrar un total pelado, no se muestra nada.
+    if (!actual || sup.precio <= actual) return;
+
+    var sh = montar(w, false); if (!sh) return;
+    var bullets = (c.items || []).filter(function (i) { return i.texto; }).map(function (i) {
+      return '<li>' + esc(i.texto) + '</li>';
+    }).join('');
+
+    pintar(sh,
+      '.c{border:2px solid ' + p.bg + ';border-radius:12px;padding:18px 20px;margin:20px 0;background:' + p.suave + '}' +
+      'h3{margin:0 0 4px;font-size:17px;color:#2a2620}' +
+      '.dif{font-size:22px;font-weight:700;color:' + p.bg + ';margin:6px 0 12px}' +
+      '.dif small{font-size:13px;font-weight:400;color:#6a6157}' +
+      '.top{display:flex;gap:13px;align-items:center;margin-bottom:10px}' +
+      'img{width:56px;height:56px;border-radius:8px;object-fit:cover;flex:0 0 auto}' +
+      '.nom{font-size:13.5px;color:#5a534a}' +
+      'ul{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px}' +
+      'li{font-size:14px;color:#3a352e;padding-left:20px;position:relative;line-height:1.45}' +
+      'li:before{content:"+";position:absolute;left:4px;color:' + p.bg + ';font-weight:700}' +
+      'button{width:100%;padding:13px;background:' + p.bg + ';color:' + p.texto + ';border-radius:9px;font-size:15px;font-weight:700}',
+      '<div class="c"><div class="top">' +
+      (sup.imagen ? '<img src="' + esc(sup.imagen) + '" alt="">' : '') +
+      '<div><h3>' + esc(c.titulo) + '</h3><div class="nom">' + esc(sup.nombre) + '</div></div></div>' +
+      '<div class="dif">+ ' + esc(pesos(sup.precio - actual)) + ' <small>sobre lo que estás viendo</small></div>' +
+      (bullets ? '<ul>' + bullets + '</ul>' : '') +
+      '<button>' + esc(c.etiqueta || 'Quiero la versión completa') + '</button></div>');
+
+    sh.querySelector('button').addEventListener('click', function () {
+      var b = sh.querySelector('button');
+      evento(w.id, 'interaccion');
+      b.disabled = true; b.textContent = 'Agregando…';
+      agregarAlCarrito(sup.id).then(function () {
+        evento(w.id, 'conversion');
+        location.href = '/carrito/';
+      });
+    });
+    verUnaVez(sh, w.id);
+  };
+
+  R.crosssell_carrito = function (w) {
+    var c = w.config, p = paleta(c.color);
+    if (totalCarrito() === null) return; // no estamos en la tienda
+    var sh = null, caja = null;
+
+    function calcular() {
+      var enCarrito = idsEnCarrito();
+      var vistos = {}, salida = [];
+      (c.items || []).forEach(function (regla) {
+        if (!regla.si_lleva || !regla.ofrecer) return;
+        if (enCarrito.indexOf(String(regla.si_lleva)) === -1) return;   // no disparó
+        if (enCarrito.indexOf(String(regla.ofrecer)) !== -1) return;    // ya lo lleva
+        if (vistos[regla.ofrecer]) return;                              // no repetir
+        var pr = prod(w, regla.ofrecer);
+        if (!pr) return;
+        vistos[regla.ofrecer] = true;
+        salida.push({ p: pr, nota: regla.nota || '' });
+      });
+      return salida;
+    }
+
+    function dibujar() {
+      var lista = calcular();
+      if (!lista.length) { if (sh) sh.host.style.display = 'none'; return; }
+
+      if (!sh) {
+        sh = montar(w, false);
+        if (!sh) return;
+        pintar(sh,
+          'h3{margin:0 0 12px;font-size:17px;color:#2a2620}' +
+          '.c{border:1px solid #e6e2da;border-radius:12px;padding:16px;margin:20px 0}' +
+          '.it{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid #f0ece5}' +
+          '.it:last-child{border-bottom:none}' +
+          'img,.ph{width:46px;height:46px;border-radius:7px;object-fit:cover;background:#f0ece5;flex:0 0 auto}' +
+          '.d{flex:1;min-width:0}b{display:block;font-size:14px;color:#2a2620}' +
+          '.n{font-size:12.5px;color:#6a6157;line-height:1.4}' +
+          '.pr{font-size:14px;font-weight:600;white-space:nowrap;margin-right:8px}' +
+          'button{padding:8px 14px;background:' + p.bg + ';color:' + p.texto + ';border-radius:8px;font-size:13px;font-weight:600;white-space:nowrap}',
+          '<div class="c"><h3>' + esc(c.titulo) + '</h3><div class="lista"></div></div>');
+        verUnaVez(sh, w.id);
+      }
+
+      sh.host.style.display = '';
+      sh.querySelector('.lista').innerHTML = lista.map(function (x) {
+        return '<div class="it">' +
+          (x.p.imagen ? '<img src="' + esc(x.p.imagen) + '" alt="">' : '<span class="ph"></span>') +
+          '<span class="d"><b>' + esc(x.p.nombre) + '</b>' +
+          (x.nota ? '<span class="n">' + esc(x.nota) + '</span>' : '') + '</span>' +
+          '<span class="pr">' + esc(pesos(x.p.precio)) + '</span>' +
+          '<button data-id="' + esc(x.p.id) + '">' + esc(c.etiqueta || 'Sumar') + '</button></div>';
+      }).join('');
+
+      [].slice.call(sh.querySelectorAll('button')).forEach(function (b) {
+        b.addEventListener('click', function () {
+          evento(w.id, 'interaccion');
+          b.disabled = true; b.textContent = 'Sumando…';
+          agregarAlCarrito(b.getAttribute('data-id')).then(function () {
+            evento(w.id, 'conversion');
+            location.reload();
+          });
+        });
+      });
+    }
+
+    // Se redibuja con el carrito: una sugerencia que sigue ofreciendo lo que la persona
+    // acaba de agregar es peor que no sugerir nada.
+    alCambiarCarrito(dibujar);
+  };
+
+  R.upsell_al_agregar = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var pr = prod(w, c.producto);
+    if (!pr) return;
+    if (totalCarrito() === null && !PREVIEW) return;
+
+    var clave = '__mic_ups_' + w.id;
+    function yaMostrado() {
+      try { return sessionStorage.getItem(clave) === '1'; } catch (e) { return false; }
+    }
+    function marcar() { try { sessionStorage.setItem(clave, '1'); } catch (e) {} }
+
+    function abrir() {
+      if (yaMostrado()) return;
+      marcar();
+      var sh = montar(w, true); if (!sh) return;
+
+      pintar(sh,
+        '.ov{position:fixed;inset:0;background:rgba(20,18,15,.72);z-index:99999;display:flex;' +
+        'align-items:center;justify-content:center;padding:16px;opacity:0;transition:opacity .25s}' +
+        '.ov.on{opacity:1}' +
+        '.c{position:relative;max-width:400px;width:100%;background:#fff;border-radius:14px;padding:26px 24px 22px;text-align:center}' +
+        'h3{margin:0 0 6px;font-size:19px;color:#2a2620}' +
+        '.t{margin:0 0 16px;font-size:14px;line-height:1.55;color:#5a534a}' +
+        'img{width:110px;height:110px;border-radius:10px;object-fit:cover;margin:0 auto 12px;display:block}' +
+        '.nom{font-size:15px;color:#2a2620;font-weight:600}' +
+        '.pr{font-size:20px;font-weight:700;color:' + p.bg + ';margin:4px 0 16px}' +
+        'button{width:100%;padding:13px;background:' + p.bg + ';color:' + p.texto + ';border-radius:9px;font-size:15px;font-weight:700}' +
+        '.no{display:block;width:100%;margin-top:10px;background:none;color:#8a8177;font-size:13px;font-weight:400;padding:6px}',
+        '<div class="ov"><div class="c">' +
+        '<h3>' + esc(c.titulo) + '</h3>' +
+        (c.texto ? '<p class="t">' + esc(c.texto) + '</p>' : '') +
+        (pr.imagen ? '<img src="' + esc(pr.imagen) + '" alt="">' : '') +
+        '<div class="nom">' + esc(pr.nombre) + '</div>' +
+        '<div class="pr">' + esc(pesos(pr.precio)) + '</div>' +
+        '<button class="si">' + esc(c.etiqueta || 'Sumarlo a mi pedido') + '</button>' +
+        '<button class="no">' + esc(c.rechazo || 'No, gracias') + '</button>' +
+        '</div></div>');
+
+      var ov = sh.querySelector('.ov');
+      setTimeout(function () { ov.classList.add('on'); }, 20);
+      evento(w.id, 'impresion');
+
+      function cerrar() {
+        ov.classList.remove('on');
+        setTimeout(function () { sh.host.remove(); }, 300);
+      }
+      sh.querySelector('.no').addEventListener('click', cerrar);
+      // Clic fuera y Escape también cierran: una ventana que aparece sin pedirla tiene que
+      // ser fácil de sacar, o el próximo carrito no se arma.
+      ov.addEventListener('click', function (e) { if (e.target === ov) cerrar(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') cerrar(); });
+
+      sh.querySelector('.si').addEventListener('click', function () {
+        var b = sh.querySelector('.si');
+        evento(w.id, 'interaccion');
+        b.disabled = true; b.textContent = 'Sumando…';
+        agregarAlCarrito(pr.id).then(function () {
+          evento(w.id, 'conversion');
+          location.href = '/carrito/';
+        });
+      });
+    }
+
+    if (PREVIEW) { abrir(); return; }
+
+    try {
+      if (window.LS && window.LS.on && window.LS.events) {
+        window.LS.on(window.LS.events.productAddedToCart, function () {
+          setTimeout(abrir, 400);
+        });
+      }
+    } catch (e) {}
   };
 
   /* ══════════════ ARRANQUE ══════════════ */

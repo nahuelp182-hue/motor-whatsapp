@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { porSlug, type Contexto } from '@/lib/widgets/tipos'
+import { porSlug, idsDeProducto, type Contexto } from '@/lib/widgets/tipos'
 import { resenasPublicas } from '@/lib/widgets/datos'
 import { productosTN } from '@/lib/widgets/productos'
 
@@ -60,18 +60,19 @@ export async function GET(req: NextRequest) {
       reglas: { rutas: (w.reglas as { rutas?: string[] })?.rutas ?? [], dispositivo: (w.reglas as { dispositivo?: string })?.dispositivo ?? 'todos' },
     }
 
-    if (tipo.datosVivos === 'productos') {
-      // Nombre, precio e imagen se resuelven acá contra el catálogo real. El widget guarda
-      // solo el id: así un cambio de precio en Tiendanube se ve en la página sin que nadie
-      // toque el widget.
+    // Todo id de producto que la config mencione viaja resuelto (nombre, precio, imagen).
+    // El widget guarda solo el id: así un cambio de precio en Tiendanube se ve en la página
+    // sin que nadie toque el widget. Es genérico —sale de la declaración del tipo—, así que
+    // un widget nuevo que use productos no necesita tocar este archivo.
+    const ids = idsDeProducto(tipo, (w.config ?? {}) as Record<string, unknown>)
+    if (ids.length) {
       const catalogo = await productosTN()
-      const items = ((w.config as Record<string, unknown>)?.items ?? []) as Array<Record<string, unknown>>
-      salida.datos = items
-        .map(i => {
-          const p = catalogo.find(x => x.id === String(i.producto ?? ''))
-          return p ? { ...p, nota: String(i.nota ?? '') } : null
-        })
-        .filter(Boolean)
+      const mapa: Record<string, unknown> = {}
+      for (const id of ids) {
+        const p = catalogo.find(x => x.id === id)
+        if (p) mapa[id] = p
+      }
+      salida.catalogo = mapa
     }
 
     if (tipo.datosVivos === 'resenas') {

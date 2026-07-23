@@ -46,7 +46,7 @@ export type TipoWidget = {
   categoria: 'conversion' | 'confianza' | 'contenido' | 'captura'
   contextos: Contexto[]
   /** El widget se sirve con datos vivos de la base (reseñas, stock). Ver lib/widgets/datos.ts */
-  datosVivos?: 'resenas' | 'productos'
+  datosVivos?: 'resenas'
   /** Dónde aparece y qué necesita para funcionar. Se muestra arriba del formulario. */
   uso: string
   /**
@@ -917,7 +917,6 @@ export const TIPOS: TipoWidget[] = [
   },
   {
     slug: 'pack_complementarios',
-    datosVivos: 'productos',
     nombre: 'Pack de complementarios',
     descripcion:
       'Casillas con productos que suman al principal, y un botón que agrega todo junto. Es el "comprados juntos habitualmente" de Amazon: el momento de mayor disposición a sumar es justo antes de comprar.',
@@ -1032,7 +1031,200 @@ export const TIPOS: TipoWidget[] = [
       CAMPO_COLOR,
     ],
   },
+  {
+    slug: 'upsell_upgrade',
+    nombre: 'Pasar a la versión superior',
+    descripcion:
+      'Compara lo que está mirando con una versión mejor y muestra la diferencia de precio. Es más fácil aceptar "por $40.000 más" que decidir de nuevo desde cero.',
+    categoria: 'conversion',
+    contextos: ['tienda', 'producto'],
+    bloque: true,
+    uso:
+      'La diferencia de precio se calcula sola: precio del superior menos el que muestra la página. No se carga ningún monto acá. El botón agrega la versión superior al carrito.',
+    cuidado:
+      'Un solo escalón hacia arriba. Ofrecer el más caro de todos desde un producto de entrada no sube el ticket: hace sentir que lo que eligió estaba mal.',
+    campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'tras_intro',
+        ayuda: 'Cerca del precio, mientras todavía está comparando.',
+      },
+      {
+        key: 'titulo',
+        label: 'Título',
+        tipo: 'texto',
+        porDefecto: 'Por un poco más, la versión completa',
+        ayuda: 'Que el foco sea la diferencia, no el precio total.',
+      },
+      {
+        key: 'producto',
+        label: 'Versión superior',
+        tipo: 'producto',
+        ayuda: 'Del catálogo real. Su precio se lee en vivo, así que la diferencia nunca queda vieja.',
+      },
+      {
+        key: 'items',
+        label: 'Qué suma respecto de lo que está mirando',
+        tipo: 'lista',
+        maxItems: 5,
+        ayuda: 'Solo las diferencias, no la lista completa de características. Tres bastan.',
+        campos: [
+          { key: 'texto', label: 'Diferencia', tipo: 'texto', ayuda: 'Un renglón, en positivo: qué gana.' },
+        ],
+      },
+      {
+        key: 'etiqueta',
+        label: 'Texto del botón',
+        tipo: 'texto',
+        porDefecto: 'Quiero la versión completa',
+        ayuda: 'En primera persona rinde más que un "Comprar".',
+      },
+      CAMPO_COLOR,
+    ],
+  },
+  {
+    slug: 'crosssell_carrito',
+    nombre: 'Complementos según el carrito',
+    descripcion:
+      'Ofrece un producto solo cuando el carrito ya tiene otro. Es el cross-sell honesto: no sugiere al azar, sugiere lo que le va a hacer falta por lo que ya eligió.',
+    categoria: 'conversion',
+    contextos: ['tienda', 'producto'],
+    bloque: true,
+    uso:
+      'Lee el carrito de Tiendanube en vivo. Cada regla dice "si lleva A, ofrecer B". Si no se cumple ninguna, el widget no aparece; y nunca ofrece algo que ya está en el carrito.',
+    cuidado:
+      'Que el complemento sea de verdad necesario para lo que compró. Ofrecer algo sin relación en el último paso hace dudar de todo lo anterior.',
+    campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'final',
+        ayuda: 'Se elige de la lista.',
+      },
+      {
+        key: 'titulo',
+        label: 'Título',
+        tipo: 'texto',
+        porDefecto: 'Con lo que llevás, esto te va a hacer falta',
+        ayuda: 'Que hable de su compra, no de la tuya.',
+      },
+      {
+        key: 'items',
+        label: 'Reglas',
+        tipo: 'lista',
+        maxItems: 6,
+        ayuda: 'Se evalúan todas y se muestra lo que corresponda, sin repetir.',
+        campos: [
+          {
+            key: 'si_lleva',
+            label: 'Si el carrito tiene…',
+            tipo: 'producto',
+            ayuda: 'El producto que dispara la sugerencia.',
+          },
+          {
+            key: 'ofrecer',
+            label: '…ofrecer',
+            tipo: 'producto',
+            ayuda: 'El complemento. Su precio se lee del catálogo.',
+          },
+          {
+            key: 'nota',
+            label: 'Por qué',
+            tipo: 'texto',
+            ayuda: 'Media línea que explique la relación entre los dos. Sin esto es solo otro producto.',
+          },
+        ],
+      },
+      {
+        key: 'etiqueta',
+        label: 'Texto del botón',
+        tipo: 'texto',
+        porDefecto: 'Sumar al carrito',
+        ayuda: 'Agrega sin sacar al visitante de donde está.',
+      },
+      CAMPO_COLOR,
+    ],
+  },
+  {
+    slug: 'upsell_al_agregar',
+    nombre: 'Oferta al agregar al carrito',
+    descripcion:
+      'Ventana que aparece justo después de agregar algo al carrito. Es el momento de mayor disposición a sumar: ya decidió comprar y todavía no salió del envión.',
+    categoria: 'conversion',
+    contextos: ['tienda', 'producto'],
+    uso:
+      'Se dispara sola con el evento de Tiendanube al agregar al carrito. No necesita que prepares nada. Aparece una sola vez por visita, aunque agreguen varias cosas.',
+    cuidado:
+      'Una sola oferta, y que tenga que ver con lo que acaba de poner. Una ventana que interrumpe la compra con algo irrelevante es la forma más cara de perder un carrito armado.',
+    campos: [
+      {
+        key: 'titulo',
+        label: 'Título',
+        tipo: 'texto',
+        porDefecto: 'Antes de seguir…',
+        ayuda: 'Corto. Ya tiene la atención, no hace falta pelearla.',
+      },
+      {
+        key: 'texto',
+        label: 'Texto',
+        tipo: 'textarea',
+        ayuda: 'Un renglón sobre por qué le sirve junto con lo que acaba de agregar.',
+      },
+      {
+        key: 'producto',
+        label: 'Producto ofrecido',
+        tipo: 'producto',
+        ayuda: 'Del catálogo real. Nombre, precio e imagen salen de ahí.',
+      },
+      {
+        key: 'etiqueta',
+        label: 'Texto del botón',
+        tipo: 'texto',
+        porDefecto: 'Sumarlo a mi pedido',
+        ayuda: 'Agrega el producto y cierra la ventana, sin sacarlo de donde estaba.',
+      },
+      {
+        key: 'rechazo',
+        label: 'Texto para rechazar',
+        tipo: 'texto',
+        porDefecto: 'No, gracias',
+        ayuda: 'Tiene que estar y ser fácil de encontrar. Esconder la salida convierte una oferta en una trampa.',
+      },
+      CAMPO_COLOR,
+    ],
+  },
 ]
+
+/**
+ * Ids de producto referenciados por una config, mirando la declaración del tipo.
+ *
+ * Genérico a propósito: un widget nuevo que use campos de tipo `producto` —sueltos o
+ * dentro de una lista— queda resuelto sin tocar la API. La alternativa era que cada
+ * widget que menciona productos tuviera su caso especial en el endpoint público, que es
+ * justo lo que este motor evita.
+ */
+export function idsDeProducto(tipo: TipoWidget, config: Record<string, unknown>): string[] {
+  const ids: string[] = []
+  for (const c of tipo.campos) {
+    if (c.tipo === 'producto') {
+      const v = String(config?.[c.key] ?? '')
+      if (v) ids.push(v)
+    } else if (c.tipo === 'lista') {
+      const items = Array.isArray(config?.[c.key]) ? (config[c.key] as Record<string, unknown>[]) : []
+      for (const item of items) {
+        for (const sub of c.campos ?? []) {
+          if (sub.tipo !== 'producto') continue
+          const v = String(item?.[sub.key] ?? '')
+          if (v) ids.push(v)
+        }
+      }
+    }
+  }
+  return [...new Set(ids)]
+}
 
 export const porSlug = (slug: string): TipoWidget | undefined => TIPOS.find(t => t.slug === slug)
 
