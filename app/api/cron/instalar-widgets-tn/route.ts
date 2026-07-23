@@ -57,6 +57,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'faltan credenciales de Tiendanube' }, { status: 500 })
   }
 
+  // Tiendanube NO deja publicar una URL cualquiera desde la API: el script tiene que estar
+  // declarado antes en el Portal de Partners, y acá solo se lo asocia a la tienda por su
+  // id. Es una defensa razonable de su lado —si no, cualquier app con token podría inyectar
+  // el código que quisiera en el storefront— pero implica un paso manual una sola vez.
+  const body = (await req.json().catch(() => ({}))) as { script_id?: string }
+  const scriptId = String(body.script_id ?? process.env.TN_SCRIPT_ID ?? '')
+  if (!scriptId) {
+    return NextResponse.json(
+      {
+        error: 'falta script_id',
+        comoObtenerlo:
+          `Registrá ${SRC} como script de la app en el Portal de Partners de Tiendanube y ` +
+          'volvé a llamar acá con { "script_id": "..." }, o cargalo como TN_SCRIPT_ID. ' +
+          'La alternativa sin Portal es pegar el bootstrap en Configuración → Códigos externos.',
+      },
+      { status: 400 },
+    )
+  }
+
   const actuales = await listar()
   if (!Array.isArray(actuales)) return NextResponse.json(actuales, { status: 502 })
 
@@ -70,7 +89,7 @@ export async function POST(req: Request) {
     headers: cabeceras(),
     // `where: 'store'` es todo el storefront, no el checkout: el checkout de Tiendanube no
     // admite scripts de terceros y además ahí ya no hay nada que convencer.
-    body: JSON.stringify({ src: SRC, event: 'onload', where: 'store' }),
+    body: JSON.stringify({ script_id: scriptId, event: 'onload', where: 'store' }),
   })
 
   const cuerpo = await r.text()
