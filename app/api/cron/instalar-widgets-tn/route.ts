@@ -35,7 +35,10 @@ async function listar(): Promise<Script[] | { error: string; status: number }> {
     headers: cabeceras(),
   })
   if (!r.ok) return { error: await r.text(), status: r.status }
-  return (await r.json()) as Script[]
+  // Este recurso NO devuelve un array pelado como el resto de la API: viene envuelto en
+  // { result, total }. Se normaliza acá para que quien llame no tenga que saberlo.
+  const j = (await r.json()) as Script[] | { result?: Script[] }
+  return Array.isArray(j) ? j : (j.result ?? [])
 }
 
 export async function GET(req: Request) {
