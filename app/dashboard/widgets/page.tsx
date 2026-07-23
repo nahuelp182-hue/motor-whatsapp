@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CampoEditor } from '@/components/widgets/CampoEditor'
 import { VistaPrevia } from '@/components/widgets/VistaPrevia'
-import { CARD, INPUT, LABEL, AYUDA, AVISO, BTN, CATEGORIAS, catDe } from '@/components/widgets/ui'
+import { CARD, INPUT, LABEL, AYUDA, AVISO, BTN, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
 
 // Panel de widgets. Todo lo que se ve acá sale del registro de tipos: la lista de widgets
@@ -24,10 +24,10 @@ type Metricas = Record<string, { impresion: number; interaccion: number; convers
 type Pagina = { ruta: string; titulo: string }
 type Producto = { id: string; nombre: string; precio: number; imagen: string | null }
 
-const CONTEXTOS: { key: Contexto; label: string; donde: string }[] = [
-  { key: 'guias', label: 'Guías', donde: 'Las notas y guías de guias.infomicelium.com.ar' },
-  { key: 'tienda', label: 'Tienda', donde: 'Portada y listados de infomicelium.com.ar' },
-  { key: 'producto', label: 'Ficha de producto', donde: 'La página de un producto, donde se decide la compra' },
+const CONTEXTOS: { key: Contexto; label: string; icono: string; donde: string }[] = [
+  { key: 'guias', label: 'Guías', icono: '📚', donde: 'Las notas y guías de guias.infomicelium.com.ar' },
+  { key: 'tienda', label: 'Tienda', icono: '🏪', donde: 'Portada y listados de infomicelium.com.ar' },
+  { key: 'producto', label: 'Ficha de producto', icono: '🏷️', donde: 'La página de un producto, donde se decide la compra' },
 ]
 
 const NUM = (n: number) => new Intl.NumberFormat('es-AR').format(n)
@@ -208,6 +208,7 @@ export default function WidgetsPage() {
                     : { color: 'rgba(255,255,255,0.5)' }
                 }
               >
+                <span className="text-sm leading-none">{c.icono}</span>
                 {c.label}
                 <span
                   className="rounded-md px-1.5 py-0.5 text-[10px] font-mono"
@@ -345,35 +346,61 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
           if (delGrupo.length === 0) return null
           return (
             <section key={k}>
-              <div className="mb-3 flex items-baseline gap-3">
+              <div className="mb-3 flex items-center gap-2.5">
+                <span className="text-base leading-none">{cat.icono}</span>
                 <span
-                  className="rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]"
-                  style={{ background: `${cat.color}1f`, color: cat.color }}
+                  className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+                  style={{ color: cat.color }}
                 >
                   {cat.label}
                 </span>
-                <p className="flex-1 text-[11px] leading-relaxed text-white/45">{cat.para}</p>
+                <span className="h-px flex-1" style={{ background: `${cat.color}33` }} />
+                <p className="text-[11px] leading-relaxed text-white/40">{cat.para}</p>
               </div>
               <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                 {delGrupo.map(t => (
                   <button
                     key={t.slug}
                     onClick={() => onElegir(t)}
-                    className="group rounded-xl border border-white/[0.07] bg-white/[0.02] p-3.5 text-left transition-all hover:bg-white/[0.05]"
+                    // El texto largo (uso, advertencia) vive acá: está a un segundo de
+                    // distancia si hace falta, y no obliga a leer veinte párrafos para
+                    // recorrer el catálogo con la vista.
+                    title={[t.descripcion, t.uso, t.cuidado && `⚠ ${t.cuidado}`]
+                      .filter(Boolean)
+                      .join('\n\n')}
+                    className="group flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3.5 text-left transition-all hover:bg-white/[0.06]"
                     style={{ borderLeft: `2px solid ${cat.color}66` }}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-white">{t.nombre}</span>
-                      <span
-                        className="text-xs opacity-0 transition-opacity group-hover:opacity-100"
-                        style={{ color: cat.color }}
-                      >
-                        +
+                    <span
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl leading-none"
+                      style={{ background: `${cat.color}1f` }}
+                    >
+                      {iconoDe(t.slug)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate text-sm font-semibold text-white">{t.nombre}</span>
+                        {t.cuidado && (
+                          <span className="text-[11px] text-amber-300/80" title={t.cuidado}>
+                            ⚠
+                          </span>
+                        )}
+                        {t.datosVivos && (
+                          <span className="text-[11px] text-emerald-300/80" title="Se llena solo con datos reales del sitio">
+                            ⚡
+                          </span>
+                        )}
                       </span>
-                    </div>
-                    <p className="mt-1.5 text-xs leading-relaxed text-white/55">{t.descripcion}</p>
-                    <p className="mt-2 text-[11px] leading-relaxed text-white/35">{t.uso}</p>
-                    {t.cuidado && <p className={`mt-2 ${AVISO}`}>⚠ {t.cuidado}</p>}
+                      <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-white/50">
+                        {t.descripcion}
+                      </span>
+                    </span>
+                    <span
+                      className="text-base leading-none opacity-0 transition-opacity group-hover:opacity-100"
+                      style={{ color: cat.color }}
+                    >
+                      +
+                    </span>
                   </button>
                 ))}
               </div>
@@ -423,17 +450,17 @@ function TarjetaWidget({
           />
         </button>
 
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg leading-none"
+          style={{ background: `${cat.color}1f` }}
+          title={`${cat.label} — ${tipo?.nombre ?? w.tipo}`}
+        >
+          {iconoDe(w.tipo)}
+        </span>
+
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-white">{w.nombre}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <span
-              className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em]"
-              style={{ background: `${cat.color}1f`, color: cat.color }}
-            >
-              {cat.label}
-            </span>
-            <span className="text-[11px] text-white/45">{tipo?.nombre ?? w.tipo}</span>
-          </div>
+          <p className="mt-0.5 truncate text-[11px] text-white/45">{tipo?.nombre ?? w.tipo}</p>
         </div>
 
         <button onClick={onEditar} className={BTN}>
@@ -525,10 +552,11 @@ function Editor({
           ← Todos los widgets
         </button>
         <span
-          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]"
-          style={{ background: `${cat.color}1f`, color: cat.color }}
+          className="flex h-8 w-8 items-center justify-center rounded-xl text-base leading-none"
+          style={{ background: `${cat.color}1f` }}
+          title={cat.label}
         >
-          {cat.label}
+          {iconoDe(widget.tipo)}
         </span>
         <span className="text-sm font-semibold text-white">{tipo.nombre}</span>
         <button

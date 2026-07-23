@@ -35,26 +35,62 @@ export const BTN =
 export const CATEGORIAS = {
   conversion: {
     label: 'Conversión',
+    icono: '🎯',
     color: '#f0a03c',
-    para: 'Empujan la decisión: acercan el pago, la consulta o el clic al momento en que la persona ya está decidiendo.',
+    para: 'Empujan la decisión: acercan el pago, la consulta o el clic.',
   },
   confianza: {
     label: 'Confianza',
+    icono: '🛡️',
     color: '#6f9e5f',
-    para: 'Bajan la desconfianza, que es el freno número uno: prueba de otros, garantía, respuestas antes de la duda.',
+    para: 'Bajan la desconfianza, que es el freno número uno.',
   },
   captura: {
     label: 'Captura',
+    icono: '✉️',
     color: '#9b8cf0',
-    para: 'Se quedan con el contacto para seguir la conversación después. Quien no compra hoy sigue siendo alcanzable.',
+    para: 'Se quedan con el contacto: quien no compra hoy sigue siendo alcanzable.',
   },
   contenido: {
     label: 'Contenido',
+    icono: '📖',
     color: '#5fa8d3',
-    para: 'Explican sin vender: datos, video, ficha técnica. Sirven cuando la duda es qué es esto, no cuánto cuesta.',
+    para: 'Explican sin vender. Para cuando la duda es qué es esto, no cuánto cuesta.',
   },
 } as const
 
 export type CategoriaKey = keyof typeof CATEGORIAS
 
 export const catDe = (k: string) => CATEGORIAS[k as CategoriaKey] ?? CATEGORIAS.contenido
+
+// ── Íconos por tipo ──────────────────────────────────────────────────────────
+// Un ícono por widget para poder recorrer el catálogo con la vista en vez de leyendo
+// veinte párrafos. Es reconocimiento, no decoración: el texto largo sigue estando, pero
+// pasa a segundo plano (tooltip y editor).
+//
+// El registro de tipos no declara ícono a propósito — un tipo nuevo sin entrada acá cae en
+// el genérico y el panel sigue funcionando, que es la regla del motor.
+const ICONOS: Record<string, string> = {
+  whatsapp_flotante: '💬',
+  cta_producto: '🎯',
+  barra_accion: '📌',
+  resenas: '⭐',
+  faq: '❓',
+  beneficios: '✅',
+  garantia: '🛡️',
+  captura_email: '✉️',
+  cuotas: '💳',
+  envio_estimado: '🚚',
+  pasos: '🔢',
+  barra_confianza: '🤝',
+  comparador: '⚖️',
+  especificaciones: '📋',
+  banner_anuncio: '📣',
+  cuenta_regresiva: '⏳',
+  video: '▶️',
+  progreso_envio: '📦',
+  pack_complementarios: '🎁',
+  viendo_ahora: '👀',
+}
+
+export const iconoDe = (slug: string) => ICONOS[slug] ?? '🧩'
