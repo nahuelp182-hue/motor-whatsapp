@@ -82,16 +82,44 @@ export function respuesta429(r: ResultadoLimite, headersExtra: Record<string, st
   })
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LATCHES: "esto pasa una sola vez, para siempre"
+//
+// Misma tabla, semántica opuesta a la de un rate limit: no vence. Se usa para que un mail
+// automático salga una única vez por cliente y por hito, y para quemar un token de entrada
+// de un solo uso.
+//
+// Por qué acá y no en una tabla nueva: el upsert de esta tabla ya es atómico, que es lo
+// único que hace falta. Una tabla propia obligaría a una migración sin ganar nada.
+//
+// El prefijo NO es decorativo: `limpiarVencidos` lo usa para no borrar estas filas. Sin esa
+// exclusión, la limpieza diaria reabriría cada latch y los clientes recibirían de nuevo
+// todos los mails del ciclo.
+const PREFIJO_LATCH = 'latch:'
+
+/** Devuelve true la PRIMERA vez que se llama con esa clave, y false siempre después. */
+export async function tomarLatch(clave: string): Promise<boolean> {
+  const r = await consumirLimite(`${PREFIJO_LATCH}${clave}`, 1, 100 * 365 * 86400)
+  return r.permitido
+}
+
 /**
  * Borra ventanas vencidas. Se llama de forma oportunista (1 de cada 50 requests) para que
  * la tabla no crezca sin control, sin sumar un cron nuevo.
+ *
+ * Los latches quedan afuera a propósito: son permanentes por definición.
  */
 export async function limpiarVencidos(): Promise<void> {
   if (Math.random() > 0.02) return
   const pool = getPool()
   if (!pool) return
   try {
-    await pool.query(`DELETE FROM "RateLimit" WHERE "ventana_inicio" < now() - interval '1 day'`)
+    await pool.query(
+      `DELETE FROM "RateLimit"
+        WHERE "ventana_inicio" < now() - interval '1 day'
+          AND "key" NOT LIKE $1`,
+      [`${PREFIJO_LATCH}%`],
+    )
   } catch {
     /* best-effort */
   }

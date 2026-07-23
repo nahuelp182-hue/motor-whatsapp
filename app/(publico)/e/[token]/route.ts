@@ -11,11 +11,9 @@
 // afuera por un problema nuestro.
 import { NextRequest, NextResponse } from 'next/server'
 import { COOKIE_CLIENTE_NOMBRE, MAX_AGE_CLIENTE, crearSesionCliente, verificarTokenEntrada } from '@/lib/session'
-import { consumirLimite } from '@/lib/ratelimit'
+import { tomarLatch } from '@/lib/ratelimit'
 
 export const runtime = 'nodejs'
-
-const UN_ANIO = 365 * 86400
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ token: string }> }) {
   const secreto = process.env.DASHBOARD_PASSWORD
@@ -29,8 +27,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
   const t = await verificarTokenEntrada(token, secreto)
   if (!t) return NextResponse.redirect(caido)
 
-  const uso = await consumirLimite(`entrada:${t.jti}`, 1, UN_ANIO)
-  if (!uso.permitido) return NextResponse.redirect(new URL('/acceso?link=usado', req.url))
+  if (!(await tomarLatch(`entrada:${t.jti}`))) {
+    return NextResponse.redirect(new URL('/acceso?link=usado', req.url))
+  }
 
   const cookie = await crearSesionCliente({ num: t.num, nom: t.nom, eq: t.eq }, secreto)
   const res = NextResponse.redirect(destino)

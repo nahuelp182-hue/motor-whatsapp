@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { CARD, iconoDe } from './ui'
+import { CARD, ACENTO, iconoDe } from './ui'
 
 // Tablero del motor de widgets: qué se vio, qué se tocó y cuánta plata movió cada uno.
 //
@@ -49,10 +49,10 @@ export function Metricas() {
   return (
     <div className={`${CARD} mb-5 p-4`}>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/55">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#737373]">
           Rendimiento
         </span>
-        <div className="ml-auto flex gap-1 rounded-lg bg-white/[0.04] p-0.5">
+        <div className="ml-auto flex gap-1 rounded-lg bg-[#f4f4f1] p-0.5">
           {PERIODOS.map(p => (
             <button
               key={p.dias}
@@ -60,8 +60,8 @@ export function Metricas() {
               className="rounded-md px-2.5 py-1 text-[11px] font-medium transition-all"
               style={
                 dias === p.dias
-                  ? { background: 'rgb(var(--ac) / 0.18)', color: 'rgb(var(--ac))' }
-                  : { color: 'rgba(255,255,255,0.45)' }
+                  ? { background: '#eef1e9', color: ACENTO }
+                  : { color: '#737373' }
               }
             >
               {p.label}
@@ -71,7 +71,7 @@ export function Metricas() {
       </div>
 
       {cargando || !t ? (
-        <p className="py-6 text-center text-sm text-white/35">Cargando…</p>
+        <p className="py-6 text-center text-sm text-[#a3a3a0]">Cargando…</p>
       ) : (
         <>
           <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -81,10 +81,10 @@ export function Metricas() {
               { k: 'Al carrito', v: num(t.conversion), s: 'sumados desde un widget' },
               { k: 'Movido', v: t.monto > 0 ? pesos(t.monto) : '—', s: 'valor de lo agregado' },
             ].map(m => (
-              <div key={m.k} className="rounded-xl bg-white/[0.03] p-3">
-                <div className="text-[10px] uppercase tracking-[0.12em] text-white/45">{m.k}</div>
-                <div className="mt-1 text-xl font-semibold text-white">{m.v}</div>
-                <div className="mt-0.5 text-[11px] text-white/35">{m.s}</div>
+              <div key={m.k} className="rounded-xl bg-[#f4f4f1] p-3">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-[#737373]">{m.k}</div>
+                <div className="mt-1 font-mono text-xl font-semibold text-[#171717]">{m.v}</div>
+                <div className="mt-0.5 text-[11px] text-[#a3a3a0]">{m.s}</div>
               </div>
             ))}
           </div>
@@ -99,13 +99,13 @@ export function Metricas() {
                     className="w-full rounded-t transition-all"
                     style={{
                       height: `${Math.max(2, (x.impresion / tope) * 96)}px`,
-                      background: x.interaccion > 0 ? 'rgb(var(--ac) / 0.75)' : 'rgba(255,255,255,0.12)',
+                      background: x.interaccion > 0 ? 'rgb(var(--ac) / 0.75)' : '#e0e0db',
                     }}
                   />
                 </div>
               ))}
             </div>
-            <div className="mt-1.5 flex justify-between text-[10px] text-white/30">
+            <div className="mt-1.5 flex justify-between text-[10px] text-[#a3a3a0]">
               <span>{d.serie[0]?.fecha.slice(5)}</span>
               <span>{d.serie[d.serie.length - 1]?.fecha.slice(5)}</span>
             </div>
@@ -113,19 +113,19 @@ export function Metricas() {
 
           <div className="space-y-1.5">
             {d.porWidget.filter(w => w.impresion > 0 || w.activo).map(w => (
-              <div key={w.id} className="rounded-lg bg-white/[0.03] px-3 py-2">
+              <div key={w.id} className="rounded-lg bg-[#f4f4f1] px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span>{iconoDe(w.tipo)}</span>
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-white/85">{w.nombre}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-[#3f3f3c]">{w.nombre}</span>
                   {!w.activo && (
-                    <span className="text-[10px] uppercase tracking-wider text-white/30">apagado</span>
+                    <span className="text-[10px] uppercase tracking-wider text-[#a3a3a0]">apagado</span>
                   )}
-                  <span className="text-[12px] text-white/55">{num(w.impresion)} vistas</span>
-                  <span className="w-20 text-right text-[12px] text-white/75">
+                  <span className="text-[12px] text-[#737373]">{num(w.impresion)} vistas</span>
+                  <span className="w-20 text-right text-[12px] text-[#3f3f3c]">
                     {w.interaccion > 0 ? `${num(w.interaccion)} clics` : '—'}
                   </span>
                 </div>
-                <div className="mt-1.5 h-1 rounded-full bg-white/[0.06]">
+                <div className="mt-1.5 h-1 rounded-full bg-[#e0e0db]">
                   <div
                     className="h-full rounded-full"
                     style={{
@@ -137,7 +137,7 @@ export function Metricas() {
               </div>
             ))}
             {d.porWidget.every(w => w.impresion === 0) && (
-              <p className="py-4 text-center text-xs text-white/35">
+              <p className="py-4 text-center text-xs text-[#a3a3a0]">
                 Todavía no hay datos en este período. Se registran solos cuando un visitante ve
                 un widget prendido.
               </p>

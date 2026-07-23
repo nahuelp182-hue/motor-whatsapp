@@ -1,32 +1,42 @@
 // Piezas visuales compartidas del panel de widgets.
 //
-// El panel vive dentro del dashboard, que es oscuro (globals.css pone el fondo casi negro y
-// el texto blanco). Cualquier clase clara heredada de un formulario suelto queda ilegible,
-// así que los estilos de campo se declaran UNA vez acá y todos los editores los usan.
+// Sistema de diseño Micelium (definitivo 23/07/26): "Neutro premium + salvia". Casi
+// blanco/negro como Tesla/Samsung, la salvia SOLO como firma. Títulos en Fraunces, cuerpo
+// en Manrope, números en DM Mono. Los tokens se declaran UNA vez acá y todos los editores
+// los usan, así el panel y el store parecen la misma empresa.
+//
+// Paleta:  fondo #fafafa · card #fff · alt #f4f4f1 · hairline #e7e7e2
+//          ink #171717 · cuerpo #3f3f3c · muted #737373 · faint #a3a3a0
+//          acento salvia #6f8a5f · texto-acento #57704a · wash #eef1e9
 
-/** Tarjeta de vidrio: el mismo tratamiento que MetricCard en el panel de métricas. */
+/** Color de la salvia para texto sobre fondo claro (el #6f8a5f puro queda flojo en blanco). */
+export const ACENTO = '#57704a'
+/** Fuente de títulos — Fraunces, servida por el layout como variable. */
+export const TITULO = 'var(--font-fraunces), Georgia, serif'
+
+/** Tarjeta base: blanca, borde hairline, sombra mínima. */
 export const CARD =
-  'rounded-2xl border border-white/[0.07] bg-gradient-to-br from-white/[0.04] to-white/[0.01]'
+  'rounded-2xl border border-[#e7e7e2] bg-white shadow-[0_1px_3px_rgba(23,23,23,0.04)]'
 
-/** Campo de formulario sobre fondo oscuro. */
+/** Campo de formulario sobre fondo claro. */
 export const INPUT =
-  'w-full rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white ' +
-  'placeholder:text-white/25 focus:border-white/25 focus:outline-none transition-colors ' +
-  '[&>option]:bg-neutral-900 [&>option]:text-white'
+  'w-full rounded-xl border border-[#e7e7e2] bg-white px-3 py-2 text-sm text-[#171717] ' +
+  'placeholder:text-[#a3a3a0] focus:border-[#6f8a5f] focus:ring-2 focus:ring-[#6f8a5f]/15 ' +
+  'focus:outline-none transition-colors'
 
-/** Rótulo de campo. */
-export const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55'
+/** Rótulo de campo — eyebrow Manrope. */
+export const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#737373]'
 
 /** Texto de ayuda debajo del campo. */
-export const AYUDA = 'mt-1.5 text-xs leading-relaxed text-white/45'
+export const AYUDA = 'mt-1.5 text-xs leading-relaxed text-[#737373]'
 
-/** Advertencia: ámbar legible sobre oscuro, no el ámbar 700 de fondo blanco. */
-export const AVISO = 'text-xs leading-relaxed text-amber-300/90'
+/** Advertencia: ámbar legible sobre fondo claro. */
+export const AVISO = 'text-xs leading-relaxed text-amber-700'
 
 /** Botón secundario. */
 export const BTN =
-  'rounded-xl border border-white/12 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/80 ' +
-  'hover:border-white/25 hover:text-white transition-all disabled:opacity-30'
+  'rounded-md border border-[#e7e7e2] bg-white px-3 py-1.5 text-xs font-medium text-[#3f3f3c] ' +
+  'hover:border-[#171717]/25 hover:text-[#171717] transition-all disabled:opacity-30'
 
 // ── Categorías ───────────────────────────────────────────────────────────────
 // Cada widget declara su categoría en lib/widgets/tipos.ts. Acá se le pone nombre, color y

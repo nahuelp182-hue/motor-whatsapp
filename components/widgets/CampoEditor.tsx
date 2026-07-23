@@ -8,8 +8,8 @@ import { INPUT, LABEL, AYUDA, AVISO } from './ui'
 // Ningún tipo de widget tiene formulario propio. Agregar un tipo nuevo no toca este archivo
 // mientras use los tipos de campo ya soportados — que es justo el punto del diseño.
 //
-// Los estilos salen de ./ui: el panel es oscuro, y un campo con borde gris claro sobre
-// fondo negro se lee tan mal como no estar.
+// Estilos: sistema "Neutro premium + salvia" (ver ./ui). Fondo claro, hairline #e7e7e2,
+// selección con salvia. El acento activo se dibuja con la variable --ac que fija la página.
 
 export type Producto = { id: string; nombre: string; precio: number; imagen: string | null }
 
@@ -36,16 +36,16 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
     const prendido = valor === true
     return (
       <div className="py-1">
-        <label className="flex cursor-pointer items-center gap-3 text-sm text-white/85">
+        <label className="flex cursor-pointer items-center gap-3 text-sm text-[#3f3f3c]">
           <button
             type="button"
             onClick={() => onChange(!prendido)}
             className={`h-5 w-9 shrink-0 rounded-full transition ${
-              prendido ? 'bg-emerald-500' : 'bg-white/15'
+              prendido ? 'bg-emerald-500' : 'bg-[#d4d4d0]'
             }`}
           >
             <span
-              className={`block h-4 w-4 rounded-full bg-white transition ${
+              className={`block h-4 w-4 rounded-full bg-white shadow-sm transition ${
                 prendido ? 'translate-x-[18px]' : 'translate-x-0.5'
               }`}
             />
@@ -83,18 +83,18 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
                 title={u.ayuda}
                 className="w-[104px] rounded-xl border p-2 text-left transition-all"
                 style={{
-                  borderColor: activo ? 'rgb(var(--ac) / 0.55)' : 'rgba(255,255,255,0.10)',
-                  background: activo ? 'rgb(var(--ac) / 0.10)' : 'rgba(255,255,255,0.02)',
+                  borderColor: activo ? 'rgb(var(--ac) / 0.55)' : '#e7e7e2',
+                  background: activo ? '#eef1e9' : '#fff',
                 }}
               >
-                <div className="mb-1.5 space-y-[3px] rounded-md bg-white/[0.07] p-1.5">
+                <div className="mb-1.5 space-y-[3px] rounded-md bg-[#f0f0ec] p-1.5">
                   {[0, 1, 2, 3, 4].map(i => (
                     <div
                       key={i}
                       className={
                         i === posicion
                           ? 'h-2 rounded-sm'
-                          : `h-[3px] rounded-sm bg-white/20 ${i % 2 ? 'w-3/4' : 'w-full'}`
+                          : `h-[3px] rounded-sm bg-[#cfcfc9] ${i % 2 ? 'w-3/4' : 'w-full'}`
                       }
                       style={i === posicion ? { background: 'rgb(var(--ac))' } : undefined}
                     />
@@ -102,7 +102,7 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
                 </div>
                 <span
                   className="block text-[11px] leading-tight"
-                  style={{ color: activo ? '#fff' : 'rgba(255,255,255,0.6)' }}
+                  style={{ color: activo ? '#171717' : '#737373' }}
                 >
                   {u.label}
                 </span>
@@ -163,7 +163,7 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
             <img
               src={elegido.imagen}
               alt=""
-              className="h-11 w-11 shrink-0 rounded-lg border border-white/10 object-cover"
+              className="h-11 w-11 shrink-0 rounded-lg border border-[#e7e7e2] object-cover"
             />
           )}
           <select
@@ -198,10 +198,10 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
           <button
             type="button"
             onClick={() => onChange('')}
-            className="h-9 w-9 rounded-lg border text-xs text-white/60 transition-all"
+            className="h-9 w-9 rounded-lg border text-xs text-[#737373] transition-all"
             style={{
-              borderColor: !valor ? 'rgb(var(--ac) / 0.55)' : 'rgba(255,255,255,0.10)',
-              background: !valor ? 'rgb(var(--ac) / 0.10)' : 'rgba(255,255,255,0.02)',
+              borderColor: !valor ? 'rgb(var(--ac) / 0.55)' : '#e7e7e2',
+              background: !valor ? '#eef1e9' : '#fff',
             }}
             title="Sin emoji"
           >
@@ -214,8 +214,8 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
               onClick={() => onChange(e)}
               className="h-9 w-9 rounded-lg border text-lg leading-none transition-all"
               style={{
-                borderColor: valor === e ? 'rgb(var(--ac) / 0.55)' : 'rgba(255,255,255,0.10)',
-                background: valor === e ? 'rgb(var(--ac) / 0.10)' : 'rgba(255,255,255,0.02)',
+                borderColor: valor === e ? 'rgb(var(--ac) / 0.55)' : '#e7e7e2',
+                background: valor === e ? '#eef1e9' : '#fff',
               }}
             >
               {e}
@@ -231,18 +231,18 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
     const items = Array.isArray(valor) ? (valor as Record<string, unknown>[]) : []
     const tope = campo.maxItems ?? 20
     return (
-      <div className="rounded-xl border border-white/10 bg-black/20 p-3.5">
+      <div className="rounded-xl border border-[#e7e7e2] bg-[#fafafa] p-3.5">
         {etiqueta}
         {ayuda}
         <div className="mt-3 space-y-3">
           {items.map((item, i) => (
-            <div key={i} className="rounded-xl border border-white/[0.07] bg-white/[0.03] p-3">
+            <div key={i} className="rounded-xl border border-[#e7e7e2] bg-white p-3">
               <div className="mb-2.5 flex items-center justify-between">
-                <span className="font-mono text-[11px] text-white/35">#{i + 1}</span>
+                <span className="font-mono text-[11px] text-[#a3a3a0]">#{i + 1}</span>
                 <div className="flex items-center gap-2 text-xs">
                   <button
                     type="button"
-                    className="text-white/50 hover:text-white disabled:opacity-25"
+                    className="text-[#737373] hover:text-[#171717] disabled:opacity-25"
                     disabled={i === 0}
                     onClick={() => {
                       const c = [...items]
@@ -254,7 +254,7 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
                   </button>
                   <button
                     type="button"
-                    className="text-white/50 hover:text-white disabled:opacity-25"
+                    className="text-[#737373] hover:text-[#171717] disabled:opacity-25"
                     disabled={i === items.length - 1}
                     onClick={() => {
                       const c = [...items]
@@ -266,7 +266,7 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
                   </button>
                   <button
                     type="button"
-                    className="text-red-400/80 hover:text-red-400"
+                    className="text-red-500 hover:text-red-600"
                     onClick={() => onChange(items.filter((_, j) => j !== i))}
                   >
                     Borrar
@@ -293,7 +293,7 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
         </div>
         <button
           type="button"
-          className="mt-3 rounded-xl border border-white/12 bg-white/[0.04] px-3 py-1.5 text-xs text-white/80 transition-all hover:border-white/25 hover:text-white disabled:opacity-30"
+          className="mt-3 rounded-md border border-[#e7e7e2] bg-white px-3 py-1.5 text-xs text-[#3f3f3c] transition-all hover:border-[#171717]/25 hover:text-[#171717] disabled:opacity-30"
           disabled={items.length >= tope}
           onClick={() => onChange([...items, {}])}
         >
@@ -337,18 +337,16 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
                 className="h-8 w-8 rounded-full border-2 transition-all"
                 style={{
                   background: p.hex,
-                  borderColor: valor === p.value ? '#fff' : 'rgba(255,255,255,0.15)',
-                  boxShadow: valor === p.value ? '0 0 0 3px rgba(255,255,255,0.12)' : undefined,
+                  borderColor: valor === p.value ? '#171717' : '#e7e7e2',
+                  boxShadow: valor === p.value ? '0 0 0 3px rgba(23,23,23,0.10)' : undefined,
                 }}
               />
             ))}
-            <span className="mx-1 h-6 w-px bg-white/10" />
+            <span className="mx-1 h-6 w-px bg-[#e7e7e2]" />
             <label
               className="flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-1"
               style={{
-                borderColor: String(valor ?? '').startsWith('#')
-                  ? 'rgba(255,255,255,0.5)'
-                  : 'rgba(255,255,255,0.10)',
+                borderColor: String(valor ?? '').startsWith('#') ? '#171717' : '#e7e7e2',
               }}
               title="Elegir un color propio"
             >
@@ -358,13 +356,13 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
                 value={String(valor ?? '').startsWith('#') ? String(valor) : '#6f8a5f'}
                 onChange={e => onChange(e.target.value)}
               />
-              <span className="text-xs text-white/70">Otro color</span>
+              <span className="text-xs text-[#3f3f3c]">Otro color</span>
             </label>
             <input
               type="text"
               placeholder="#a1b2c3"
               maxLength={7}
-              className="w-24 rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 font-mono text-xs uppercase text-white placeholder:text-white/25 focus:border-white/25 focus:outline-none"
+              className="w-24 rounded-lg border border-[#e7e7e2] bg-white px-2 py-1 font-mono text-xs uppercase text-[#171717] placeholder:text-[#a3a3a0] focus:border-[#6f8a5f] focus:outline-none"
               value={String(valor ?? '').startsWith('#') ? String(valor) : ''}
               onChange={e => {
                 const v = e.target.value.trim()

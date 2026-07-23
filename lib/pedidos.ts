@@ -157,9 +157,10 @@ export type CompraSeguimiento = {
   nombre: string
   email: string
   equipos: EquipoId[]
-  /** Fecha desde la que se cuenta el ciclo: la entrega si la hay, si no el pago. */
-  referencia: Date
-  entregado: boolean
+  /** Cuándo se cobró: reloj de la bienvenida, y el único que tiene el material digital. */
+  pagado: Date
+  /** Cuándo se entregó, si ya se entregó: reloj del ciclo de cultivo. */
+  entrega: Date | null
 }
 
 /**
@@ -195,21 +196,19 @@ export async function comprasParaSeguimiento(): Promise<CompraSeguimiento[]> {
       const email = String(o.contact_email ?? '').trim()
       if (!email) continue
 
+      if (!o.paid_at) continue
       const entregado = o.shipping_status === 'delivered'
-      // El material digital no se despacha: el ciclo arranca con el pago.
-      const equipos = equiposDe(o.products ?? [])
-      const base = entregado
-        ? (o.shipped_at ?? o.updated_at ?? o.paid_at)
-        : o.paid_at
-      if (!base) continue
+      // Tiendanube no expone `delivered_at`: el mejor proxy de la entrega es el último
+      // cambio de estado del pedido, que es justamente el que lo marcó como entregado.
+      const fechaEntrega = entregado ? new Date(o.updated_at ?? o.shipped_at ?? o.paid_at) : null
 
       out.push({
         numero: o.number,
         nombre: nombreDePila(o.contact_name ?? ''),
         email,
-        equipos,
-        referencia: new Date(base),
-        entregado,
+        equipos: equiposDe(o.products ?? []),
+        pagado: new Date(o.paid_at),
+        entrega: fechaEntrega,
       })
     }
     return out

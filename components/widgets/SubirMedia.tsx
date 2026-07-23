@@ -169,7 +169,7 @@ export function SubirMedia({ valor, label, ayuda, recomendado, onChange }: Props
 
       {valor ? (
         <div className="flex items-start gap-3">
-          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-[#e7e7e2] bg-[#f4f4f1]">
             {esVideo ? (
               <video src={valor} className="h-full w-full object-cover" autoPlay loop muted playsInline />
             ) : (
@@ -190,7 +190,7 @@ export function SubirMedia({ valor, label, ayuda, recomendado, onChange }: Props
         <button
           type="button"
           onClick={() => input.current?.click()}
-          className={`${INPUT} flex h-24 items-center justify-center border-dashed text-white/50 hover:border-white/25`}
+          className={`${INPUT} flex h-24 items-center justify-center border-dashed text-[#737373] hover:border-[#6f8a5f]`}
         >
           {estado || 'Elegir imagen, GIF o video'}
         </button>
@@ -209,7 +209,7 @@ export function SubirMedia({ valor, label, ayuda, recomendado, onChange }: Props
       />
 
       {estado && valor && <p className={AYUDA}>{estado}</p>}
-      {ahorro && <p className="mt-1.5 text-xs text-emerald-300/90">{ahorro}</p>}
+      {ahorro && <p className="mt-1.5 text-xs text-emerald-600">{ahorro}</p>}
       {error && <p className={`mt-1.5 ${AVISO}`}>{error}</p>}
 
       <p className={AYUDA}>

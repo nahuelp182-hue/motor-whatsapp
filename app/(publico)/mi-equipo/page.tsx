@@ -2,8 +2,9 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { COOKIE_CLIENTE_NOMBRE, verificarSesionCliente } from '@/lib/session'
-import { estadoEnvio, type EquipoId } from '@/lib/pedidos'
+import { estadoEnvio, tieneHardware, type EquipoId } from '@/lib/pedidos'
 import { getGuia } from '@/lib/guias'
+import { bibliotecaDe } from '@/lib/biblioteca'
 import SalirBoton from './SalirBoton'
 
 // Datos privados del cliente: nunca se indexa. Dinámico (lee cookie + Tiendanube en vivo).
@@ -19,11 +20,19 @@ const NOMBRE_EQUIPO: Record<EquipoId, string> = {
 
 // Material completo del cliente: primero los manuales detallados (privados), después las
 // guías generales. El orden importa: lo que compró está arriba.
+//
+// El manual del INC101 se muestra SOLO a quien tiene un equipo. Antes lo veía cualquiera que
+// entrara —incluido quien compró únicamente material digital—, lo que además de confundir
+// entregaba el material del equipo a quien no lo había comprado.
 function guiasDe(equipos: string[]): string[] {
   if (equipos.includes('inc101')) {
     return ['manual-inc101', 'cultivo-paso-a-paso', 'los-dos-vitales', 'solucion-de-problemas']
   }
-  return ['manual-inc101', 'los-dos-vitales', 'solucion-de-problemas']
+  if (tieneHardware(equipos)) {
+    return ['manual-inc101', 'los-dos-vitales', 'solucion-de-problemas']
+  }
+  // Solo material digital: guías generales (públicas) + su biblioteca, que va en su sección.
+  return ['los-dos-vitales', 'que-se-puede-cultivar', 'solucion-de-problemas']
 }
 
 function BloqueEnvio({
@@ -86,15 +95,20 @@ export default async function MiEquipo() {
   // se la alcanza por otro camino. El customerId sale de la cookie, nunca de la URL (anti-IDOR).
   if (!sesion) redirect('/acceso')
 
-  const envio = await estadoEnvio(sesion.num)
   const guias = guiasDe(sesion.eq)
   const equipos = (sesion.eq.length ? sesion.eq : ['otro']) as EquipoId[]
+  const hardware = tieneHardware(sesion.eq)
+  const biblioteca = bibliotecaDe(sesion.eq)
+
+  // A quien compró solo material digital no se le consulta el envío: no hay nada que
+  // despachar, y mostrarle un bloque vacío parece un error del sistema.
+  const envio = hardware ? await estadoEnvio(sesion.num) : null
 
   return (
     <>
       <section style={{ paddingTop: '4.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1rem' }}>
-          <p className="mic-eyebrow">Tu equipo</p>
+          <p className="mic-eyebrow">{hardware ? 'Tu equipo' : 'Tu cuenta'}</p>
           <SalirBoton />
         </div>
         <h1 className="mic-titulo">Hola{sesion.nom ? `, ${sesion.nom}` : ''}</h1>
@@ -141,13 +155,50 @@ export default async function MiEquipo() {
         </ul>
       </section>
 
-      <section id="envio">
-        <h2 className="mic-h2">Tu envío</h2>
-        <BloqueEnvio envio={envio} />
-      </section>
+      {biblioteca.length > 0 && (
+        <section id="biblioteca">
+          <h2 className="mic-h2">Tu biblioteca</h2>
+          <p className="mic-p" style={{ color: 'var(--tinta-suave)' }}>
+            Tu material digital, disponible siempre y sin vencimiento. Cuando actualizamos un
+            título, la versión nueva aparece acá sin que tengas que comprar nada.
+          </p>
+          <ul className="mic-lista" style={{ marginTop: '1rem' }}>
+            {biblioteca.map((item, i) => (
+              <li key={item.id} className="mic-item">
+                {item.archivo ? (
+                  <a href={item.archivo} download>
+                    <span className="mic-item-num">{String(i + 1).padStart(2, '0')}</span>
+                    <span>
+                      <h3 className="mic-item-titulo">{item.titulo}</h3>
+                      <p className="mic-item-resumen">{item.descripcion}</p>
+                      <p className="mic-item-meta">Descargar PDF</p>
+                    </span>
+                  </a>
+                ) : (
+                  <a href={`https://wa.me/543512145521?text=Hola,%20soy%20del%20pedido%20%23${sesion.num}%20y%20quiero%20mi%20material:%20${encodeURIComponent(item.titulo)}`}>
+                    <span className="mic-item-num">{String(i + 1).padStart(2, '0')}</span>
+                    <span>
+                      <h3 className="mic-item-titulo">{item.titulo}</h3>
+                      <p className="mic-item-resumen">{item.descripcion}</p>
+                      <p className="mic-item-meta">Pedilo por WhatsApp y te lo enviamos</p>
+                    </span>
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {hardware && (
+        <section id="envio">
+          <h2 className="mic-h2">Tu envío</h2>
+          <BloqueEnvio envio={envio} />
+        </section>
+      )}
 
       <div className="mic-cierre">
-        <h3>¿Tenés una duda sobre tu equipo?</h3>
+        <h3>{hardware ? '¿Tenés una duda sobre tu equipo?' : '¿Tenés una duda sobre tu cultivo?'}</h3>
         <p>
           El asistente ya sabe qué compraste y cómo viene tu envío: preguntale directamente. Y si
           tu cultivo va mal o hay una falla, escribinos por WhatsApp con tu pedido (#{sesion.num})
