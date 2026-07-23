@@ -53,6 +53,12 @@ export async function middleware(request: NextRequest) {
   // servicio a los scripts embebidos en la tienda (geogate, tracking, lead magnet) y a las
   // guías, que es justo lo contrario de lo que se quiere.
   if (PUBLICOS.has(pathname)) return NextResponse.next()
+  // Metadatos que leen los buscadores y las apps al compartir un link: van sin login, son
+  // justo lo que se consulta antes de que exista una sesión. El robots.txt y el sitemap.xml
+  // viven en la raíz; la OG de la portada se sirve en /opengraph-image (las de cada guía caen
+  // bajo /guia y ya pasan por PREFIJOS_PUBLICOS).
+  if (pathname === '/robots.txt' || pathname === '/sitemap.xml') return NextResponse.next()
+  if (pathname.startsWith('/opengraph-image')) return NextResponse.next()
   if (PREFIJOS_PUBLICOS.some(p => pathname === p || pathname.startsWith(p + '/'))) {
     return NextResponse.next()
   }

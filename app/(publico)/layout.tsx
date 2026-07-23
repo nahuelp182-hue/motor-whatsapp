@@ -19,12 +19,24 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
+  // metadataBase: sin esto, las URLs de og:image y los canónicos salen relativas y las tarjetas
+  // al compartir se rompen. Es el dominio real de la capa pública de guías.
+  metadataBase: new URL('https://guias.infomicelium.com.ar'),
   // El ® va siempre pegado al nombre: hay vendedores de insumos que usan "mycelium" y el
   // cliente confunde marca con palabra genérica. El símbolo es lo que separa una cosa de la otra.
   title: { default: 'Guías · Micelium®', template: '%s · Micelium®' },
   description:
     'Guías de cultivo de Micelium® Argentina: lo esencial primero, sin relleno. Fabricamos ' +
     'incubadoras automáticas y acompañamos el cultivo.',
+  // Tarjeta al compartir. La imagen la aporta opengraph-image.tsx (marca) y cada guía define
+  // la suya; acá van el tipo, el sitio y el idioma que completan la ficha.
+  openGraph: {
+    type: 'website',
+    siteName: 'Micelium® — Guías de cultivo',
+    locale: 'es_AR',
+    url: '/guia',
+  },
+  twitter: { card: 'summary_large_image' },
 }
 
 export default function PublicoLayout({ children }: { children: React.ReactNode }) {
@@ -58,6 +70,12 @@ export default function PublicoLayout({ children }: { children: React.ReactNode 
             <a href="/guia/asistente">Asistente</a>
             <a href="/contacto">Contacto</a>
             <a href="https://infomicelium.com.ar">Tienda</a>
+            {/* La puerta del portal tiene que estar donde ya está el cliente. Sin este link
+                el área privada existía pero era invisible: nadie llega a una URL que nunca
+                vio. Va último y marcado, para que no compita con el contenido público. */}
+            <a href="/acceso" className="mic-nav-cuenta">
+              Mi cuenta
+            </a>
           </nav>
         </div>
       </header>

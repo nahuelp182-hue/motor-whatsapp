@@ -162,6 +162,20 @@
 .mic-nav a { color: var(--sobre-oscuro); text-decoration: none; padding-bottom: 2px; border-bottom: 1px solid transparent; }
 .mic-nav a:hover { color: #fff; border-bottom-color: var(--sage); }
 
+/* "Mi cuenta": misma barra pero encapsulado, para que se lea como acceso y no como una
+   sección más de contenido. */
+.mic-nav a.mic-nav-cuenta {
+  border: 1px solid rgba(232, 237, 228, 0.35); border-radius: 999px;
+  padding: 0.28rem 0.85rem;
+}
+.mic-nav a.mic-nav-cuenta:hover { border-color: var(--sage); background: rgba(111, 138, 95, 0.18); }
+
+/* Enlace con forma de botón dentro de un texto (cambiar de puerta en /acceso). */
+.mic-link-boton {
+  background: none; border: none; padding: 0; font: inherit; cursor: pointer;
+  color: var(--verde-accion); text-decoration: underline; text-underline-offset: 2px;
+}
+
 .mic-footer {
   background: var(--verde-oscuro); color: var(--sobre-oscuro-tenue);
   margin-top: 6rem;
@@ -437,6 +451,11 @@
 }
 .mic-item-flecha svg { width: 1rem; height: 1rem; }
 .mic-item a:hover .mic-item-flecha { opacity: 1; transform: translateX(0); }
+/* En pantallas táctiles no hay hover: la señal "Leer" tiene que estar siempre visible, si no
+   el affordance de "entrá a esta guía" queda invisible para la mayoría del tráfico (mobile). */
+@media (hover: none) {
+  .mic-item-flecha { opacity: 1; transform: none; }
+}
 
 /* ── Índice lateral del artículo ────────────────────────────────────────── */
 
@@ -463,6 +482,20 @@
   padding-left: calc(0.9rem - 1px);
 }
 .mic-toc a[data-activa] .mic-toc-num { color: var(--verde-accion); }
+
+/* En mobile el índice se renderiza al final del DOM (después del cuerpo), así que como barra
+   lateral no sirve: quedaba pegado abajo, cuando ya leíste todo. Acá se reubica ARRIBA del
+   artículo (order: -1) y pasa a ser un bloque de saltos: un mapa de la guía antes de entrar,
+   no una nota al pie. Deja de ser sticky para no taparse con la barra de marca. */
+@media (max-width: 62rem) {
+  .mic-toc {
+    order: -1; position: static; top: auto;
+    background: var(--crema); border: 1px solid var(--linea);
+    border-radius: 14px; padding: 1.25rem 1.4rem; margin-bottom: 0.5rem;
+  }
+  .mic-toc p { margin-bottom: 0.75rem; }
+  .mic-toc nav { display: grid; gap: 0.15rem; }
+}
 
 /* ── Cierre / derivación ────────────────────────────────────────────────── */
 
