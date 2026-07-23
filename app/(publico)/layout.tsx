@@ -128,6 +128,11 @@ export default function PublicoLayout({ children }: { children: React.ReactNode 
           </div>
         </div>
       </footer>
+
+      {/* Motor de widgets: lo que se muestra y si está prendido se maneja desde
+          /dashboard/widgets, no desde acá. Este script no decide nada — pide la config y
+          dibuja. Los widgets de bloque van donde haya un <div data-mic-slot="TIPO">. */}
+      <script src="/mic.js" data-ctx="guias" async />
     </div>
   )
 }
