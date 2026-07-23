@@ -26,18 +26,14 @@
     'color:#8a8179 !important;max-width:560px}',
   ].join('')
 
+  // El bloque de sitios queda apagado hasta que las guías estén terminadas: no mandamos
+  // tráfico de la tienda a un sitio a medio hacer. Para reactivarlo, volver a poner acá
+  // el <p class="mic-st-tit"> + el <div class="mic-st-grid"> con Tienda y:
+  //   <a class="mic-st" href="https://guias.infomicelium.com.ar/guia">
+  //     <span class="mic-st-n">Guías de cultivo</span>
+  //     <span class="mic-st-u">guias.infomicelium.com.ar</span>
+  //   </a>
   var HTML = [
-    '<p class="mic-st-tit">Nuestros sitios</p>',
-    '<div class="mic-st-grid">',
-    '<a class="mic-st" href="https://infomicelium.com.ar">',
-    '<span class="mic-st-n">Tienda</span>',
-    '<span class="mic-st-u">infomicelium.com.ar</span>',
-    '</a>',
-    '<a class="mic-st" href="https://guias.infomicelium.com.ar/guia">',
-    '<span class="mic-st-n">Guías de cultivo</span>',
-    '<span class="mic-st-u">guias.infomicelium.com.ar</span>',
-    '</a>',
-    '</div>',
     // Hay vendedores de insumos usando "mycelium" y el cliente confunde la marca con la
     // palabra genérica. La aclaración informa sin ponerse a discutir con nadie.
     '<p class="mic-st-legal">Micelium® es marca registrada. No tenemos relación ',
