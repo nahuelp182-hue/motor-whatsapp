@@ -43,6 +43,10 @@ export type TipoWidget = {
   contextos: Contexto[]
   /** El widget se sirve con datos vivos de la base (reseñas, stock). Ver lib/widgets/datos.ts */
   datosVivos?: 'resenas'
+  /** Dónde aparece y qué necesita para funcionar. Se muestra arriba del formulario. */
+  uso: string
+  /** Cuándo NO conviene usarlo. Se muestra en el panel para no tener que recordarlo. */
+  cuidado?: string
   campos: Campo[]
 }
 
@@ -71,23 +75,57 @@ export const TIPOS: TipoWidget[] = [
     slug: 'whatsapp_flotante',
     nombre: 'Botón de WhatsApp',
     descripcion:
-      'Botón flotante que abre un mensaje ya escrito en WhatsApp. La asesoría es lo que más convierte: esto la pone a un clic.',
+      'Botón flotante que abre WhatsApp con un mensaje ya escrito. La asesoría es lo que más convierte: esto la pone a un clic.',
     categoria: 'conversion',
     contextos: ['guias', 'tienda', 'producto'],
+    uso: 'Flota sobre la página, siempre visible. No necesita que prepares ningún lugar: se ubica solo.',
+    cuidado:
+      'Si ya hay otro botón flotante en la misma página (chat de Tiendanube, por ejemplo), se van a superponer.',
     campos: [
-      { key: 'numero', label: 'Número (formato internacional, sin +)', tipo: 'texto', placeholder: '5493525623546' },
-      { key: 'etiqueta', label: 'Texto del botón', tipo: 'texto', porDefecto: 'Consultanos' },
+      {
+        key: 'numero',
+        label: 'Número de WhatsApp',
+        tipo: 'texto',
+        placeholder: '5493512145521',
+        ayuda:
+          'Con código de país y área, sin el signo + ni espacios ni guiones. Para Córdoba: 54 9 351 y el número. Es el destino de la conversación.',
+      },
+      {
+        key: 'etiqueta',
+        label: 'Texto del botón',
+        tipo: 'texto',
+        porDefecto: 'Consultanos',
+        ayuda: 'Lo que se lee al lado del ícono. Corto: dos o tres palabras, si no en celular se corta.',
+      },
       {
         key: 'mensaje',
         label: 'Mensaje precargado',
         tipo: 'textarea',
         porDefecto: 'Hola, quería hacer una consulta sobre el equipo.',
+        ayuda:
+          'Aparece ya escrito en el chat del visitante; él solo aprieta enviar. Conviene que diga de qué página viene, así sabés qué estaba mirando.',
       },
-      { key: 'posicion', label: 'Posición', tipo: 'select', porDefecto: 'derecha', opciones: [
-        { value: 'derecha', label: 'Abajo a la derecha' },
-        { value: 'izquierda', label: 'Abajo a la izquierda' },
-      ] },
-      { key: 'demora', label: 'Aparece después de (segundos)', tipo: 'numero', porDefecto: 3, min: 0, max: 120 },
+      {
+        key: 'posicion',
+        label: 'Posición en pantalla',
+        tipo: 'select',
+        porDefecto: 'derecha',
+        ayuda: 'De qué lado flota. En celular la derecha queda bajo el pulgar de la mayoría.',
+        opciones: [
+          { value: 'derecha', label: 'Abajo a la derecha' },
+          { value: 'izquierda', label: 'Abajo a la izquierda' },
+        ],
+      },
+      {
+        key: 'demora',
+        label: 'Aparece después de (segundos)',
+        tipo: 'numero',
+        porDefecto: 3,
+        min: 0,
+        max: 120,
+        ayuda:
+          'Cuánto espera antes de mostrarse, desde que carga la página. En 0 aparece de entrada. Unos segundos evita que tape el contenido antes de que lo lean.',
+      },
       CAMPO_COLOR,
     ],
   },
@@ -95,14 +133,38 @@ export const TIPOS: TipoWidget[] = [
     slug: 'cta_producto',
     nombre: 'Bloque de llamada a la acción',
     descripcion:
-      'Bloque con título, texto y botón. Es el puente que hoy falta entre el blog (51% de las impresiones) y el producto.',
+      'Recuadro con título, texto y botón. Es el puente entre una guía y el producto: hoy el blog trae visitas y no las deriva.',
     categoria: 'conversion',
     contextos: ['guias', 'tienda', 'producto'],
+    uso:
+      'Va dentro del texto, donde vos lo pongas. Necesita un <div data-mic-slot="cta_producto"></div> en la página; si no está, el widget no se dibuja.',
     campos: [
-      { key: 'titulo', label: 'Título', tipo: 'texto' },
-      { key: 'texto', label: 'Texto', tipo: 'textarea' },
-      { key: 'etiqueta', label: 'Texto del botón', tipo: 'texto', porDefecto: 'Ver el equipo' },
-      { key: 'url', label: 'Enlace del botón', tipo: 'url' },
+      {
+        key: 'titulo',
+        label: 'Título',
+        tipo: 'texto',
+        ayuda: 'La frase grande del recuadro. Funciona mejor si continúa lo que la persona venía leyendo.',
+      },
+      {
+        key: 'texto',
+        label: 'Texto',
+        tipo: 'textarea',
+        ayuda: 'Dos o tres renglones. Explica qué gana haciendo clic, no qué es el producto.',
+      },
+      {
+        key: 'etiqueta',
+        label: 'Texto del botón',
+        tipo: 'texto',
+        porDefecto: 'Ver el equipo',
+        ayuda: 'Lo que dice el botón. Que describa la acción concreta, no un genérico tipo "Clic acá".',
+      },
+      {
+        key: 'url',
+        label: 'Enlace del botón',
+        tipo: 'url',
+        ayuda:
+          'A dónde lleva. Puede ser una dirección completa (https://infomicelium.com.ar/...) o interna empezando con barra (/contacto). Si queda vacío, el botón no aparece.',
+      },
       CAMPO_COLOR,
     ],
   },
@@ -110,14 +172,45 @@ export const TIPOS: TipoWidget[] = [
     slug: 'barra_accion',
     nombre: 'Barra de acción fija',
     descripcion:
-      'Barra pegada abajo con el precio y el botón de compra. Ataca la caída de add-to-cart en celular.',
+      'Barra pegada al borde inferior con el precio y el botón de compra, siempre a mano mientras la persona baja.',
     categoria: 'conversion',
     contextos: ['tienda', 'producto'],
+    uso:
+      'Solo en la ficha de producto de la tienda. No crea un carrito propio: aprieta el botón de compra real de Tiendanube. Si el diseño de la tienda cambia y ese botón deja de existir, la barra directamente no aparece.',
     campos: [
-      { key: 'etiqueta', label: 'Texto del botón', tipo: 'texto', porDefecto: 'Agregar al carrito' },
-      { key: 'mostrar_precio', label: 'Mostrar el precio', tipo: 'booleano', porDefecto: true },
-      { key: 'solo_movil', label: 'Solo en celular', tipo: 'booleano', porDefecto: true },
-      { key: 'scroll', label: 'Aparece tras desplazar (%)', tipo: 'numero', porDefecto: 25, min: 0, max: 100 },
+      {
+        key: 'etiqueta',
+        label: 'Texto del botón',
+        tipo: 'texto',
+        porDefecto: 'Agregar al carrito',
+        ayuda: 'Conviene que diga lo mismo que el botón original, para que no parezcan dos acciones distintas.',
+      },
+      {
+        key: 'mostrar_precio',
+        label: 'Mostrar el precio en la barra',
+        tipo: 'booleano',
+        porDefecto: true,
+        ayuda:
+          'Toma el precio que ya muestra la página, no uno que cargues acá: nunca puede quedar desactualizado. Si lo apagás, la barra queda solo con el botón.',
+      },
+      {
+        key: 'solo_movil',
+        label: 'Solo en celular',
+        tipo: 'booleano',
+        porDefecto: true,
+        ayuda:
+          'En pantallas grandes el botón de compra casi siempre queda a la vista, así que la barra sobra. El problema medido está en celular.',
+      },
+      {
+        key: 'scroll',
+        label: 'Aparece tras desplazar (%)',
+        tipo: 'numero',
+        porDefecto: 25,
+        min: 0,
+        max: 100,
+        ayuda:
+          'Cuánto tiene que haber bajado la persona para que la barra suba. En 0 aparece apenas entra; en 25 aparece cuando ya avanzó un cuarto de la página, que es cuando el botón original quedó arriba.',
+      },
       CAMPO_COLOR,
     ],
   },
@@ -125,33 +218,78 @@ export const TIPOS: TipoWidget[] = [
     slug: 'resenas',
     nombre: 'Reseñas verificadas',
     descripcion:
-      'Reseñas de compradores reales, con sello de compra verificada. Salen de la base, no se cargan a mano.',
+      'Reseñas de compradores reales con sello de compra verificada. Es el widget que ataca el freno número uno: la desconfianza.',
     categoria: 'confianza',
     contextos: ['tienda', 'producto', 'guias'],
     datosVivos: 'resenas',
+    uso:
+      'Necesita un <div data-mic-slot="resenas"></div> en la página. Los textos NO se cargan acá: salen solos de las respuestas que dejan los clientes por WhatsApp tras recibir el equipo. Si todavía no hay ninguna, el widget no dibuja nada en vez de mostrar relleno.',
     campos: [
-      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: 'Lo que dicen quienes ya lo usan' },
-      { key: 'cantidad', label: 'Cuántas mostrar', tipo: 'numero', porDefecto: 6, min: 1, max: 30 },
-      { key: 'sello', label: 'Mostrar sello de compra verificada', tipo: 'booleano', porDefecto: true },
+      {
+        key: 'titulo',
+        label: 'Título',
+        tipo: 'texto',
+        porDefecto: 'Lo que dicen quienes ya lo usan',
+        ayuda: 'Encabezado de la sección. Vacío = sin encabezado.',
+      },
+      {
+        key: 'cantidad',
+        label: 'Cuántas mostrar',
+        tipo: 'numero',
+        porDefecto: 6,
+        min: 1,
+        max: 30,
+        ayuda:
+          'Se muestran las más recientes hasta ese número. Las respuestas muy cortas (menos de 25 caracteres) se descartan solas porque no aportan.',
+      },
+      {
+        key: 'sello',
+        label: 'Mostrar sello de compra verificada',
+        tipo: 'booleano',
+        porDefecto: true,
+        ayuda:
+          'Agrega "✓ compra verificada" bajo cada nombre. Es cierto: cada reseña viene de una entrega real, por eso se puede afirmar.',
+      },
       CAMPO_COLOR,
     ],
   },
   {
     slug: 'faq',
     nombre: 'Preguntas frecuentes',
-    descripcion: 'Acordeón de preguntas y respuestas. Se carga con las objeciones reales que llegan por WhatsApp.',
+    descripcion:
+      'Lista de preguntas que se despliegan al tocarlas. Sirve para contestar de antemano lo que frena la compra.',
     categoria: 'confianza',
     contextos: ['guias', 'tienda', 'producto'],
+    uso:
+      'Necesita un <div data-mic-slot="faq"></div> en la página. Cargalo con las preguntas que de verdad llegan por WhatsApp, no con las que uno imagina.',
     campos: [
-      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: 'Preguntas frecuentes' },
+      {
+        key: 'titulo',
+        label: 'Título',
+        tipo: 'texto',
+        porDefecto: 'Preguntas frecuentes',
+        ayuda: 'Encabezado de la sección. Vacío = sin encabezado.',
+      },
       {
         key: 'items',
         label: 'Preguntas',
         tipo: 'lista',
         maxItems: 20,
+        ayuda:
+          'Se muestran en este orden, todas cerradas al principio. Usá las flechas para reordenar: lo que más frena la compra va primero.',
         campos: [
-          { key: 'pregunta', label: 'Pregunta', tipo: 'texto' },
-          { key: 'respuesta', label: 'Respuesta', tipo: 'textarea' },
+          {
+            key: 'pregunta',
+            label: 'Pregunta',
+            tipo: 'texto',
+            ayuda: 'Es lo único visible hasta que la tocan. Escribila como la haría el cliente.',
+          },
+          {
+            key: 'respuesta',
+            label: 'Respuesta',
+            tipo: 'textarea',
+            ayuda: 'Se ve al desplegar. Los saltos de línea que pongas se respetan.',
+          },
         ],
       },
       CAMPO_COLOR,
@@ -160,19 +298,39 @@ export const TIPOS: TipoWidget[] = [
   {
     slug: 'beneficios',
     nombre: 'Lista de beneficios',
-    descripcion: 'Lista con íconos. Habla de resultados, no de componentes.',
+    descripcion: 'Lista corta con un emoji por línea. Habla de resultados, no de componentes.',
     categoria: 'confianza',
     contextos: ['guias', 'tienda', 'producto'],
+    uso: 'Necesita un <div data-mic-slot="beneficios"></div> en la página.',
+    cuidado:
+      'Nunca listar de qué está hecho el equipo ni cómo se arma: eso le da la receta a quien quiera copiarlo, y al cliente no le mueve la aguja. Hablar de lo que consigue.',
     campos: [
-      { key: 'titulo', label: 'Título (opcional)', tipo: 'texto' },
+      {
+        key: 'titulo',
+        label: 'Título',
+        tipo: 'texto',
+        ayuda: 'Opcional. Si lo dejás vacío, la lista arranca directamente.',
+      },
       {
         key: 'items',
         label: 'Beneficios',
         tipo: 'lista',
         maxItems: 10,
+        ayuda: 'De cinco a siete rinde mejor que diez: una lista larga se deja de leer.',
         campos: [
-          { key: 'icono', label: 'Emoji', tipo: 'texto', placeholder: '🌱' },
-          { key: 'texto', label: 'Texto', tipo: 'texto' },
+          {
+            key: 'icono',
+            label: 'Emoji',
+            tipo: 'texto',
+            placeholder: '🌱',
+            ayuda: 'Un solo emoji, al principio de la línea. Vacío = se usa un punto.',
+          },
+          {
+            key: 'texto',
+            label: 'Texto',
+            tipo: 'texto',
+            ayuda: 'Un renglón. Que se entienda leyendo solo esa línea, sin las demás.',
+          },
         ],
       },
       CAMPO_COLOR,
@@ -181,13 +339,32 @@ export const TIPOS: TipoWidget[] = [
   {
     slug: 'garantia',
     nombre: 'Mensaje de garantía',
-    descripcion: 'Franja de respaldo bajo el botón de compra: garantía, soporte, quién está atrás.',
+    descripcion: 'Recuadro de respaldo: garantía, soporte, quién está atrás del equipo.',
     categoria: 'confianza',
     contextos: ['tienda', 'producto'],
+    uso:
+      'Necesita un <div data-mic-slot="garantia"></div>. Rinde justo debajo del botón de compra, que es donde aparece la duda de "¿y si me quedo solo con esto?".',
     campos: [
-      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: 'Garantía de 1 año' },
-      { key: 'texto', label: 'Texto', tipo: 'textarea' },
-      { key: 'icono', label: 'Emoji', tipo: 'texto', porDefecto: '🛡️' },
+      {
+        key: 'titulo',
+        label: 'Título',
+        tipo: 'texto',
+        porDefecto: 'Garantía de 1 año',
+        ayuda: 'La línea en negrita. Concreta y verificable: un plazo, una cobertura.',
+      },
+      {
+        key: 'texto',
+        label: 'Texto',
+        tipo: 'textarea',
+        ayuda: 'Un renglón o dos explicando qué cubre y a quién le escribe si pasa algo.',
+      },
+      {
+        key: 'icono',
+        label: 'Emoji',
+        tipo: 'texto',
+        porDefecto: '🛡️',
+        ayuda: 'Un solo emoji, va grande a la izquierda del recuadro.',
+      },
       CAMPO_COLOR,
     ],
   },
@@ -195,20 +372,70 @@ export const TIPOS: TipoWidget[] = [
     slug: 'captura_email',
     nombre: 'Captura de email',
     descripcion:
-      'Ventana o bloque que pide el email a cambio de algo (la guía en PDF, aviso de stock). Reemplaza al lead magnet cableado en el código.',
+      'Pide el correo a cambio de la guía en PDF. Sirve para que una visita que hoy se va sin comprar quede en la lista.',
     categoria: 'captura',
     contextos: ['guias', 'tienda', 'producto'],
+    uso:
+      'Como ventana emergente no necesita nada preparado. Como bloque necesita un <div data-mic-slot="captura_email"></div>. El correo se valida (formato y que el dominio exista de verdad) y se envía la guía en PDF; quien la pide queda suscripto para las campañas.',
+    cuidado:
+      'Una sola ventana emergente por página. Si la persona ya dejó su correo o cerró la ventana, no le vuelve a aparecer.',
     campos: [
-      { key: 'titulo', label: 'Título', tipo: 'texto' },
-      { key: 'texto', label: 'Texto', tipo: 'textarea' },
-      { key: 'etiqueta', label: 'Texto del botón', tipo: 'texto', porDefecto: 'Quiero recibirla' },
-      { key: 'modo', label: 'Cómo aparece', tipo: 'select', porDefecto: 'popup', opciones: [
-        { value: 'popup', label: 'Ventana emergente' },
-        { value: 'bloque', label: 'Bloque en la página' },
-      ] },
-      { key: 'demora', label: 'Ventana: aparece a los (segundos)', tipo: 'numero', porDefecto: 15, min: 0, max: 300 },
-      { key: 'salida', label: 'Ventana: también al intentar salir', tipo: 'booleano', porDefecto: true },
-      { key: 'gracias', label: 'Mensaje de agradecimiento', tipo: 'texto', porDefecto: '¡Listo! Revisá tu correo.' },
+      {
+        key: 'titulo',
+        label: 'Título',
+        tipo: 'texto',
+        ayuda: 'La promesa, en una línea. Qué recibe, no qué le pedís.',
+      },
+      {
+        key: 'texto',
+        label: 'Texto',
+        tipo: 'textarea',
+        ayuda: 'Dos renglones sobre qué va a encontrar adentro. Concreto rinde más que entusiasta.',
+      },
+      {
+        key: 'etiqueta',
+        label: 'Texto del botón',
+        tipo: 'texto',
+        porDefecto: 'Quiero recibirla',
+        ayuda: 'Mejor en primera persona ("Quiero recibirla") que imperativo ("Enviar").',
+      },
+      {
+        key: 'modo',
+        label: 'Cómo aparece',
+        tipo: 'select',
+        porDefecto: 'popup',
+        ayuda:
+          'Ventana emergente: tapa la pantalla, capta más y molesta más. Bloque: queda dentro del texto, no interrumpe y capta menos.',
+        opciones: [
+          { value: 'popup', label: 'Ventana emergente' },
+          { value: 'bloque', label: 'Bloque en la página' },
+        ],
+      },
+      {
+        key: 'demora',
+        label: 'Ventana: aparece a los (segundos)',
+        tipo: 'numero',
+        porDefecto: 15,
+        min: 0,
+        max: 300,
+        ayuda:
+          'Solo aplica al modo ventana. Antes de 10 segundos interrumpe a alguien que todavía no leyó nada. Se ignora si elegiste bloque.',
+      },
+      {
+        key: 'salida',
+        label: 'Ventana: también al intentar salir',
+        tipo: 'booleano',
+        porDefecto: true,
+        ayuda:
+          'Muestra la ventana cuando el puntero sube hacia la barra del navegador, señal de que se está yendo. En celular no existe ese gesto, así que ahí manda la demora.',
+      },
+      {
+        key: 'gracias',
+        label: 'Mensaje de agradecimiento',
+        tipo: 'texto',
+        porDefecto: '¡Listo! Revisá tu correo.',
+        ayuda: 'Lo que se lee después de enviar. Conviene aclarar que el material llega por correo y no se descarga acá.',
+      },
       CAMPO_COLOR,
     ],
   },

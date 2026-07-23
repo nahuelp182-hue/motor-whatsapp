@@ -16,21 +16,26 @@ const input =
   'w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none'
 
 export function CampoEditor({ campo, valor, onChange }: Props) {
+  // La ayuda va SIEMPRE debajo del campo y en renglón aparte, no como texto gris al lado
+  // del rótulo. Es la diferencia entre poder configurar un widget sin preguntarle a nadie y
+  // tener que acordarse de qué hacía cada casilla.
+  const ayuda = campo.ayuda ? (
+    <p className="mt-1 text-xs leading-relaxed text-neutral-500">{campo.ayuda}</p>
+  ) : null
+
   if (campo.tipo === 'booleano') {
     return (
-      <label className="flex items-center gap-2 py-1 text-sm">
-        <input type="checkbox" checked={valor === true} onChange={e => onChange(e.target.checked)} />
-        <span>{campo.label}</span>
-      </label>
+      <div className="py-1">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={valor === true} onChange={e => onChange(e.target.checked)} />
+          <span>{campo.label}</span>
+        </label>
+        {campo.ayuda && <p className="ml-6 mt-1 text-xs leading-relaxed text-neutral-500">{campo.ayuda}</p>}
+      </div>
     )
   }
 
-  const etiqueta = (
-    <label className="mb-1 block text-xs font-medium text-neutral-600">
-      {campo.label}
-      {campo.ayuda && <span className="ml-2 font-normal text-neutral-400">{campo.ayuda}</span>}
-    </label>
-  )
+  const etiqueta = <label className="mb-1 block text-xs font-medium text-neutral-600">{campo.label}</label>
 
   if (campo.tipo === 'lista') {
     const items = Array.isArray(valor) ? (valor as Record<string, unknown>[]) : []
@@ -38,7 +43,8 @@ export function CampoEditor({ campo, valor, onChange }: Props) {
     return (
       <div className="rounded border border-neutral-200 p-3">
         {etiqueta}
-        <div className="space-y-3">
+        {ayuda}
+        <div className="mt-3 space-y-3">
           {items.map((item, i) => (
             <div key={i} className="rounded bg-neutral-50 p-3">
               <div className="mb-2 flex items-center justify-between">
@@ -159,6 +165,7 @@ export function CampoEditor({ campo, valor, onChange }: Props) {
           onChange={e => onChange(e.target.value)}
         />
       )}
+      {ayuda}
     </div>
   )
 }

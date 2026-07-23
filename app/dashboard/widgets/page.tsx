@@ -125,7 +125,11 @@ export default function WidgetsPage() {
               className="rounded border border-neutral-200 p-3 text-left hover:border-neutral-400"
             >
               <div className="text-sm font-medium">{t.nombre}</div>
-              <div className="mt-1 text-xs text-neutral-500">{t.descripcion}</div>
+              <div className="mt-1 text-xs leading-relaxed text-neutral-500">{t.descripcion}</div>
+              <div className="mt-2 text-xs leading-relaxed text-neutral-400">{t.uso}</div>
+              {t.cuidado && (
+                <div className="mt-2 text-xs leading-relaxed text-amber-700">⚠ {t.cuidado}</div>
+              )}
             </button>
           ))}
         </div>
@@ -228,6 +232,16 @@ function Editor({
 
   return (
     <div className="mt-4 space-y-4 border-t border-neutral-200 pt-4">
+      {/* Qué hace y qué necesita, arriba de todo: configurar un widget no debería requerir
+          acordarse de nada ni preguntar. */}
+      <div className="rounded bg-neutral-50 p-3">
+        <p className="text-xs leading-relaxed text-neutral-600">{tipo.descripcion}</p>
+        <p className="mt-2 text-xs leading-relaxed text-neutral-500">{tipo.uso}</p>
+        {tipo.cuidado && (
+          <p className="mt-2 text-xs leading-relaxed text-amber-700">⚠ {tipo.cuidado}</p>
+        )}
+      </div>
+
       <div>
         <label className="mb-1 block text-xs font-medium text-neutral-600">Nombre interno</label>
         <input
@@ -235,6 +249,9 @@ function Editor({
           value={widget.nombre}
           onChange={e => onCambio({ ...widget, nombre: e.target.value })}
         />
+        <p className="mt-1 text-xs leading-relaxed text-neutral-500">
+          Solo para reconocerlo en esta lista. No se ve en el sitio.
+        </p>
       </div>
 
       {tipo.campos.map(c => (
@@ -255,6 +272,10 @@ function Editor({
             <label className="mb-1 block text-xs text-neutral-500">
               Rutas (una por línea, vacío = en todas)
             </label>
+            <p className="mb-1 text-xs leading-relaxed text-neutral-500">
+              Se compara con el principio de la dirección: <code>/guia/</code> lo muestra en todas
+              las guías, <code>/guia/como-comprar</code> solo en esa.
+            </p>
             <textarea
               className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
               rows={3}
@@ -279,6 +300,10 @@ function Editor({
               <option value="escritorio">Solo escritorio</option>
             </select>
           </div>
+          <p className="text-xs leading-relaxed text-neutral-500">
+            Fechas opcionales. Fuera de la ventana el widget ni siquiera se envía a la página, así
+            que una promoción vencida no queda escondida en el código a la vista de nadie.
+          </p>
           <div className="flex gap-3">
             <div>
               <label className="mb-1 block text-xs text-neutral-500">Desde</label>
