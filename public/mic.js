@@ -26,7 +26,20 @@
   // servía todo con 200.
   var BASE = 'https://guias.infomicelium.com.ar';
   var script = document.currentScript;
-  var CTX = (script && script.getAttribute('data-ctx')) || 'guias';
+
+  /* Contexto: de dónde salen los widgets que corresponden a esta página.
+     En Tiendanube el mismo código se inyecta UNA vez para todo el sitio, así que no puede
+     venir escrito en la etiqueta: se deduce. `LS` solo existe en el storefront, y
+     `LS.template` dice qué plantilla se está mostrando. */
+  function contextoAuto() {
+    try {
+      if (window.LS && window.LS.template) {
+        return window.LS.template === 'product' ? 'producto' : 'tienda';
+      }
+    } catch (e) {}
+    return 'guias';
+  }
+  var CTX = (script && script.getAttribute('data-ctx')) || contextoAuto();
 
   var PALETA = {
     sage:     { bg: '#6f8a5f', texto: '#ffffff', suave: '#eef1ea' },

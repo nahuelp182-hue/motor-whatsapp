@@ -33,8 +33,13 @@ export async function GET(req: NextRequest) {
   })
   if (!store) return NextResponse.json({ widgets: [] }, { headers: CORS })
 
+  // «Tienda» es todo el storefront y «ficha de producto» es un lugar puntual dentro de él,
+  // así que una ficha de producto recibe las dos cosas. Si no, un anuncio pensado para toda
+  // la tienda desaparecería justo en la página donde se decide la compra.
+  const contextos = ctx === 'producto' ? ['producto', 'tienda'] : [ctx]
+
   const filas = await prisma.widget.findMany({
-    where: { store_id: store.id, contexto: ctx, activo: true },
+    where: { store_id: store.id, contexto: { in: contextos }, activo: true },
     orderBy: { orden: 'asc' },
     select: { id: true, tipo: true, config: true, reglas: true },
   })
