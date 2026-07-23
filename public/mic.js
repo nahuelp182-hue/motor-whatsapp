@@ -85,11 +85,14 @@
 
   var PREVIEW = !!(script && script.hasAttribute('data-preview'));
 
-  function evento(id, tipo) {
+  /* `valor` es el monto en pesos que el widget puso en juego (lo que se agregó al carrito).
+     Sin eso, «facturación estimada» sería una columna vacía: se sabría que alguien hizo clic
+     pero no cuánto movió, que es lo único que permite comparar widgets entre sí. */
+  function evento(id, tipo, valor) {
     // En vista previa no se registra nada: inflaría las métricas del widget real.
     if (PREVIEW) return;
     try {
-      var body = JSON.stringify({ widget_id: id, tipo: tipo, vid: vid() });
+      var body = JSON.stringify({ widget_id: id, tipo: tipo, vid: vid(), valor: valor || 0 });
       if (navigator.sendBeacon) navigator.sendBeacon(BASE + '/api/widgets/evento', body);
       else fetch(BASE + '/api/widgets/evento', { method: 'POST', body: body, keepalive: true });
     } catch (e) {}
@@ -906,6 +909,9 @@
     boton.addEventListener('click', function () {
       var elegidos = casillas.filter(function (ch) { return ch.checked; });
       if (!elegidos.length) return;
+      var montoTotal = elegidos.reduce(function (acc, ch) {
+        return acc + (Number(ch.getAttribute('data-precio')) || 0);
+      }, 0);
       evento(w.id, 'interaccion');
       boton.disabled = true;
       boton.textContent = 'Agregando…';
@@ -916,7 +922,7 @@
       var i = 0;
       (function siguiente() {
         if (i >= elegidos.length) {
-          evento(w.id, 'conversion');
+          evento(w.id, 'conversion', montoTotal);
           location.href = '/carrito/';
           return;
         }
@@ -1087,7 +1093,7 @@
       evento(w.id, 'interaccion');
       b.disabled = true; b.textContent = 'Agregando…';
       agregarAlCarrito(sup.id).then(function () {
-        evento(w.id, 'conversion');
+        evento(w.id, 'conversion', sup.precio - actual);
         location.href = '/carrito/';
       });
     });
@@ -1143,15 +1149,16 @@
           '<span class="d"><b>' + esc(x.p.nombre) + '</b>' +
           (x.nota ? '<span class="n">' + esc(x.nota) + '</span>' : '') + '</span>' +
           '<span class="pr">' + esc(pesos(x.p.precio)) + '</span>' +
-          '<button data-id="' + esc(x.p.id) + '">' + esc(c.etiqueta || 'Sumar') + '</button></div>';
+          '<button data-id="' + esc(x.p.id) + '" data-precio="' + x.p.precio + '">' + esc(c.etiqueta || 'Sumar') + '</button></div>';
       }).join('');
 
       [].slice.call(sh.querySelectorAll('button')).forEach(function (b) {
         b.addEventListener('click', function () {
           evento(w.id, 'interaccion');
           b.disabled = true; b.textContent = 'Sumando…';
+          var monto = Number(b.getAttribute('data-precio')) || 0;
           agregarAlCarrito(b.getAttribute('data-id')).then(function () {
-            evento(w.id, 'conversion');
+            evento(w.id, 'conversion', monto);
             location.reload();
           });
         });
@@ -1221,7 +1228,7 @@
         evento(w.id, 'interaccion');
         b.disabled = true; b.textContent = 'Sumando…';
         agregarAlCarrito(pr.id).then(function () {
-          evento(w.id, 'conversion');
+          evento(w.id, 'conversion', pr.precio);
           location.href = '/carrito/';
         });
       });

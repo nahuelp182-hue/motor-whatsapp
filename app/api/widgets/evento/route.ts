@@ -19,7 +19,7 @@ export function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   // sendBeacon manda text/plain → se parsea a mano, igual que /api/track.
-  let b: { widget_id?: string; tipo?: string; vid?: string }
+  let b: { widget_id?: string; tipo?: string; vid?: string; valor?: number }
   try {
     b = JSON.parse(await req.text())
   } catch {
@@ -44,6 +44,12 @@ export async function POST(req: NextRequest) {
   const existe = await prisma.widget.findUnique({ where: { id: widgetId }, select: { id: true } })
   if (!existe) return new NextResponse(null, { status: 204, headers: CORS })
 
-  await prisma.widgetEvent.create({ data: { widget_id: widgetId, tipo, vid } })
+  // El monto llega del navegador, así que se acota: sin tope, un valor absurdo arruinaría
+  // la facturación estimada de todo el período y no habría cómo notarlo.
+  const valor = Math.min(50_000_000, Math.max(0, Number(b.valor) || 0))
+
+  await prisma.widgetEvent.create({
+    data: { widget_id: widgetId, tipo, vid, meta: valor > 0 ? { valor } : undefined },
+  })
   return new NextResponse(null, { status: 204, headers: CORS })
 }

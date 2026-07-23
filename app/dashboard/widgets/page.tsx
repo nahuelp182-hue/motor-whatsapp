@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CampoEditor } from '@/components/widgets/CampoEditor'
 import { VistaPrevia } from '@/components/widgets/VistaPrevia'
+import { Metricas } from '@/components/widgets/Metricas'
 import { CARD, INPUT, LABEL, AYUDA, AVISO, BTN, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
 
@@ -225,6 +226,11 @@ export default function WidgetsPage() {
 
       {/* ── Catálogo por categoría ─────────────────────────────────── */}
       {creando && <Catalogo tipos={disponibles} onElegir={t => void crear(t)} />}
+
+      {/* ── Rendimiento ────────────────────────────────────────────
+          Arriba de la lista y no escondido en otra pantalla: la decisión que importa es
+          cuál apagar, y esa se toma mirando los números al lado de los widgets. */}
+      {!editando && !creando && <Metricas />}
 
       {/* ── Lista o editor ─────────────────────────────────────────── */}
       {cargando ? (
