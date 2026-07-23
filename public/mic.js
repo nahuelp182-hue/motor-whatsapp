@@ -35,7 +35,29 @@
     tierra:   { bg: '#7a6a55', texto: '#ffffff', suave: '#f1ede7' },
     carbon:   { bg: '#1c1a17', texto: '#ffffff', suave: '#ecebe9' }
   };
-  function paleta(c) { return PALETA[c] || PALETA.sage; }
+  /* El color puede ser un token de marca o un código propio (#rrggbb) cargado desde el
+     panel para un evento puntual. Con un código propio hay que derivar las otras dos
+     variantes, porque un widget necesita tres cosas y el panel solo pide una:
+       bg    → el color elegido
+       texto → blanco o carbón, el que se lea sobre ese fondo
+       suave → la versión clara para los recuadros de fondo
+     Derivarlas es lo que evita el caso de texto blanco sobre amarillo. */
+  function paleta(c) {
+    if (typeof c === 'string' && c.charAt(0) === '#' && c.length === 7) {
+      var r = parseInt(c.substr(1, 2), 16),
+          g = parseInt(c.substr(3, 2), 16),
+          b = parseInt(c.substr(5, 2), 16);
+      // Luminancia percibida: el ojo ve el verde mucho más que el azul.
+      var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      function mezclarConBlanco(x) { return Math.round(x + (255 - x) * 0.9); }
+      return {
+        bg: c,
+        texto: lum > 0.62 ? '#1c1a17' : '#ffffff',
+        suave: 'rgb(' + mezclarConBlanco(r) + ',' + mezclarConBlanco(g) + ',' + mezclarConBlanco(b) + ')'
+      };
+    }
+    return PALETA[c] || PALETA.sage;
+  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
@@ -808,6 +830,95 @@
     });
 
     verUnaVez(sh, w.id);
+  };
+
+  /* Gente viendo ahora.
+   *
+   * El navegador avisa que está presente y el servidor devuelve cuántos hay en esta misma
+   * página. Se repite cada 45 s mientras la pestaña esté a la vista: si el visitante se va
+   * a otra solapa deja de avisar, y al volver retoma. Así el número baja solo cuando la
+   * gente se va, que es lo que lo hace cierto.
+   *
+   * El factor de corrección se aplica acá y no en el servidor a propósito: del lado del
+   * servidor queda siempre el conteo crudo, que es contra el que se recalibra.
+   */
+  R.viendo_ahora = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var factor = Math.min(5, Math.max(1, Number(c.factor) || 1));
+    var minimo = Math.max(2, Number(c.minimo) || 3);
+    var ventana = Math.min(600, Math.max(60, (Number(c.ventana) || 3) * 60));
+
+    // Identificador propio del widget: si el tracker de curiosos no dejó uno (bloqueadores,
+    // primera visita), se genera uno acá. Sin identificador no se puede contar sin duplicar.
+    var id = vid();
+    if (!id) {
+      try {
+        id = localStorage.getItem('__mic_pid');
+        if (!id) {
+          id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+          localStorage.setItem('__mic_pid', id);
+        }
+      } catch (e) {
+        id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+      }
+    }
+
+    var sh = null, texto = null, visible = false;
+
+    function dibujar(n) {
+      var frase = String(c.plantilla || '{n} personas están viendo este producto');
+      // Concordancia: con 1 no puede decir "personas están".
+      if (n === 1) {
+        frase = frase
+          .replace(/personas/gi, 'persona')
+          .replace(/\bestán\b/gi, 'está')
+          .replace(/\bviendo\b/gi, 'viendo');
+      }
+      frase = frase.replace(/\{n\}/g, String(n));
+
+      if (!sh) {
+        sh = montar(w, false);
+        if (!sh) return;
+        pintar(sh,
+          '.v{display:inline-flex;align-items:center;gap:8px;margin:14px 0;padding:8px 14px;' +
+          'background:' + p.suave + ';border-radius:999px;font-size:13.5px;color:#2a2620}' +
+          '.d{width:8px;height:8px;border-radius:50%;background:#3fa34d;flex:none;' +
+          'animation:lat 2s ease-in-out infinite}' +
+          '@keyframes lat{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}' +
+          '@media (prefers-reduced-motion:reduce){.d{animation:none}}',
+          '<div class="v"><span class="d"></span><span class="t"></span></div>');
+        texto = sh.querySelector('.t');
+        verUnaVez(sh, w.id);
+      }
+      texto.textContent = frase;
+      if (!visible) { sh.host.style.display = ''; visible = true; }
+    }
+
+    function ocultar() {
+      if (sh && visible) { sh.host.style.display = 'none'; visible = false; }
+    }
+
+    function latir() {
+      // Con la pestaña oculta no se avisa: quien está en otra solapa no está mirando esto.
+      if (document.hidden) return;
+      fetch(BASE + '/api/presencia', {
+        method: 'POST',
+        body: JSON.stringify({ pagina: location.pathname, vid: id, ventana: ventana })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var real = Number(d && d.n) || 0;
+          if (!real) { ocultar(); return; } // sin dato real no se muestra nada
+          var mostrado = Math.round(real * factor);
+          if (mostrado < minimo) { ocultar(); return; }
+          dibujar(mostrado);
+        })
+        .catch(function () { ocultar(); });
+    }
+
+    latir();
+    setInterval(latir, 45000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) latir(); });
   };
 
   /* ══════════════ ARRANQUE ══════════════ */

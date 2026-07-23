@@ -273,20 +273,58 @@ export function CampoEditor({ campo, valor, productos = [], onChange }: Props) {
           ))}
         </select>
       ) : campo.tipo === 'color' ? (
-        // Sin selector libre: solo la paleta de marca. Ver el comentario en tipos.ts.
-        <div className="flex gap-2">
-          {PALETA.map(p => (
-            <button
-              key={p.value}
-              type="button"
-              title={p.label}
-              onClick={() => onChange(p.value)}
-              className={`h-8 w-8 rounded-full border-2 ${
-                valor === p.value ? 'border-neutral-900' : 'border-neutral-200'
+        // La paleta de marca primero, y un código propio para lo puntual (un evento, una
+        // fecha). El orden importa: lo de marca es el camino fácil, el color libre es el
+        // desvío deliberado.
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            {PALETA.map(p => (
+              <button
+                key={p.value}
+                type="button"
+                title={p.label}
+                onClick={() => onChange(p.value)}
+                className={`h-8 w-8 rounded-full border-2 ${
+                  valor === p.value ? 'border-neutral-900' : 'border-neutral-200'
+                }`}
+                style={{ background: p.hex }}
+              />
+            ))}
+            <span className="mx-1 h-6 w-px bg-neutral-200" />
+            <label
+              className={`flex cursor-pointer items-center gap-2 rounded border px-2 py-1 ${
+                String(valor ?? '').startsWith('#') ? 'border-neutral-900' : 'border-neutral-200'
               }`}
-              style={{ background: p.hex }}
+              title="Elegir un color propio"
+            >
+              <input
+                type="color"
+                className="h-6 w-6 cursor-pointer border-0 bg-transparent p-0"
+                value={String(valor ?? '').startsWith('#') ? String(valor) : '#6f8a5f'}
+                onChange={e => onChange(e.target.value)}
+              />
+              <span className="text-xs text-neutral-600">Otro color</span>
+            </label>
+            <input
+              type="text"
+              placeholder="#a1b2c3"
+              maxLength={7}
+              className="w-24 rounded border border-neutral-300 px-2 py-1 font-mono text-xs uppercase"
+              value={String(valor ?? '').startsWith('#') ? String(valor) : ''}
+              onChange={e => {
+                const v = e.target.value.trim()
+                // Se avisa recién con el código completo: marcar en rojo mientras todavía
+                // lo está escribiendo es ruido, no ayuda.
+                onChange(v === '' ? 'sage' : v.startsWith('#') ? v : '#' + v)
+              }}
             />
-          ))}
+          </div>
+          {String(valor ?? '').startsWith('#') && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(String(valor)) && (
+            <p className="mt-1 text-xs text-amber-700">
+              Código incompleto. Va con almohadilla y seis dígitos, por ejemplo #b0341d. Si se
+              guarda así, vuelve al color de marca.
+            </p>
+          )}
         </div>
       ) : campo.tipo === 'numero' ? (
         <input

@@ -109,6 +109,8 @@ const CAMPO_COLOR: Campo = {
   label: 'Color principal',
   tipo: 'color',
   porDefecto: 'sage',
+  ayuda:
+    'La paleta de marca es lo normal. El código propio está para un evento o una fecha puntual: si termina quedándose, el sitio deja de verse como una sola marca.',
 }
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
@@ -972,6 +974,64 @@ export const TIPOS: TipoWidget[] = [
       CAMPO_COLOR,
     ],
   },
+  {
+    slug: 'viendo_ahora',
+    nombre: 'Gente viendo ahora',
+    descripcion:
+      'Cuántas personas están mirando esta misma página en este momento. El dato sale de visitantes reales presentes, no de un número al azar.',
+    categoria: 'conversion',
+    contextos: ['producto', 'tienda'],
+    bloque: true,
+    uso:
+      'El navegador de cada visitante avisa que está en la página y vuelve a avisar cada 45 segundos mientras la pestaña esté a la vista. Se cuentan los presentes de los últimos minutos, y el número se refresca solo sin recargar. Si no llega al mínimo configurado, el widget no se muestra: mejor nada que "1 persona".',
+    cuidado:
+      'Este número es verificable: alguien puede abrir la página en dos dispositivos y contar. Si el factor de corrección está alto, el widget dice algo que se puede desmentir en treinta segundos, y eso cuesta más de lo que suma. Conviene contrastarlo contra los usuarios activos de GA4 en tiempo real antes de fijarlo.',
+    campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'tras_intro',
+        ayuda: 'Cerca del precio o del botón de compra es donde pesa.',
+      },
+      {
+        key: 'plantilla',
+        label: 'Texto',
+        tipo: 'texto',
+        porDefecto: '{n} personas están viendo este producto',
+        ayuda: 'Escribí {n} donde va el número. Si queda en 1, el texto se ajusta solo al singular.',
+      },
+      {
+        key: 'factor',
+        label: 'Factor de corrección',
+        tipo: 'numero',
+        min: 1,
+        max: 5,
+        porDefecto: 3,
+        ayuda:
+          'Multiplica el conteo real para compensar visitantes que no se registran (bloqueadores, JS desactivado, navegación privada). En 1 se muestra el dato crudo. Cuanto más alto, más se aleja de lo verificable.',
+      },
+      {
+        key: 'minimo',
+        label: 'No mostrar si son menos de',
+        tipo: 'numero',
+        min: 2,
+        max: 20,
+        porDefecto: 3,
+        ayuda: 'Por debajo de este número el widget no aparece. Evita el "1 persona está viendo", que resta en vez de sumar.',
+      },
+      {
+        key: 'ventana',
+        label: 'Minutos que cuenta como "ahora"',
+        tipo: 'numero',
+        min: 1,
+        max: 10,
+        porDefecto: 3,
+        ayuda: 'Cuánto sigue contando alguien después de su último aviso. Tres minutos es lo habitual.',
+      },
+      CAMPO_COLOR,
+    ],
+  },
 ]
 
 export const porSlug = (slug: string): TipoWidget | undefined => TIPOS.find(t => t.slug === slug)
@@ -1009,8 +1069,18 @@ export function sanearConfig(tipo: TipoWidget, entrada: unknown): Record<string,
       }
       case 'select':
         return c.opciones?.some(o => o.value === v) ? v : (c.porDefecto ?? c.opciones?.[0]?.value ?? '')
-      case 'color':
-        return PALETA.some(p => p.value === v) ? v : 'sage'
+      case 'color': {
+        if (PALETA.some(p => p.value === v)) return v
+        // Además de la paleta se admite un código propio, para campañas o fechas puntuales
+        // que piden un color que no es de marca. Se acepta SOLO #rrggbb: cualquier otra
+        // cosa termina metida dentro de una hoja de estilos que se sirve a los visitantes.
+        const hex = String(v ?? '').trim().toLowerCase()
+        if (/^#[0-9a-f]{6}$/.test(hex)) return hex
+        if (/^#[0-9a-f]{3}$/.test(hex)) {
+          return '#' + hex.slice(1).split('').map(x => x + x).join('')
+        }
+        return 'sage'
+      }
       case 'producto':
         // Solo el id numérico de Tiendanube; el nombre y el precio se leen en vivo.
         return /^\d{1,12}$/.test(String(v ?? '')) ? String(v) : ''
