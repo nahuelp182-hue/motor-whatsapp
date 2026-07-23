@@ -609,6 +609,7 @@ function Editor({
                 campo={c}
                 valor={widget.config?.[c.key]}
                 productos={productos}
+                config={widget.config}
                 onChange={v => onCambio({ ...widget, config: { ...widget.config, [c.key]: v } })}
               />
             ))}

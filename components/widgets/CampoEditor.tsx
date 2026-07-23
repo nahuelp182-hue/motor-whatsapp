@@ -1,6 +1,7 @@
 'use client'
 
-import { PALETA, UBICACIONES, DESTINOS, EMOJIS, type Campo } from '@/lib/widgets/tipos'
+import { PALETA, UBICACIONES, DESTINOS, EMOJIS, PROPORCIONES, type Campo } from '@/lib/widgets/tipos'
+import { SubirMedia } from './SubirMedia'
 import { INPUT, LABEL, AYUDA, AVISO } from './ui'
 
 // Formulario genérico: dibuja UN campo a partir de su declaración en lib/widgets/tipos.ts.
@@ -17,12 +18,15 @@ type Props = {
   valor: unknown
   /** Catálogo real de Tiendanube, para los campos de tipo producto. */
   productos?: Producto[]
+  /** Config completa del widget: algún campo necesita mirar a otro (la medida sugerida
+   *  del archivo depende de la proporción elegida). */
+  config?: Record<string, unknown>
   onChange: (v: unknown) => void
 }
 
 const input = INPUT
 
-export function CampoEditor({ campo, valor, productos = [], onChange }: Props) {
+export function CampoEditor({ campo, valor, productos = [], config, onChange }: Props) {
   // La ayuda va SIEMPRE debajo del campo y en renglón aparte, no como texto gris al lado
   // del rótulo. Es la diferencia entre poder configurar un widget sin preguntarle a nadie y
   // tener que acordarse de qué hacía cada casilla.
@@ -132,6 +136,22 @@ export function CampoEditor({ campo, valor, productos = [], onChange }: Props) {
 
   // Producto del catálogo real. Nunca se escribe un id: un id mal tipeado no falla a la
   // vista, deja el widget ofreciendo algo que no existe.
+  // Subida de archivo: la conversión y el tope de peso viven en SubirMedia.
+  if (campo.tipo === 'media') {
+    // La medida sugerida sale de la proporción que el widget ya tenga elegida, así el
+    // número que se muestra es el que corresponde y no una tabla genérica.
+    const prop = PROPORCIONES.find(x => x.value === String(config?.proporcion ?? '16:9'))
+    return (
+      <SubirMedia
+        valor={String(valor ?? '')}
+        label={campo.label}
+        ayuda={campo.ayuda}
+        recomendado={prop?.medida}
+        onChange={onChange}
+      />
+    )
+  }
+
   if (campo.tipo === 'producto') {
     const elegido = productos.find(p => p.id === String(valor ?? ''))
     return (

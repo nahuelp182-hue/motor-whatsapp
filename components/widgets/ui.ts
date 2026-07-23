@@ -91,6 +91,10 @@ const ICONOS: Record<string, string> = {
   progreso_envio: '📦',
   pack_complementarios: '🎁',
   viendo_ahora: '👀',
+  media: '🖼️',
+  upsell_upgrade: '🚀',
+  crosssell_carrito: '🧩',
+  upsell_al_agregar: '🎁',
 }
 
 export const iconoDe = (slug: string) => ICONOS[slug] ?? '🧩'

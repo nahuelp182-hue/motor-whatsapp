@@ -21,6 +21,7 @@ export type TipoCampo =
   | 'emoji'
   | 'ubicacion'
   | 'producto'
+  | 'media'
   | 'lista'
 
 export type Campo = {
@@ -112,6 +113,23 @@ const CAMPO_COLOR: Campo = {
   ayuda:
     'La paleta de marca es lo normal. El código propio está para un evento o una fecha puntual: si termina quedándose, el sitio deja de verse como una sola marca.',
 }
+
+// Proporciones con su medida sugerida. El panel muestra la medida ANTES de subir, que es
+// cuando sirve: después de subir una foto mal encuadrada ya no hay nada que hacer.
+export const PROPORCIONES = [
+  { value: '16:9', label: 'Apaisado (16:9)', medida: '1600 × 900 px' },
+  { value: '4:3', label: 'Clásico (4:3)', medida: '1600 × 1200 px' },
+  { value: '1:1', label: 'Cuadrado (1:1)', medida: '1200 × 1200 px' },
+  { value: '4:5', label: 'Vertical (4:5)', medida: '1080 × 1350 px' },
+  { value: 'original', label: 'Como venga el archivo', medida: 'ancho máximo 1600 px' },
+] as const
+
+export const MARCOS = [
+  { value: 'ninguno', label: 'Sin marco', radio: '0' },
+  { value: 'suave', label: 'Esquinas suaves', radio: '8px' },
+  { value: 'redondo', label: 'Esquinas redondeadas', radio: '18px' },
+  { value: 'circulo', label: 'Círculo', radio: '999px' },
+] as const
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -1196,6 +1214,95 @@ export const TIPOS: TipoWidget[] = [
       CAMPO_COLOR,
     ],
   },
+  {
+    slug: 'media',
+    nombre: 'Imagen o animación',
+    descripcion:
+      'Una imagen, un GIF o un video corto en bucle, con marco y proporción a elección. Para mostrar en movimiento lo que en texto necesita tres párrafos.',
+    categoria: 'contenido',
+    contextos: ['guias', 'tienda', 'producto'],
+    bloque: true,
+    uso:
+      'Se inserta donde elijas. El archivo NO se sube como viene: las fotos se achican y pasan a WebP, y los GIF se convierten a video, que pesa hasta veinte veces menos y se ve igual. Un GIF de 50 MB terminaría pesando menos de 3 MB.',
+    cuidado:
+      'La proporción recorta al centro para que la pieza entre siempre bien en su lugar. Si lo importante está en un borde, conviene recortar antes de subir o elegir «como venga el archivo».',
+    campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'medio',
+        ayuda: 'Se elige de la lista.',
+      },
+      {
+        key: 'archivo',
+        label: 'Archivo',
+        tipo: 'media',
+        ayuda: 'El video va en bucle, sin sonido y sin controles: se comporta como el GIF que reemplaza.',
+      },
+      {
+        key: 'proporcion',
+        label: 'Proporción',
+        tipo: 'select',
+        porDefecto: '16:9',
+        ayuda:
+          'Define el lugar que ocupa. Elegirla evita el salto del texto mientras carga y que una imagen mal medida deforme la página.',
+        opciones: [
+          { value: '16:9', label: 'Apaisado (16:9) — 1600 × 900 px' },
+          { value: '4:3', label: 'Clásico (4:3) — 1600 × 1200 px' },
+          { value: '1:1', label: 'Cuadrado (1:1) — 1200 × 1200 px' },
+          { value: '4:5', label: 'Vertical (4:5) — 1080 × 1350 px' },
+          { value: 'original', label: 'Como venga el archivo' },
+        ],
+      },
+      {
+        key: 'marco',
+        label: 'Marco',
+        tipo: 'select',
+        porDefecto: 'redondo',
+        ayuda: 'El círculo solo queda bien con proporción cuadrada.',
+        opciones: [
+          { value: 'ninguno', label: 'Sin marco' },
+          { value: 'suave', label: 'Esquinas suaves' },
+          { value: 'redondo', label: 'Esquinas redondeadas' },
+          { value: 'circulo', label: 'Círculo' },
+        ],
+      },
+      {
+        key: 'borde',
+        label: 'Línea de contorno',
+        tipo: 'booleano',
+        porDefecto: false,
+        ayuda: 'Una línea fina del color elegido. Ayuda cuando la imagen tiene fondo claro y se pierde contra la página.',
+      },
+      {
+        key: 'epigrafe',
+        label: 'Epígrafe',
+        tipo: 'texto',
+        ayuda: 'Opcional, va debajo. Sirve para aclarar qué se está viendo; también lo leen los buscadores.',
+      },
+      {
+        key: 'alt',
+        label: 'Descripción para quien no puede verla',
+        tipo: 'texto',
+        ayuda:
+          'Qué se ve, en una frase. Lo usan los lectores de pantalla y los buscadores. Si queda vacío, se usa el epígrafe.',
+      },
+      {
+        key: 'ancho',
+        label: 'Ancho',
+        tipo: 'select',
+        porDefecto: 'completo',
+        ayuda: 'Hasta dónde se estira dentro del texto.',
+        opciones: [
+          { value: 'completo', label: 'Todo el ancho del texto' },
+          { value: 'medio', label: 'La mitad, centrada' },
+          { value: 'chico', label: 'Chica, centrada' },
+        ],
+      },
+      CAMPO_COLOR,
+    ],
+  },
 ]
 
 /**
@@ -1273,6 +1380,13 @@ export function sanearConfig(tipo: TipoWidget, entrada: unknown): Record<string,
         }
         return 'sage'
       }
+      case 'media':
+        // Solo URLs del almacén propio. Sin esto, la config puede terminar apuntando a un
+        // archivo de cualquier servidor, que además de romperse cuando ese servidor cambia
+        // le cuenta a un tercero quién visita el sitio.
+        return /^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.com\//i.test(String(v ?? ''))
+          ? String(v)
+          : ''
       case 'producto':
         // Solo el id numérico de Tiendanube; el nombre y el precio se leen en vivo.
         return /^\d{1,12}$/.test(String(v ?? '')) ? String(v) : ''

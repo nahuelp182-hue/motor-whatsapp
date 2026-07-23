@@ -1142,6 +1142,58 @@
     } catch (e) {}
   };
 
+  R.media = function (w) {
+    var c = w.config, p = paleta(c.color);
+    if (!c.archivo) return;
+    var sh = montar(w, false); if (!sh) return;
+
+    var RADIOS = { ninguno: '0', suave: '8px', redondo: '18px', circulo: '999px' };
+    var radio = RADIOS[c.marco] || '18px';
+
+    // La proporción se reserva ANTES de que cargue el archivo. Sin esto el texto salta
+    // cuando la imagen aparece, que además de molesto penaliza en los buscadores.
+    var PROPS = { '16:9': '16/9', '4:3': '4/3', '1:1': '1/1', '4:5': '4/5' };
+    var prop = PROPS[c.proporcion];
+
+    var ANCHOS = { completo: '100%', medio: '60%', chico: '38%' };
+    var ancho = ANCHOS[c.ancho] || '100%';
+
+    var esVideo = /\.(webm|mp4)(\?|$)/i.test(c.archivo);
+    var alt = esc(c.alt || c.epigrafe || '');
+
+    pintar(sh,
+      'figure{margin:24px auto;width:' + ancho + ';max-width:100%}' +
+      '.m{width:100%;overflow:hidden;border-radius:' + radio + ';background:#f0ece5;display:block' +
+      (prop ? ';aspect-ratio:' + prop : '') +
+      (c.borde ? ';border:1px solid ' + p.bg : '') + '}' +
+      // object-fit recorta al centro: una imagen de cualquier medida entra en su lugar sin
+      // deformarse. Es lo que evita que una foto mal exportada rompa la página.
+      'img,video{width:100%;height:100%;object-fit:' + (prop ? 'cover' : 'contain') + ';display:block}' +
+      'figcaption{margin-top:9px;font-size:13px;line-height:1.5;color:#6a6157;text-align:center}',
+      '<figure><div class="m">' +
+      (esVideo
+        ? '<video src="' + esc(c.archivo) + '" autoplay loop muted playsinline preload="metadata" aria-label="' + alt + '"></video>'
+        : '<img src="' + esc(c.archivo) + '" alt="' + alt + '" loading="lazy" decoding="async">') +
+      '</div>' +
+      (c.epigrafe ? '<figcaption>' + esc(c.epigrafe) + '</figcaption>' : '') +
+      '</figure>');
+
+    // El video arranca recién cuando entra en pantalla: reproducir algo que nadie está
+    // mirando gasta datos del visitante y batería, sin comprarle nada a nadie.
+    var v = sh.querySelector('video');
+    if (v && 'IntersectionObserver' in window) {
+      v.autoplay = false;
+      new IntersectionObserver(function (es) {
+        es.forEach(function (e) {
+          if (e.isIntersecting) { v.play().catch(function () {}); }
+          else { v.pause(); }
+        });
+      }, { threshold: 0.25 }).observe(v);
+    }
+
+    verUnaVez(sh, w.id);
+  };
+
   /* ══════════════ ARRANQUE ══════════════ */
   function arrancar(lista) {
     for (var i = 0; i < lista.length; i++) {
