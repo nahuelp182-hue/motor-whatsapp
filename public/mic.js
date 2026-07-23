@@ -499,35 +499,103 @@
   };
 
   R.envio_estimado = function (w) {
-    var c = w.config, p = paleta(c.color);
+    var c = w.config;
+    var p = paleta(c.color), pt = paleta(c.color_texto);
     var sh = montar(w, false); if (!sh) return;
 
-    // Solo días hábiles, y si ya pasó la hora de corte la cuenta arranca mañana. Es la
-    // misma lógica que usa cualquier tienda grande, y es lo que hace creíble la fecha.
+    /* Suma días hábiles. El sábado cuenta solo si la tienda despacha los sábados; el
+       domingo nunca. Es la diferencia entre una fecha creíble y una que no se cumple. */
     function habiles(desde, dias) {
-      var d = new Date(desde), sumados = 0;
+      var d = new Date(desde.getTime()), sumados = 0;
       while (sumados < dias) {
         d.setDate(d.getDate() + 1);
         var dia = d.getDay();
-        if (dia !== 0 && dia !== 6) sumados++;
+        if (dia === 0) continue;
+        if (dia === 6 && !c.sabados) continue;
+        sumados++;
       }
       return d;
     }
+
+    var corte = Number(c.corte);
+    if (!isFinite(corte)) corte = 18;
+    var ahora = new Date();
+    var pasoLaHora = ahora.getHours() >= corte;
+
+    // Base: hoy, salvo que ya haya pasado la hora de corte. Un domingo o un sábado sin
+    // despacho también corre la base al próximo día hábil.
     var base = new Date();
-    if (base.getHours() >= (Number(c.corte) || 15)) base.setDate(base.getDate() + 1);
+    if (pasoLaHora) base = habiles(base, 1);
+    else {
+      var dh = base.getDay();
+      if (dh === 0 || (dh === 6 && !c.sabados)) base = habiles(base, 1);
+    }
 
-    var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-    function fmt(d) { return d.getDate() + ' de ' + MESES[d.getMonth()]; }
+    var envio = Number(c.dias_envio) > 0 ? habiles(base, Number(c.dias_envio)) : base;
+    var entrega = habiles(envio, Math.max(1, Number(c.dias_entrega) || 1));
+    var entrega2 = habiles(entrega, 1);
 
-    var a = habiles(base, Math.max(1, Number(c.dias_min) || 3));
-    var b = habiles(base, Math.max(Number(c.dias_min) || 3, Number(c.dias_max) || 7));
+    var MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    function corto(d) { return d.getDate() + ' ' + MESES[d.getMonth()]; }
+
+    // "Hoy" y "Mañana" se entienden de un vistazo; una fecha obliga a pensar qué día es hoy.
+    function relativo(d) {
+      var h = new Date(); h.setHours(0, 0, 0, 0);
+      var x = new Date(d.getTime()); x.setHours(0, 0, 0, 0);
+      var dias = Math.round((x - h) / 86400000);
+      if (dias <= 0) return 'Hoy';
+      if (dias === 1) return 'Mañana';
+      return corto(d);
+    }
+
+    function dosDigitos(n) { return (n < 10 ? '0' : '') + n; }
+    var limite = (!pasoLaHora && c.mostrar_limite) ? 'antes de las ' + dosDigitos(corte) + ':00' : '';
+
+    var textoEntrega = c.rango
+      ? corto(entrega) + ' - ' + corto(entrega2)
+      : corto(entrega);
+
+    var SVG = {
+      compra: '<path d="M6 7V6a6 6 0 0112 0v1h3l-1.5 15h-15L3 7h3zm2 0h8V6a4 4 0 00-8 0v1z"/>',
+      envio: '<path d="M1 5h13v10H1V5zm14 3h4l3 4v3h-2a2.5 2.5 0 01-5 0h-.5V8h.5zM4.5 15a2.5 2.5 0 105 0 2.5 2.5 0 00-5 0z"/>',
+      entrega: '<path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>'
+    };
+    function icono(clave, emoji) {
+      if (c.iconos === 'emoji') return '<span class="em">' + emoji + '</span>';
+      return '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">' + SVG[clave] + '</svg>';
+    }
+
+    function paso(clave, emoji, titulo, fecha, extra) {
+      return '<div class="p"><span class="ic">' + icono(clave, emoji) + '</span>' +
+        '<span class="t">' + esc(titulo) + '</span>' +
+        '<span class="f">' + esc(fecha) + '</span>' +
+        (extra ? '<span class="lim">' + esc(extra) + '</span>' : '') + '</div>';
+    }
 
     pintar(sh,
-      '.e{display:flex;gap:11px;align-items:center;background:' + p.suave + ';border-radius:10px;padding:14px 18px;margin:16px 0}' +
-      '.i{font-size:20px}' +
-      'span{font-size:14.5px;color:#3a352e;line-height:1.5}b{color:' + p.bg + '}',
-      '<div class="e"><span class="i">🚚</span><span>' + esc(c.texto || 'Llega entre el') +
-      ' <b>' + esc(fmt(a)) + '</b> y el <b>' + esc(fmt(b)) + '</b></span></div>');
+      '.c{margin:20px 0;padding:' + (c.fondo === 'ninguno' ? '4px 0' : '18px 14px') + ';' +
+      (c.fondo === 'ninguno' ? '' : 'background:' + p.suave + ';border-radius:12px;') + '}' +
+      '.fila{display:flex;align-items:flex-start;justify-content:space-between}' +
+      '.p{flex:1 1 0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;min-width:0}' +
+      '.ic{color:' + p.bg + ';height:24px;display:flex;align-items:center}' +
+      '.em{font-size:20px;line-height:1}' +
+      '.t{font-size:13.5px;font-weight:600;color:' + pt.bg + '}' +
+      '.f{font-size:12.5px;color:' + p.bg + '}' +
+      '.lim{font-size:10.5px;color:#8a8177;text-transform:uppercase;letter-spacing:.04em}' +
+      // La línea se alinea con los íconos, no con el bloque entero: si se centrara sobre
+      // todo el alto, quedaría cruzando el texto.
+      '.ln{flex:0 1 60px;height:1px;background:' + p.bg + ';opacity:.45;margin-top:12px}' +
+      '.nota{margin:12px 0 0;text-align:center;font-size:11.5px;color:#8a8177}',
+      '<div class="c"><div class="fila">' +
+      paso('compra', '🛒', c.et_compra || 'Compra', relativo(base), limite) +
+      '<span class="ln"></span>' +
+      paso('envio', '🚚', c.et_envio || 'Envío', relativo(envio), '') +
+      '<span class="ln"></span>' +
+      paso('entrega', '✅', c.et_entrega || 'Entrega', textoEntrega, '') +
+      '</div>' +
+      (c.nota ? '<p class="nota">' + esc(c.nota) + '</p>' : '') +
+      '</div>');
+
     verUnaVez(sh, w.id);
   };
 
