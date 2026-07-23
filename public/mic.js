@@ -119,10 +119,25 @@
       'article',
       '.mic-ancho main',
       'main',
-      '.js-product-description',   // ficha de producto de Tiendanube
+      // Tiendanube no usa <main> ni <article>. En la ficha de producto, la columna de la
+      // derecha (`js-product-detail`) es donde están el precio y el botón: ahí es donde
+      // sirve un widget. La descripción va después, como segunda opción.
+      '.js-product-detail',
+      '.js-product-description',
       '.product-description'
     ];
+
+    // Esas tres últimas SOLO valen en la ficha de producto. En la portada de la tienda
+    // aparecen dentro de las tarjetas de la grilla y de plantillas ocultas: un widget ahí
+    // terminaría metido adentro de un producto cualquiera. Sin lugar razonable, no se
+    // dibuja — es mejor que aparecer en un lugar absurdo.
+    var esFicha = true;
+    try {
+      if (window.LS && window.LS.template) esFicha = window.LS.template === 'product';
+    } catch (e) {}
+
     for (var i = 0; i < candidatos.length; i++) {
+      if (i >= 4 && !esFicha) return null;
       var el = document.querySelector(candidatos[i]);
       if (el) return el;
     }
