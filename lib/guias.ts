@@ -5,6 +5,12 @@
 // Un bloque `vital` no se puede confundir con un párrafo, y el índice puede ordenar por
 // importancia sin que nadie se acuerde de hacerlo a mano.
 //
+// Registro editorial: cercano pero profesional. Voseo sí (es el registro rioplatense
+// natural), coloquialismo no. La terminología técnica se usa —micelio, sustrato,
+// colonización, fructificación, primordios— y se aclara la primera vez que aparece.
+// El lector es aficionado, no ignorante: escribirle como si fuera una charla de café
+// resta autoridad y es el error típico del texto generado sin criterio.
+//
 // Todo bloque marcado con `verificar: true` sale renderizado con una marca visible: son
 // datos técnicos que tiene que confirmar Nahuel antes de publicar. Inventar una temperatura
 // o una potencia sería peor que no tener la página.
@@ -21,6 +27,22 @@ export type Bloque =
   | {
       tipo: 'cronograma'
       filas: Array<{ etapa: string; dias: string; que: string; ojo?: string }>
+    }
+  // Ficha comparativa de especies. Es el bloque que más decide una compra: el visitante no
+  // pregunta "cómo funciona", pregunta "qué puedo cultivar YO, donde vivo, en esta época".
+  // Los rangos térmicos siguen los parámetros de Paul Stamets (Growing Gourmet and Medicinal
+  // Mushrooms, 3.ª ed.), acotados a lo que el INC101 puede sostener: calienta, no refrigera.
+  | {
+      tipo: 'especies'
+      filas: Array<{
+        nombre: string
+        cientifico: string
+        nivel: 'inicial' | 'intermedia' | 'avanzada'
+        colonizacion: string
+        fructificacion: string
+        ciclo: string
+        nota: string
+      }>
     }
   // Precio leído de Tiendanube al renderizar. Nunca se escribe a mano: se ajusta 2 veces por
   // mes y un número viejo en una guía genera un reclamo.
@@ -56,86 +78,88 @@ const insumos: Guia = {
   titulo: 'Qué necesitás además del equipo',
   eyebrow: 'Antes de empezar',
   resumen:
-    'La incubadora controla el ambiente. El material de cultivo lo conseguís aparte, y esa ' +
-    'separación es a propósito. Acá está qué hace falta, por qué no lo vendemos y qué mirar ' +
-    'para elegir bien.',
+    'La incubadora controla el ambiente de cultivo. El material biológico —micelio y ' +
+    'sustrato— se adquiere por separado, y esa separación es deliberada. Acá está qué hace ' +
+    'falta, por qué no lo comercializamos y qué criterios usar para elegirlo.',
   intencion: 'informacional',
   actualizado: '2026-07-21',
   mensajesQueResuelve: 26,
   secciones: [
     {
       id: 'que-vendemos',
-      titulo: 'Qué vendemos y qué no',
+      titulo: 'Qué fabricamos y qué no',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'Diseñamos y fabricamos equipos: la incubadora sostiene la temperatura y la humedad ' +
-            'estables el tiempo que dura el cultivo. Eso es lo que hacemos y es lo único que ' +
-            'vendemos.',
+            'Diseñamos y fabricamos equipos de cultivo. La incubadora sostiene temperatura y ' +
+            'humedad estables durante todo el ciclo, que es la variable ambiental de la que ' +
+            'depende el resultado. Ese es nuestro rubro y es lo único que comercializamos.',
         },
         {
           tipo: 'parrafo',
           texto:
-            'No vendemos material de cultivo. No es una limitación: es una decisión. El material ' +
-            'vivo viaja mal, pierde calidad en el camino y su estado depende de cómo se conserve ' +
-            'cada día. Prefiramos hacernos responsables de lo que sí podemos controlar de punta a ' +
-            'punta.',
+            'No vendemos material biológico. No es una limitación operativa: es una decisión. ' +
+            'El micelio es un organismo vivo, se degrada en el transporte y su viabilidad ' +
+            'depende de la cadena de conservación día a día. Preferimos responder por aquello ' +
+            'que podemos controlar de punta a punta.',
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Si alguien te vende el equipo y el material juntos, preguntá quién se hace cargo ' +
-            'cuando el cultivo falla. Separar las dos cosas hace que cada parte se pueda revisar.',
+            'Cuando un mismo proveedor vende el equipo y el material biológico juntos, conviene ' +
+            'preguntar quién responde ante un cultivo fallido. Separar ambas cosas permite ' +
+            'auditar cada parte por separado.',
         },
       ],
     },
     {
       id: 'las-tres-patas',
-      titulo: 'Las tres patas de un cultivo que sale bien',
+      titulo: 'Los tres factores que determinan el resultado',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'Un cultivo se sostiene sobre tres cosas, y si falta una no hay forma de compensarla ' +
-            'con las otras dos. Vale la pena tenerlo claro antes de comprar nada.',
+            'Un cultivo se sostiene sobre tres factores. No son intercambiables: la carencia de ' +
+            'uno no se compensa reforzando los otros dos. Conviene tenerlos claros antes de ' +
+            'realizar cualquier compra.',
         },
         {
           tipo: 'pasos',
           items: [
-            'Material de calidad. Lo conseguís vos, y es lo que más varía entre un resultado y otro.',
-            'Ambiente estable. Es lo que resuelve el equipo: temperatura y humedad sin sobresaltos.',
-            'Conocimiento. Saber qué mirar y cuándo. Está en estas guías y no se cobra aparte.',
+            'Material biológico de calidad. Se adquiere por separado y es la variable de mayor dispersión entre un resultado y otro.',
+            'Ambiente estable. Es lo que resuelve el equipo: temperatura y humedad sin oscilaciones.',
+            'Conocimiento del proceso. Saber qué observar y en qué momento. Está en estas guías, incluido en la compra.',
           ],
         },
       ],
     },
     {
       id: 'como-elegir',
-      titulo: 'Cómo elegir el material',
+      titulo: 'Cómo evaluar al proveedor de material',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'No recomendamos proveedores puntuales, porque la calidad de cada uno cambia con el ' +
-            'tiempo y no podemos garantizar algo que no controlamos. Lo que sí podemos darte es ' +
-            'qué preguntar antes de comprar.',
+            'No recomendamos proveedores puntuales: la calidad de cada uno varía con el tiempo y ' +
+            'no podemos garantizar un proceso que no controlamos. Lo que sí podemos aportar son ' +
+            'los criterios técnicos para evaluarlos.',
         },
         {
           tipo: 'faq',
           items: [
             {
-              p: '¿De cuándo es el material?',
-              r: 'Es material vivo. Cuanto más reciente, mejor arranca. Un proveedor serio te dice la fecha sin que se la pidas dos veces.',
+              p: '¿Cuál es la fecha de elaboración del material?',
+              r: 'Es material vivo y su vigor decae con el tiempo de almacenamiento. Cuanto más reciente, mejor implantación inicial. Un proveedor serio informa la fecha sin que haya que insistir.',
             },
             {
-              p: '¿Cómo viajó y cómo se conservó?',
-              r: 'El calor en tránsito arruina material que salió perfecto. Preguntá cómo lo despachan, sobre todo en verano.',
+              p: '¿Cómo se transporta y se conserva?',
+              r: 'La exposición al calor durante el tránsito compromete material que salió en perfectas condiciones. Conviene consultar el método de despacho, especialmente en verano.',
             },
             {
-              p: '¿Qué especie es, exactamente?',
-              r: 'Cada especie tiene su propia ventana de temperatura. Sin saber cuál es, no hay forma de configurar bien el equipo.',
+              p: '¿De qué especie se trata, con precisión?',
+              r: 'Cada especie tiene su propio rango óptimo de temperatura. Sin ese dato no hay forma de configurar correctamente el equipo.',
             },
           ],
         },
@@ -147,64 +171,70 @@ const insumos: Guia = {
 
 const vitales: Guia = {
   slug: 'los-dos-vitales',
-  titulo: 'Las dos cosas que definen el resultado',
+  titulo: 'Las dos variables que definen el resultado',
   eyebrow: 'Lo esencial',
   resumen:
-    'De todo lo que se puede hacer bien o mal, dos cosas explican casi todos los cultivos que ' +
-    'fracasan. Si te ocupás de estas dos, el resto es cuestión de esperar.',
+    'Entre todo lo que puede hacerse bien o mal, dos variables explican la mayor parte de los ' +
+    'cultivos fallidos: la asepsia y la temperatura. Controladas esas dos, el resto del ' +
+    'proceso es cuestión de respetar los tiempos.',
   intencion: 'informacional',
   actualizado: '2026-07-21',
   mensajesQueResuelve: 97,
   secciones: [
     {
       id: 'los-dos',
-      titulo: 'Los dos vitales',
+      titulo: 'Los dos factores críticos',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'Las guías largas tienen un problema: todo parece igual de importante. No lo es. ' +
-            'Estas dos cosas concentran la mayoría de los cultivos que se pierden.',
+            'Las guías extensas comparten un defecto: presentan toda la información con el mismo ' +
+            'peso. No lo tiene. Estas dos variables concentran la mayoría de los cultivos que se ' +
+            'pierden.',
         },
         {
           tipo: 'vital',
           numero: 1,
-          titulo: 'Sanidad',
+          titulo: 'Asepsia',
           texto:
-            'Todo lo que toca el cultivo tiene que estar limpio, incluidas tus manos y el aire ' +
-            'del ambiente donde trabajás. La contaminación no avisa: aparece cuando ya no se ' +
-            'puede revertir. Es el momento donde más se gana siendo obsesivo.',
+            'Todo lo que entra en contacto con el cultivo debe estar desinfectado, incluidas las ' +
+            'manos y el aire del ambiente de trabajo. La contaminación por mohos competidores no ' +
+            'da señales tempranas: se hace visible cuando ya es irreversible. Es la instancia ' +
+            'donde el rigor tiene mayor retorno.',
         },
         {
           tipo: 'vital',
           numero: 2,
-          titulo: 'La ventana de temperatura de tu especie',
+          titulo: 'El rango térmico de la especie',
           texto:
-            'Cada especie tiene un rango donde avanza bien. Fuera de ese rango no se muere de ' +
-            'golpe: se frena, y ahí es cuando otra cosa le gana el lugar. Averiguá el rango de tu ' +
-            'especie antes de arrancar y configurá el equipo una sola vez.',
+            'Cada especie tiene un rango de temperatura en el que el micelio —la red de ' +
+            'filamentos blancos que coloniza el sustrato— se desarrolla con vigor. Fuera de ese ' +
+            'rango no muere de inmediato: se ralentiza, y esa demora es la que aprovechan los ' +
+            'organismos competidores. Averiguá el rango de tu especie antes de iniciar y ' +
+            'configurá el equipo una sola vez.',
         },
       ],
     },
     {
       id: 'los-tiempos',
-      titulo: 'Los tiempos: la regla de 2 a 3 semanas',
+      titulo: 'Los tiempos: la referencia de 2 a 3 semanas',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'Cada etapa lleva entre dos y tres semanas. Es la regla más útil que te podemos dar, ' +
-            'porque convierte la ansiedad en un dato: si pasaron diez días y no ves cambios, no ' +
-            'pasa nada. Si pasaron cuatro semanas y sigue igual, algo hay que revisar.',
+            'Cada etapa del ciclo demanda entre dos y tres semanas. Es la referencia más útil ' +
+            'que podemos darte, porque convierte la incertidumbre en un parámetro verificable: ' +
+            'si pasaron diez días sin cambios visibles, está dentro de lo esperado. Si pasaron ' +
+            'cuatro semanas sin avance, corresponde revisar las condiciones.',
         },
         {
           tipo: 'aviso',
           tono: 'cuidado',
           texto:
-            'El diagnóstico es binario: va bien o va mal. No hay término medio ni cultivo que ' +
-            '"esté raro pero zafa". Si dudás, escribinos con los días que pasaron desde que ' +
-            'armaste, la temperatura que marca el equipo y en qué zona del país estás. Con esos ' +
-            'tres datos se resuelve casi siempre.',
+            'El diagnóstico es binario: el cultivo progresa o está comprometido. No existe un ' +
+            'estado intermedio recuperable. Ante la duda, escribinos indicando los días ' +
+            'transcurridos desde el armado, la temperatura que registra el equipo y tu zona ' +
+            'geográfica. Con esos tres datos el caso se resuelve en la mayoría de las consultas.',
         },
       ],
     },
@@ -217,8 +247,8 @@ const equipo: Guia = {
   titulo: 'Cómo funciona la incubadora',
   eyebrow: 'El equipo',
   resumen:
-    'Qué hace el equipo mientras vos no estás mirando, qué decisiones toma solo y qué queda ' +
-    'de tu lado.',
+    'Qué regula el equipo de forma autónoma, qué variables controla sin intervención y qué ' +
+    'queda a cargo del usuario.',
   intencion: 'comercial',
   actualizado: '2026-07-21',
   mensajesQueResuelve: 153,
@@ -230,15 +260,17 @@ const equipo: Guia = {
         {
           tipo: 'parrafo',
           texto:
-            'Un cultivo necesita condiciones parejas durante semanas. El problema no es lograrlas ' +
-            'un rato: es sostenerlas de noche, cuando baja la temperatura, y en los días en que ' +
-            'no estás en casa. Eso es exactamente lo que hace el equipo.',
+            'Un cultivo requiere condiciones ambientales estables durante varias semanas. La ' +
+            'dificultad no está en alcanzarlas puntualmente, sino en sostenerlas durante la ' +
+            'noche, cuando cae la temperatura, y en los días de ausencia. Esa es la función del ' +
+            'equipo.',
         },
         {
           tipo: 'parrafo',
           texto:
-            'Vos configurás el rango una vez. A partir de ahí mantiene la temperatura, sostiene ' +
-            'la humedad y renueva el aire, sin que tengas que revisarlo todos los días.',
+            'El rango se configura una sola vez. A partir de ahí el equipo mantiene la ' +
+            'temperatura, sostiene la humedad relativa y renueva el aire, sin requerir control ' +
+            'diario.',
         },
       ],
     },
@@ -255,20 +287,20 @@ const equipo: Guia = {
               valor: 'Área útil de cultivo 35 × 25 × 30 cm (≈ 26 litros)',
             },
             {
-              clave: 'Cuánto entra',
+              clave: 'Capacidad de carga',
               valor: '15 frascos, o 4 recipientes tipo bandeja de 1,5 litros (dos columnas de dos)',
             },
             { clave: 'Consumo eléctrico', valor: '25 W promedio por hora' },
             {
               clave: 'Temperatura de cultivo',
-              valor: 'Mantiene el ambiente entre 10 °C y 30 °C, que es el rango útil para cultivar',
+              valor: 'Sostiene el ambiente entre 10 °C y 30 °C, el rango útil para cultivo',
             },
-            { clave: 'Calor máximo', valor: 'El equipo puede calentar hasta 42 °C' },
-            { clave: 'Humedad', valor: 'Hasta 85 % con el booster de humedad' },
-            { clave: 'Renovación de aire', valor: 'Renovación pasiva por aire caliente' },
+            { clave: 'Temperatura máxima', valor: 'El equipo alcanza los 42 °C' },
+            { clave: 'Humedad relativa', valor: 'Hasta 85 % con el booster de humedad' },
+            { clave: 'Renovación de aire', valor: 'Pasiva, por convección del aire caliente' },
             {
               clave: 'Garantía',
-              valor: '12 meses de fábrica, y después servicio técnico oficial y repuestos de por vida',
+              valor: '12 meses de fábrica, y luego servicio técnico oficial y repuestos de por vida',
             },
           ],
         },
@@ -276,34 +308,34 @@ const equipo: Guia = {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'La garantía es de un año, pero el equipo no deja de tener soporte cuando se vence: ' +
-            'seguimos con repuestos y servicio técnico oficial mientras lo tengas. Es la ' +
-            'diferencia entre comprarle a una fábrica y comprarle a un revendedor.',
+            'La garantía cubre 12 meses, pero el soporte no se interrumpe al vencerla: ' +
+            'continuamos proveyendo repuestos y servicio técnico oficial mientras conserves el ' +
+            'equipo. Es la diferencia entre comprarle al fabricante y comprarle a un revendedor.',
         },
       ],
     },
     {
       id: 'preguntas',
-      titulo: 'Lo que más nos preguntan',
+      titulo: 'Consultas frecuentes',
       bloques: [
         {
           tipo: 'faq',
           items: [
             {
-              p: '¿Anda con energía solar?',
-              r: 'Sí. Consume unos 25 W promedio por hora, así que un sistema solar hogareño lo sostiene sin problema, incluso funcionando las 24 horas.',
+              p: '¿Funciona con energía solar?',
+              r: 'Sí. El consumo promedio es de 25 W por hora, de modo que un sistema solar hogareño lo sostiene sin inconvenientes, incluso en operación continua las 24 horas.',
             },
             {
-              p: '¿Enfría o solo calienta?',
-              r: 'El INC101 solo calienta: sostiene la temperatura por encima de la del ambiente. No refrigera. Si estás en una zona donde en verano se pasa de 30 °C de forma sostenida, escribinos antes de comprar y lo hablamos con tu caso.',
+              p: '¿Refrigera o solo calienta?',
+              r: 'El INC101 es un equipo calefactor: sostiene la temperatura por encima de la ambiente, no refrigera. Si tu zona supera los 30 °C de forma sostenida en verano, escribinos antes de comprar y evaluamos tu caso.',
             },
             {
-              p: '¿Hasta cuántos grados llega?',
-              r: 'El equipo puede calentar hasta 42 °C, pero el rango que vas a usar para cultivar es de 10 a 30 °C: por encima de eso el cultivo se inhibe. Los 42 °C sirven, por ejemplo, para el modo deshidratador.',
+              p: '¿Cuál es la temperatura máxima?',
+              r: 'El equipo alcanza 42 °C, aunque el rango de uso para cultivo es de 10 a 30 °C: por encima de ese valor el desarrollo se inhibe. Los 42 °C se aprovechan, por ejemplo, en el modo deshidratador.',
             },
             {
-              p: '¿Viene con material para empezar?',
-              r: 'No. El equipo controla el ambiente; el material de cultivo lo conseguís aparte. Está explicado en «Qué necesitás además del equipo».',
+              p: '¿Incluye material para iniciar el cultivo?',
+              r: 'No. El equipo controla el ambiente; el material biológico se adquiere por separado. El criterio está desarrollado en «Qué necesitás además del equipo».',
             },
           ],
         },
@@ -318,151 +350,388 @@ const cultivar: Guia = {
   titulo: 'Qué se puede cultivar',
   eyebrow: 'Qué esperar',
   resumen:
-    'Qué especies andan bien en el equipo, cuáles son las más fáciles para arrancar y qué ' +
-    'rinde cada una. Una idea realista antes de empezar.',
+    'Nueve especies comestibles y funcionales con sus rangos térmicos, su nivel de exigencia y ' +
+    'su ciclo real. Incluye qué especies de moda no son cultivables en una incubadora —y por ' +
+    'qué— y qué conviene cultivar en cada estación del año en Argentina.',
   intencion: 'informacional',
-  actualizado: '2026-07-21',
+  actualizado: '2026-07-22',
   mensajesQueResuelve: 36,
   secciones: [
     {
       id: 'especies',
-      titulo: 'Las especies que recomendamos',
+      titulo: 'Especies recomendadas',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'El equipo sirve para cultivar hongos comestibles y funcionales. Estas son las que ' +
-            'mejor resultado dan y con las que más acompañamiento tenemos:',
+            'El equipo está diseñado para especies comestibles y funcionales. La tabla que sigue ' +
+            'reúne las que se desarrollan bien en un ambiente de 26 litros con humedad ' +
+            'controlada, con el dato que efectivamente decide el resultado: el rango térmico de ' +
+            'cada etapa. Los parámetros siguen los publicados por Paul Stamets en Growing ' +
+            'Gourmet and Medicinal Mushrooms, contrastados con nuestra experiencia de ' +
+            'acompañamiento en cultivos argentinos.',
         },
         {
-          tipo: 'pasos',
-          items: [
-            'Gírgolas: las más fáciles y las más perdonadoras. Si es tu primera vez, empezá por acá.',
-            'Melena de león: un poco más exigente, muy buscada por su uso funcional.',
-            'Reishi: la más lenta, para quien ya tomó la mano.',
+          tipo: 'especies',
+          filas: [
+            {
+              nombre: 'Gírgola común',
+              cientifico: 'Pleurotus ostreatus',
+              nivel: 'inicial',
+              colonizacion: '24 °C',
+              fructificacion: '15 a 21 °C',
+              ciclo: '4 a 6 semanas',
+              nota:
+                'La especie de mayor tolerancia a desvíos en las condiciones y la de colonización ' +
+                'más veloz. Es la indicada para un primer cultivo, y la que usamos como referencia ' +
+                'en todas las guías.',
+            },
+            {
+              nombre: 'Gírgola rosada',
+              cientifico: 'Pleurotus djamor',
+              nivel: 'inicial',
+              colonizacion: '27 a 30 °C',
+              fructificacion: '21 a 30 °C',
+              ciclo: '3 a 4 semanas',
+              nota:
+                'La única del grupo que fructifica cómoda en pleno verano argentino: su rango ' +
+                'coincide con el ambiente de diciembre a febrero. Ciclo muy corto y color rosado ' +
+                'intenso. Se deteriora rápido tras la cosecha, así que se consume en el día.',
+            },
+            {
+              nombre: 'Gírgola de verano',
+              cientifico: 'Pleurotus pulmonarius',
+              nivel: 'inicial',
+              colonizacion: '24 a 27 °C',
+              fructificacion: '18 a 24 °C',
+              ciclo: '4 a 5 semanas',
+              nota:
+                'Rango intermedio entre la común y la rosada, lo que la vuelve la más versátil ' +
+                'para media estación. Rinde bien en sustratos de paja y de aserrín.',
+            },
+            {
+              nombre: 'Melena de león',
+              cientifico: 'Hericium erinaceus',
+              nivel: 'intermedia',
+              colonizacion: '21 a 24 °C',
+              fructificacion: '18 a 24 °C',
+              ciclo: '5 a 7 semanas',
+              nota:
+                'La más demandada por su uso funcional (contiene hericenonas y erinacinas, ' +
+                'compuestos estudiados por su acción sobre el factor de crecimiento nervioso). Es ' +
+                'sensible a la acumulación de CO₂: con ventilación escasa desarrolla forma ' +
+                'coraloide, ramificada, en lugar de la cascada de espinas característica. Sigue ' +
+                'siendo comestible.',
+            },
+            {
+              nombre: 'Reishi',
+              cientifico: 'Ganoderma lucidum',
+              nivel: 'avanzada',
+              colonizacion: '24 a 30 °C',
+              fructificacion: '21 a 27 °C',
+              ciclo: '8 a 12 semanas',
+              nota:
+                'No es difícil de sostener: es lenta. Requiere ocupar el equipo durante dos o tres ' +
+                'meses. Dato técnico útil: en atmósfera con CO₂ elevado —como la de una cámara ' +
+                'chica— desarrolla la forma «asta de ciervo», ramificada y sin sombrero, que ' +
+                'concentra los mismos triterpenos y es la presentación más valorada.',
+            },
+            {
+              nombre: 'Cola de pavo',
+              cientifico: 'Trametes versicolor',
+              nivel: 'intermedia',
+              colonizacion: '24 a 27 °C',
+              fructificacion: '18 a 21 °C',
+              ciclo: '6 a 9 semanas',
+              nota:
+                'La más rústica de las funcionales: tolera CO₂ elevado y desvíos de humedad sin ' +
+                'perder el cultivo. Es la fuente de los polisacáridos PSK y PSP. No se consume ' +
+                'como alimento sino en infusión o extracto, por su textura leñosa.',
+            },
+            {
+              nombre: 'Oreja de Judas',
+              cientifico: 'Auricularia auricula-judae',
+              nivel: 'inicial',
+              colonizacion: '24 a 27 °C',
+              fructificacion: '21 a 27 °C',
+              ciclo: '4 a 6 semanas',
+              nota:
+                'Muy tolerante y de rango cálido, lo que la hace buena alternativa de verano junto ' +
+                'con la rosada. Es el hongo negro de la cocina asiática: se deshidrata sin perder ' +
+                'calidad y se rehidrata en minutos, así que la cosecha se conserva bien.',
+            },
+            {
+              nombre: 'Shiitake',
+              cientifico: 'Lentinula edodes',
+              nivel: 'avanzada',
+              colonizacion: '21 a 26 °C',
+              fructificacion: '12 a 18 °C',
+              ciclo: '10 a 16 semanas',
+              nota:
+                'Exige paciencia en dos frentes: la colonización lleva de 30 a 70 días y termina ' +
+                'con el pardeamiento del bloque (la corteza marrón que se forma sola), y la ' +
+                'fructificación se induce por inmersión en agua fría. Su rango exige otoño o ' +
+                'invierno: el equipo no puede bajar de la temperatura ambiente.',
+            },
+            {
+              nombre: 'Cordyceps',
+              cientifico: 'Cordyceps militaris',
+              nivel: 'avanzada',
+              colonizacion: '20 a 22 °C, en oscuridad',
+              fructificacion: '18 a 22 °C, con luz',
+              ciclo: '7 a 10 semanas',
+              nota:
+                'Es el único del listado que no es un hongo de sombrero sino un ascomiceto: crece ' +
+                'sobre sustrato de arroz enriquecido, en frascos, y sus estromas anaranjados ' +
+                'requieren luz para desarrollarse. Es la fuente de la cordicepina. Exige ' +
+                'esterilización a presión del sustrato y una asepsia superior a la del resto.',
+            },
           ],
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Cada especie tiene su propia ventana de temperatura. El equipo la sostiene, pero el ' +
-            'rango se lo tenés que indicar vos según lo que cultives. Está en la guía «Las dos ' +
-            'cosas que definen el resultado».',
+            'La ventilación del equipo es pasiva, de modo que el CO₂ dentro de la cámara se ' +
+            'mantiene por encima del ambiente. En las gírgolas eso se traduce en estipes (el ' +
+            'pie del hongo) más largos y sombreros más pequeños; en reishi, en la forma de asta ' +
+            'de ciervo. Es un efecto conocido y predecible, no una falla del cultivo.',
         },
       ],
     },
     {
-      id: 'rinde',
-      titulo: '¿Cuánto rinde y cuánto tarda?',
+      id: 'funcionales',
+      titulo: 'Hongos funcionales y adaptógenos: qué es cultivable y qué no',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'Depende de la especie y del material con el que arranques, pero la regla de los ' +
-            'tiempos es pareja: cada etapa lleva entre dos y tres semanas. Del armado a la ' +
-            'cosecha, contá varias semanas, no días.',
+            'El consumo de hongos funcionales dejó de ser un nicho: el mercado global de ' +
+            'adaptógenos crece a tasas de dos dígitos anuales y reishi, melena de león y ' +
+            'cordyceps concentran la mayor parte de la demanda. Esa popularidad trajo también ' +
+            'confusión sobre qué se puede producir en casa, así que conviene ser precisos.',
+        },
+        {
+          tipo: 'parrafo',
+          texto:
+            'De las especies asociadas al consumo funcional, cuatro se cultivan sin dificultad en ' +
+            'el equipo —reishi, melena de león, cola de pavo y cordyceps— y otras no son ' +
+            'viables en una incubadora, por razones biológicas que no dependen de la calidad del ' +
+            'equipo:',
         },
         {
           tipo: 'faq',
           items: [
             {
-              p: '¿Sirve si nunca cultivé nada?',
-              r: 'Sí. La mayoría de nuestros clientes arrancó sin experiencia. Empezando por gírgolas y siguiendo las guías, se llega. Lo importante son las dos cosas de siempre: sanidad y temperatura.',
+              p: 'Chaga (Inonotus obliquus)',
+              r: 'No es cultivable en cámara. Lo que se comercializa como chaga no es un cuerpo fructífero sino un esclerocio: una masa endurecida que el hongo forma parasitando abedules vivos durante años, en climas fríos del hemisferio norte. Fuera de ese hospedador no hay proceso que reproducir. Lo que sí se produce en biorreactor es biomasa de micelio, que no equivale al material silvestre.',
             },
             {
-              p: '¿Puedo cultivar todo el año?',
-              r: 'Sí, esa es la idea del equipo: mantiene las condiciones aunque afuera cambie el clima. En verano, si tu zona pasa de 30 °C sostenidos, escribinos antes (el INC101 calienta, no refrigera).',
+              p: 'Maitake (Grifola frondosa)',
+              r: 'Biológicamente cultivable, pero fructifica entre 10 y 16 °C. Como el INC101 calienta y no refrigera, solo es viable si tu ambiente ya está en ese rango, es decir en pleno invierno y en zonas frías. Fuera de esa ventana el cultivo no llega a formar cuerpos fructíferos.',
+            },
+            {
+              p: 'Champiñón y portobello (Agaricus bisporus)',
+              r: 'Requieren una capa de cobertura (casing) de turba sobre el sustrato y un manejo de compost que excede el formato de una incubadora doméstica. Es un cultivo posible, pero no es lo que este equipo resuelve mejor.',
+            },
+            {
+              p: 'Trufas',
+              r: 'No corresponden a este tipo de cultivo. Son hongos micorrícicos: viven asociados a las raíces de un árbol hospedador y fructifican bajo tierra, en plantaciones que tardan entre seis y diez años en producir.',
+            },
+          ],
+        },
+        {
+          tipo: 'aviso',
+          tono: 'dato',
+          texto:
+            'Ninguna de estas guías constituye información médica. Los compuestos mencionados ' +
+            '—triterpenos, polisacáridos, cordicepina— están descritos en la literatura ' +
+            'científica sobre el género, y eso no equivale a una indicación terapéutica.',
+        },
+      ],
+    },
+    {
+      id: 'calendario',
+      titulo: 'Qué cultivar en cada estación',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'Esta es la sección que más consultas evita, y parte de una limitación que preferimos ' +
+            'declarar: el equipo calienta y sostiene, pero no refrigera. Puede mantener 24 °C en ' +
+            'una noche de invierno, y no puede mantener 18 °C en una tarde de enero a 33 °C. En ' +
+            'consecuencia, la estación no condiciona si podés cultivar, sino qué conviene ' +
+            'cultivar.',
+        },
+        {
+          tipo: 'cronograma',
+          filas: [
+            {
+              etapa: 'Verano',
+              dias: 'Diciembre a febrero',
+              que: 'Especies de rango cálido: gírgola rosada, oreja de Judas y reishi. Las tres fructifican por encima de los 21 °C, de modo que el ambiente juega a favor.',
+              ojo: 'Es la peor época para shiitake y para gírgola común: su rango de fructificación queda por debajo de la temperatura ambiente.',
+            },
+            {
+              etapa: 'Otoño',
+              dias: 'Marzo a mayo',
+              que: 'La mejor ventana del año. El ambiente acompaña casi todos los rangos y el equipo compensa la amplitud térmica entre el día y la noche.',
+              ojo: 'Momento indicado para iniciar shiitake, que tiene la colonización más larga.',
+            },
+            {
+              etapa: 'Invierno',
+              dias: 'Junio a agosto',
+              que: 'Temporada de las especies de rango templado y frío: shiitake, cola de pavo, cordyceps y gírgola común. El equipo sostiene la temperatura que el ambiente no da.',
+              ojo: 'Es cuando más se nota el equipo: sin control térmico, el invierno directamente detiene el cultivo.',
+            },
+            {
+              etapa: 'Primavera',
+              dias: 'Septiembre a noviembre',
+              que: 'Segunda ventana amplia del año, apta para todas las especies del listado. Buen momento para probar una especie nueva.',
+              ojo: 'Conviene cerrar los ciclos largos antes de diciembre, para no terminar la fructificación en pleno calor.',
+            },
+          ],
+        },
+        {
+          tipo: 'aviso',
+          tono: 'cuidado',
+          texto:
+            'Si tu zona supera los 30 °C de forma sostenida durante el verano, escribinos antes ' +
+            'de comprar. Vamos a decirte con franqueza qué especies vas a poder cultivar en esa ' +
+            'época y cuáles conviene reservar para el resto del año.',
+        },
+      ],
+    },
+    {
+      id: 'rinde',
+      titulo: 'Rendimiento y duración del ciclo',
+      bloques: [
+        {
+          tipo: 'parrafo',
+          texto:
+            'El rendimiento se expresa como eficiencia biológica: la relación entre el peso de la ' +
+            'cosecha fresca y el peso seco del sustrato. Un cultivo bien llevado de gírgolas ' +
+            'alcanza entre el 75 % y el 100 % en la primera oleada, es decir cerca de un kilo de ' +
+            'hongos frescos por kilo de sustrato seco. Las especies funcionales rinden bastante ' +
+            'menos, porque destinan más energía a la estructura del cuerpo fructífero.',
+        },
+        {
+          tipo: 'parrafo',
+          texto:
+            'El factor de mayor incidencia no es la especie sino la calidad del material inicial: ' +
+            'el mismo procedimiento sobre un micelio vigoroso o sobre uno almacenado durante ' +
+            'meses arroja resultados que no admiten comparación.',
+        },
+        {
+          tipo: 'faq',
+          items: [
+            {
+              p: '¿Es viable sin experiencia previa?',
+              r: 'Sí. La mayoría de nuestros clientes inició sin experiencia. Empezando por gírgolas y respetando las guías, el resultado se alcanza. Las dos variables determinantes siguen siendo las mismas: asepsia y temperatura.',
+            },
+            {
+              p: '¿Puedo cultivar dos especies a la vez en el mismo equipo?',
+              r: 'Es posible si los rangos térmicos se superponen —gírgola de verano y melena de león comparten la franja de 18 a 24 °C, por ejemplo—, pero no es recomendable mientras estés aprendiendo: una contaminación se propaga a ambos cultivos y perdés la posibilidad de identificar qué falló.',
+            },
+            {
+              p: '¿Se puede cultivar durante todo el año?',
+              r: 'Sí, y es precisamente el propósito del equipo: sostiene las condiciones internas al margen del clima exterior. Lo que cambia con la estación es la especie más conveniente, según el calendario de la sección anterior.',
+            },
+            {
+              p: '¿Cuántos cultivos entran por ciclo?',
+              r: 'El área útil admite 15 frascos o 4 recipientes tipo bandeja de 1,5 litros. Para cordyceps, que se cultiva en frascos, esa capacidad es la determinante; para gírgolas conviene el formato bandeja.',
             },
           ],
         },
       ],
     },
   ],
-  relacionadas: ['los-dos-vitales', 'donde-conseguir-insumos'],
+  relacionadas: ['los-dos-vitales', 'donde-conseguir-insumos', 'como-funciona-la-incubadora'],
 }
 
 const problemas: Guia = {
   slug: 'solucion-de-problemas',
-  titulo: 'Cuando algo va mal',
+  titulo: 'Diagnóstico de problemas frecuentes',
   eyebrow: 'Diagnóstico',
   resumen:
-    'Los tres problemas más comunes y qué hacer con cada uno: contaminación, el equipo que no ' +
-    'levanta temperatura y la condensación. Diagnóstico directo, sin vueltas.',
+    'Los tres problemas más habituales y el procedimiento para cada uno: contaminación, falta ' +
+    'de temperatura y exceso de condensación.',
   intencion: 'informacional',
   actualizado: '2026-07-21',
   mensajesQueResuelve: 40,
   secciones: [
     {
       id: 'contaminacion',
-      titulo: 'Se contaminó',
+      titulo: 'Contaminación del cultivo',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'Si aparece moho verde, negro o rosado, o un olor feo, el cultivo está contaminado. ' +
-            'Es la causa número uno de los cultivos que se pierden, y es honesto decirlo: cuando ' +
-            'la contaminación se ve, ya no se revierte. Ese cultivo se descarta.',
+            'La aparición de moho verde, negro o rosado, o de olor desagradable, indica ' +
+            'contaminación por organismos competidores. Es la causa principal de los cultivos ' +
+            'perdidos y corresponde ser claros al respecto: cuando la contaminación es visible, ' +
+            'ya no es reversible. Ese cultivo se descarta.',
         },
         {
           tipo: 'aviso',
           tono: 'cuidado',
           texto:
-            'Lo que importa no es salvar ese intento, es entender por qué pasó para que no se ' +
-            'repita. Casi siempre es sanidad (algo entró sin estar limpio) o temperatura fuera de ' +
-            'rango demasiado tiempo. Si te pasó, escribinos con los días desde el armado, la ' +
-            'temperatura del equipo y tu zona, y lo vemos con tu caso.',
+            'Lo relevante no es recuperar ese intento, sino identificar la causa para que no se ' +
+            'repita. Casi siempre corresponde a una falla de asepsia (algo ingresó sin ' +
+            'desinfectar) o a temperatura fuera de rango durante un período prolongado. Si te ' +
+            'ocurrió, escribinos con los días transcurridos desde el armado, la temperatura del ' +
+            'equipo y tu zona, y lo analizamos sobre tu caso.',
         },
       ],
     },
     {
       id: 'no-calienta',
-      titulo: 'El equipo no levanta temperatura',
+      titulo: 'El equipo no alcanza la temperatura configurada',
       bloques: [
         {
           tipo: 'pasos',
           items: [
-            'Confirmá que esté bien enchufado y encendido, y que la temperatura objetivo esté por encima de la del ambiente.',
-            'Verificá que la sonda de temperatura esté colocada donde indica el manual: si mide mal, regula mal.',
-            'Dale tiempo: levantar temperatura no es instantáneo, sobre todo en un día frío.',
+            'Verificá la conexión eléctrica y el encendido, y que la temperatura objetivo esté por encima de la temperatura ambiente.',
+            'Controlá que la sonda de temperatura esté colocada según indica el manual: una lectura incorrecta produce una regulación incorrecta.',
+            'Considerá el tiempo de respuesta: elevar la temperatura no es instantáneo, en particular con ambiente frío.',
           ],
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Si hiciste todo esto y sigue sin calentar, puede ser una falla del equipo. Escribinos: ' +
-            'tenés 12 meses de garantía de fábrica y después servicio técnico oficial y repuestos ' +
-            'de por vida.',
+            'Si realizaste estas verificaciones y el equipo sigue sin calentar, puede tratarse de ' +
+            'una falla. Escribinos: contás con 12 meses de garantía de fábrica y, luego, servicio ' +
+            'técnico oficial y repuestos de por vida.',
         },
       ],
     },
     {
       id: 'condensacion',
-      titulo: 'Se junta mucha agua (condensación)',
+      titulo: 'Exceso de condensación',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'Algo de condensación es normal en el proceso. Se vuelve un problema cuando es tanta ' +
-            'que gotea sobre el cultivo y favorece la contaminación. Suele pasar más en zonas frías ' +
-            'o húmedas, donde la diferencia de temperatura con el ambiente es mayor.',
+            'Cierto nivel de condensación es parte normal del proceso. Se vuelve un problema ' +
+            'cuando el agua gotea sobre el cultivo y favorece la contaminación. Es más frecuente ' +
+            'en zonas frías o húmedas, donde el diferencial térmico con el ambiente es mayor.',
         },
         {
           tipo: 'pasos',
           items: [
-            'Revisá la cúpula: un poco de vaho es normal, el problema son las gotas cayendo sobre el sustrato.',
-            'Si hay agua en exceso, escurrí el recipiente de cultivo.',
-            'Secá la base de la incubadora, que es donde se junta el agua que baja.',
-            'No destapes ni rocíes para "ventilar": la ventilación es pasiva, por los orificios con cinta Micropore.',
+            'Observá la cúpula: una película de vapor es normal; el problema son las gotas que caen sobre el sustrato.',
+            'Ante exceso de agua, escurrí el recipiente de cultivo.',
+            'Secá la base de la incubadora, donde se acumula el agua que desciende.',
+            'No destapes ni rocíes para ventilar: la ventilación es pasiva, a través de los orificios cubiertos con cinta Micropore.',
           ],
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Pasa más en zonas frías o húmedas, donde la diferencia con la temperatura ambiente ' +
-            'es mayor. Si se repite seguido, escribinos y lo vemos con tu caso.',
+            'Si la situación se repite con frecuencia, escribinos y lo revisamos sobre tu caso ' +
+            'particular.',
         },
       ],
     },
@@ -475,49 +744,50 @@ const comprar: Guia = {
   titulo: 'Cómo comprar',
   eyebrow: 'Tu compra',
   resumen:
-    'El precio de hoy, los medios de pago y las opciones de envío. Todo se lee de la tienda en ' +
-    'el momento, así que es lo que vas a pagar.',
+    'Precio vigente, medios de pago y opciones de envío. Los valores se leen de la tienda en ' +
+    'el momento de la consulta, de modo que corresponden a lo que vas a abonar.',
   intencion: 'comercial',
   actualizado: '2026-07-21',
   mensajesQueResuelve: 78,
   secciones: [
     {
       id: 'donde',
-      titulo: 'Dónde se compra',
+      titulo: 'Dónde se realiza la compra',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'La compra se hace en nuestra tienda oficial, infomicelium.com.ar. El precio que ves ' +
-            'más abajo se lee de ahí en el momento, así que nunca vas a encontrar un valor viejo ' +
-            'en esta página.',
+            'La compra se realiza en nuestra tienda oficial, infomicelium.com.ar. El precio que ' +
+            'figura más abajo se lee de allí en tiempo real, por lo que en esta página nunca vas ' +
+            'a encontrar un valor desactualizado.',
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Comprás directo a la fábrica. No somos revendedores: el equipo lo diseñamos y lo ' +
-            'hacemos nosotros, y por eso el soporte y los repuestos salen de la misma mano.',
+            'La compra es directa a fábrica. No somos revendedores: diseñamos y fabricamos el ' +
+            'equipo, y por eso el soporte y los repuestos provienen de la misma fuente.',
         },
       ],
     },
     {
       id: 'precio',
-      titulo: 'Precio de hoy',
+      titulo: 'Precio vigente',
       bloques: [
         { tipo: 'precio' },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Este precio se lee de la tienda en el momento, así que es el que vas a pagar. Si ves ' +
-            'un valor distinto en otro lado, el que vale es el de la tienda.',
+            'Este valor se lee de la tienda en tiempo real, de modo que es el que vas a abonar. ' +
+            'Ante una diferencia con cualquier otra publicación, el valor válido es el de la ' +
+            'tienda oficial.',
         },
       ],
     },
     {
       id: 'pagos',
-      titulo: 'Formas de pago',
+      titulo: 'Medios de pago',
       bloques: [
         {
           tipo: 'datos',
@@ -531,16 +801,16 @@ const comprar: Guia = {
           tipo: 'faq',
           items: [
             {
-              p: '¿En cuántas cuotas puedo pagar?',
-              r: 'Las cuotas y los planes vigentes los pone Mercado Pago según tu tarjeta y el banco, y cambian seguido. Los vas a ver en pantalla al momento de pagar, antes de confirmar la compra.',
+              p: '¿En cuántas cuotas puedo abonar?',
+              r: 'Los planes de cuotas vigentes los define Mercado Pago según tu tarjeta y entidad emisora, y se actualizan con frecuencia. Se muestran en pantalla al momento de pagar, antes de confirmar la compra.',
             },
             {
-              p: '¿Conviene pagar por transferencia?',
-              r: 'Sí: pagando por transferencia o depósito tenés un 13 % de descuento sobre el precio vigente. Es el precio más bajo al que conseguís el equipo. Arriba está el monto exacto de hoy.',
+              p: '¿Conviene abonar por transferencia?',
+              r: 'Sí: el pago por transferencia o depósito tiene un 13 % de descuento sobre el precio vigente. Es el valor más bajo disponible para el equipo. El monto exacto de hoy figura más arriba.',
             },
             {
-              p: '¿Y si me arrepiento?',
-              r: 'Tenés 30 días de devolución. Somos los fabricantes, así que la garantía y el soporte los damos nosotros directamente.',
+              p: '¿Qué sucede si me arrepiento de la compra?',
+              r: 'Contás con 30 días para la devolución. Como fabricantes, la garantía y el soporte los brindamos nosotros de forma directa.',
             },
           ],
         },
@@ -554,20 +824,20 @@ const envios: Guia = {
   slug: 'envios-y-seguimiento',
   titulo: 'Envíos y seguimiento',
   eyebrow: 'Tu envío',
-  resumen: 'Cómo despachamos, a dónde llegamos y cómo seguir tu pedido.',
+  resumen: 'Cómo despachamos, a qué destinos llegamos y cómo hacer el seguimiento del pedido.',
   intencion: 'informacional',
   actualizado: '2026-07-21',
   mensajesQueResuelve: 57,
   secciones: [
     {
       id: 'como',
-      titulo: 'Cómo y a dónde enviamos',
+      titulo: 'Modalidades y cobertura',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'Enviamos a todo el país. Podés elegir entre estas opciones al finalizar la compra, y ' +
-            'apenas despachamos te llega el número de seguimiento.',
+            'Enviamos a todo el país. Las opciones se seleccionan al finalizar la compra y, ' +
+            'apenas se despacha el pedido, recibís el número de seguimiento.',
         },
         {
           tipo: 'datos',
@@ -591,19 +861,19 @@ const envios: Guia = {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Seguimos tu envío nosotros: si en el camino se demora, lo gestionamos con el correo ' +
-            'y te avisamos. No tenés que estar atrás del seguimiento.',
+            'El seguimiento del envío lo hacemos nosotros: ante una demora en el trayecto, ' +
+            'gestionamos el reclamo con el correo y te mantenemos informado. No queda a tu cargo.',
         },
         {
           tipo: 'faq',
           items: [
             {
-              p: '¿Cuánto cuesta el envío?',
-              r: 'El costo exacto depende de tu código postal y de la opción que elijas: lo ves en pantalla al finalizar la compra, antes de pagar. En varias promociones el envío va bonificado.',
+              p: '¿Cuál es el costo del envío?',
+              r: 'El costo exacto depende de tu código postal y de la modalidad elegida: se muestra en pantalla al finalizar la compra, antes del pago. En varias promociones el envío está bonificado.',
             },
             {
-              p: '¿Cuánto tarda en llegar?',
-              r: 'Entre 4 y 5 días una vez despachado. Puede variar un poco según la zona y el momento del año.',
+              p: '¿Cuál es el plazo de entrega?',
+              r: 'Entre 4 y 5 días una vez despachado. El plazo puede variar según la zona y la época del año.',
             },
           ],
         },
@@ -618,8 +888,8 @@ const sobre: Guia = {
   titulo: 'Quiénes somos',
   eyebrow: 'Micelium®',
   resumen:
-    'Somos una fábrica argentina de equipos de cultivo. Qué significa eso para vos, antes y ' +
-    'después de comprar.',
+    'Somos una fábrica argentina de equipos de cultivo. Qué implica eso para vos, antes y ' +
+    'después de la compra.',
   intencion: 'informacional',
   actualizado: '2026-07-21',
   mensajesQueResuelve: 5,
@@ -631,38 +901,38 @@ const sobre: Guia = {
         {
           tipo: 'parrafo',
           texto:
-            'Diseñamos y fabricamos nosotros mismos las incubadoras. No revendemos un producto de ' +
-            'otro: cada equipo sale de nuestro trabajo, y eso cambia todo lo que viene después de ' +
-            'la compra.',
+            'Diseñamos y fabricamos las incubadoras en nuestro propio taller. No revendemos un ' +
+            'producto de terceros: cada equipo es resultado de nuestro trabajo, y eso determina ' +
+            'todo lo que ocurre después de la compra.',
         },
         {
           tipo: 'pasos',
           items: [
-            'El soporte lo da quien hizo el equipo, no un intermediario que no lo conoce.',
-            'Los repuestos existen y van a seguir existiendo: garantía de 12 meses y servicio técnico oficial de por vida.',
-            'El acompañamiento del cultivo es parte de la compra, no un extra que se cobra aparte.',
+            'El soporte lo brinda quien fabricó el equipo, no un intermediario ajeno al producto.',
+            'Los repuestos están disponibles y van a seguir estándolo: 12 meses de garantía y servicio técnico oficial de por vida.',
+            'El acompañamiento del cultivo está incluido en la compra, no se cobra por separado.',
           ],
         },
       ],
     },
     {
       id: 'confianza',
-      titulo: 'Por qué lo contamos así',
+      titulo: 'Por qué publicamos toda esta información',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'Sabemos que comprar algo así por internet da un poco de vértigo. Por eso preferimos ' +
-            'ser claros de entrada: qué hace el equipo, qué necesitás además, qué pasa si algo ' +
-            'sale mal. Toda esta información es pública justamente para que decidas con datos, no ' +
-            'con promesas.',
+            'Adquirir un equipo por internet exige un grado de confianza que hay que ganarse. ' +
+            'Por eso preferimos ser explícitos desde el inicio: qué hace el equipo, qué material ' +
+            'necesitás además, qué procedimiento existe si algo falla. Toda esta información es ' +
+            'pública para que la decisión se tome sobre datos verificables y no sobre promesas.',
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Cualquier duda, el asistente responde al instante y, si hace falta, te pasa con una ' +
-            'persona del equipo.',
+            'Ante cualquier consulta, el asistente responde de inmediato y, de ser necesario, ' +
+            'deriva a una persona del equipo.',
         },
       ],
     },
@@ -681,8 +951,9 @@ const manualEquipo: Guia = {
   titulo: 'Manual de uso del INC101',
   eyebrow: 'Tu equipo · Manual',
   resumen:
-    'Todo el funcionamiento del equipo, paso a paso: qué viene en la caja, cómo armarlo, ' +
-    'cómo configurar la temperatura, cómo usar el booster y qué NO hacer nunca.',
+    'El funcionamiento completo del equipo, paso a paso: contenido del envío, montaje, ' +
+    'configuración de temperatura, uso del booster de humedad y las contraindicaciones que ' +
+    'no admiten excepción.',
   intencion: 'informacional',
   actualizado: '2026-07-22',
   mensajesQueResuelve: 97,
@@ -690,14 +961,14 @@ const manualEquipo: Guia = {
   secciones: [
     {
       id: 'caja',
-      titulo: '1. Qué hay en la caja',
+      titulo: '1. Contenido del envío',
       bloques: [
         { tipo: 'parrafo', texto: 'Al abrir el paquete vas a encontrar tres elementos:' },
         {
           tipo: 'pasos',
           items: [
             'Cúpula transparente (la tapa).',
-            'Base de la incubadora (la parte negra con la pantalla).',
+            'Base de la incubadora (el módulo negro con la pantalla).',
             'Booster de humedad (bolsa negra tipo sobre).',
           ],
         },
@@ -707,45 +978,46 @@ const manualEquipo: Guia = {
       id: 'montaje',
       titulo: '2. Montaje paso a paso',
       bloques: [
-        { tipo: 'parrafo', texto: 'Seguí este orden para evitar errores:' },
+        { tipo: 'parrafo', texto: 'Respetá este orden para evitar errores de instalación:' },
         {
           tipo: 'pasos',
           items: [
             'Ubicación: colocá la base sobre una superficie nivelada, seca y limpia.',
-            'Sonda: fijá la sonda de temperatura (leé la alerta de abajo antes de seguir).',
-            'Cúpula: colocá la cúpula sobre la base, con los orificios de ventilación hacia atrás.',
-            'Energía: conectá la incubadora a la red eléctrica.',
-            'Configuración: establecé la temperatura que necesites.',
+            'Sonda: fijá la sonda de temperatura (leé la advertencia siguiente antes de continuar).',
+            'Cúpula: colocá la cúpula sobre la base, con los orificios de ventilación orientados hacia atrás.',
+            'Alimentación: conectá la incubadora a la red eléctrica.',
+            'Configuración: establecé la temperatura correspondiente a tu especie.',
           ],
         },
       ],
     },
     {
       id: 'sonda',
-      titulo: '3. La sonda: lo más importante de todo',
+      titulo: '3. La sonda de temperatura: el punto crítico',
       bloques: [
         {
           tipo: 'aviso',
           tono: 'cuidado',
           texto:
-            'Leé esto con atención: de acá depende la vida de tu equipo y de tu cultivo. La sonda ' +
-            'de temperatura es el cerebro que le dice al equipo cuándo dejar de calentar.',
+            'Leé esta sección con atención: de ella depende la integridad del equipo y del ' +
+            'cultivo. La sonda de temperatura es el sensor que determina cuándo el equipo ' +
+            'interrumpe el calentamiento.',
         },
         {
           tipo: 'vital',
           numero: 1,
-          titulo: 'La sonda va SIEMPRE pegada a la base',
+          titulo: 'La sonda va SIEMPRE adherida a la base',
           texto:
-            'Adherida a la base, dentro de la bandeja, con cinta adhesiva. Nunca colgando ni al ' +
-            'aire. Si está mal colocada, el equipo no sabe qué temperatura hay: calienta sin ' +
-            'parar y puede quemar el equipo o tu cultivo.',
+            'Adherida a la base, dentro de la bandeja, con cinta adhesiva. Nunca suspendida ni ' +
+            'al aire. Si queda mal colocada, el equipo lee una temperatura que no corresponde a ' +
+            'la del cultivo: calienta de forma continua y puede dañar el equipo o el cultivo.',
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Cada vez que muevas el cultivo o coloques el booster, verificá que la sonda siga en ' +
-            'su lugar. Es el error más caro y el más fácil de evitar.',
+            'Cada vez que muevas el cultivo o coloques el booster, verificá que la sonda ' +
+            'permanezca en posición. Es el error de mayor costo y el más simple de evitar.',
         },
       ],
     },
@@ -757,17 +1029,17 @@ const manualEquipo: Guia = {
           tipo: 'aviso',
           tono: 'cuidado',
           texto:
-            'El equipo CALIENTA y mantiene la temperatura, pero NO ENFRÍA. Si en tu casa hay ' +
-            '28 °C, la incubadora no puede bajar de esa temperatura.',
+            'El equipo CALIENTA y sostiene la temperatura, pero NO REFRIGERA. Con 28 °C de ' +
+            'temperatura ambiente, la incubadora no puede descender por debajo de ese valor.',
         },
-        { tipo: 'parrafo', texto: 'Cómo configurarla, desde el menú F1:' },
+        { tipo: 'parrafo', texto: 'Procedimiento de configuración, desde el menú F1:' },
         {
           tipo: 'pasos',
           items: [
-            'Mantené presionado el botón SET unos segundos, hasta que aparezca «F1».',
-            'Presioná SET otra vez y usá las flechas ▲ ▼ para elegir la temperatura.',
-            'Para guardar, presioná el botón de encendido.',
-            'Dejá F2, F3 y F4 como vienen de fábrica: no hace falta tocarlos.',
+            'Mantené presionado el botón SET durante unos segundos, hasta que aparezca «F1».',
+            'Presioná SET nuevamente y seleccioná la temperatura con las flechas ▲ ▼.',
+            'Confirmá con el botón de encendido para guardar el valor.',
+            'Dejá los parámetros F2, F3 y F4 en su configuración de fábrica: no requieren ajuste.',
           ],
         },
       ],
@@ -780,38 +1052,38 @@ const manualEquipo: Guia = {
           tipo: 'aviso',
           tono: 'cuidado',
           texto:
-            'El booster se usa SOLO en la etapa de fructificación. Durante la incubación ' +
-            '(colonización) NO se usa.',
+            'El booster se utiliza EXCLUSIVAMENTE en la etapa de fructificación. Durante la ' +
+            'colonización NO debe usarse.',
         },
         {
           tipo: 'pasos',
           items: [
-            'Preparación del agua: en un recipiente con agua, agregá 3 gotas de lavandina por cada litro. El cloro sanitiza el booster y previene contaminaciones.',
-            'Sumergí el booster en esa agua durante 15 a 20 minutos.',
-            'Escurrí apretando suavemente, hasta que deje de chorrear.',
-            'Colocá el booster sobre la base negra, y tu cultivo encima del booster.',
+            'Preparación de la solución: en un recipiente con agua, agregá 3 gotas de lavandina por litro. El cloro sanitiza el booster y previene contaminaciones.',
+            'Sumergí el booster en la solución durante 15 a 20 minutos.',
+            'Escurrí con presión suave, hasta que deje de gotear.',
+            'Colocá el booster sobre la base negra, y el recipiente de cultivo encima del booster.',
           ],
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Al colocar el booster, controlá de nuevo que la sonda haya quedado en su lugar.',
+            'Después de colocar el booster, verificá nuevamente la posición de la sonda.',
         },
         {
           tipo: 'faq',
           items: [
             {
-              p: '¿Cada cuánto lo rehidrato?',
-              r: 'Cada 6 o 7 días, para sostener la humedad en el rango de fructificación.',
+              p: '¿Con qué frecuencia se rehidrata?',
+              r: 'Cada 6 o 7 días, para sostener la humedad relativa dentro del rango de fructificación.',
             },
             {
-              p: '¿Puedo abrirlo o esterilizarlo con calor?',
-              r: 'No. Nunca abras la bolsa del booster, y bajo ningún concepto lo pongas en microondas ni en horno: lo destruís.',
+              p: '¿Puede abrirse o esterilizarse con calor?',
+              r: 'No. La bolsa del booster no debe abrirse en ningún caso, ni exponerse a microondas u horno: el material se destruye.',
             },
             {
-              p: '¿Cómo lo guardo cuando termino el cultivo?',
-              r: 'Dejalo secar al sol antes de guardarlo. Si lo guardás húmedo, atrae contaminantes para el próximo uso.',
+              p: '¿Cómo se conserva al finalizar el cultivo?',
+              r: 'Dejalo secar al sol antes de guardarlo. Almacenado con humedad, se convierte en un foco de contaminantes para el ciclo siguiente.',
             },
           ],
         },
@@ -824,15 +1096,16 @@ const manualEquipo: Guia = {
         {
           tipo: 'parrafo',
           texto:
-            'Los orificios (que van hacia atrás) se cubren con cinta Micropore. La ventilación ' +
-            'del cultivo es pasiva: no hace falta destapar ni abrir el recipiente.',
+            'Los orificios —orientados hacia atrás— se cubren con cinta Micropore, que permite ' +
+            'el intercambio gaseoso pero retiene partículas y esporas. La ventilación del cultivo ' +
+            'es pasiva: no corresponde destapar ni abrir el recipiente.',
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Mantenimiento: cambiá la cinta solo si después de varios meses la ves cargada de ' +
-            'polvo o pelusa.',
+            'Mantenimiento: reemplazá la cinta únicamente cuando, tras varios meses, presente ' +
+            'acumulación visible de polvo o pelusa.',
         },
       ],
     },
@@ -842,22 +1115,22 @@ const manualEquipo: Guia = {
       bloques: [
         {
           tipo: 'parrafo',
-          texto: 'El equipo también seca tus setas. Para usarlo como deshidratador:',
+          texto: 'El equipo también permite deshidratar la cosecha. Procedimiento:',
         },
         {
           tipo: 'pasos',
           items: [
-            'Pegá bien la sonda a la base con cinta.',
+            'Adherí la sonda a la base con cinta, firmemente.',
             'Cubrí la bandeja con servilletas de papel.',
-            'Colocá las setas encima.',
-            'Configurá la temperatura a 40 °C.',
+            'Distribuí las setas sobre la superficie.',
+            'Configurá la temperatura en 40 °C.',
           ],
         },
         {
           tipo: 'faq',
           items: [
-            { p: 'Limpieza del equipo', r: 'Desconectá SIEMPRE antes de limpiar. Usá un trapo apenas húmedo. Nunca viertas agua directamente sobre la base negra.' },
-            { p: 'Limpieza de la cúpula', r: 'Se puede limpiar con alcohol o detergente suave, y secar con papel.' },
+            { p: 'Limpieza del equipo', r: 'Desconectá SIEMPRE el equipo antes de limpiarlo. Utilizá un paño apenas humedecido. No viertas agua directamente sobre la base.' },
+            { p: 'Limpieza de la cúpula', r: 'Admite alcohol o detergente suave, con secado posterior con papel.' },
           ],
         },
       ],
@@ -871,8 +1144,9 @@ const cultivoDetallado: Guia = {
   titulo: 'Cultivo paso a paso',
   eyebrow: 'Tu equipo · Cultivo',
   resumen:
-    'El proceso completo con tiempos, temperaturas y cantidades exactas: preparación, montaje, ' +
-    'colonización, fructificación y cómo sacarle hasta tres cosechas al mismo sustrato.',
+    'El proceso completo con tiempos, temperaturas y proporciones exactas: preparación, ' +
+    'montaje, colonización, fructificación y el procedimiento para obtener hasta tres ' +
+    'cosechas del mismo sustrato.',
   intencion: 'informacional',
   actualizado: '2026-07-22',
   mensajesQueResuelve: 40,
@@ -885,50 +1159,51 @@ const cultivoDetallado: Guia = {
         {
           tipo: 'parrafo',
           texto:
-            'El cultivo tiene tres etapas: colonización (el micelio cubre el sustrato), ' +
-            'fructificación (aparecen los hongos) y cosecha, que se puede repetir varias veces ' +
-            'con el mismo sustrato.',
+            'El ciclo consta de tres etapas: colonización (el micelio coloniza el sustrato), ' +
+            'fructificación (se desarrollan los cuerpos fructíferos, es decir los hongos ' +
+            'propiamente dichos) y cosecha, que puede repetirse en varias oleadas sobre el mismo ' +
+            'sustrato.',
         },
         {
           tipo: 'parrafo',
           texto:
-            'Elegí un lugar limpio, tranquilo y sin corrientes de aire, con una superficie lisa ' +
-            'y fácil de limpiar (una mesa de cocina sirve).',
+            'Elegí un espacio limpio, sin circulación de personas ni corrientes de aire, con una ' +
+            'superficie lisa y de fácil desinfección (una mesada de cocina es adecuada).',
         },
         {
           tipo: 'pasos',
           items: [
             'Materiales: frascos de sustrato y micelio, cuchara, tenedor, servilletas de papel y guantes descartables.',
             'Desinfectantes: alcohol al 70 % y solución de lavandina al 10 % (1 parte de lavandina, 9 de agua).',
-            'Un recipiente amplio para mezclar (bandeja o tupper grande) y un atomizador de agua.',
+            'Un recipiente amplio para la mezcla (bandeja o contenedor plástico grande) y un atomizador de agua.',
           ],
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Si todavía no vas a usar el kit, guardá los frascos de micelio y sustrato en la ' +
-            'heladera, entre 3 y 5 °C, y no los abras hasta el momento de armar.',
+            'Si no vas a utilizar el kit de inmediato, conservá los frascos de micelio y sustrato ' +
+            'refrigerados entre 3 y 5 °C, sin abrirlos hasta el momento del armado.',
         },
       ],
     },
     {
       id: 'higiene',
-      titulo: '2. Higiene: donde se gana o se pierde',
+      titulo: '2. Asepsia: la etapa determinante',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'El cultivo es muy sensible a la contaminación, y casi todos los que fracasan ' +
-            'fracasan acá. El orden importa:',
+            'El cultivo es altamente sensible a la contaminación, y la mayoría de los que ' +
+            'fracasan lo hacen en esta instancia. El orden del procedimiento importa:',
         },
         {
           tipo: 'pasos',
           items: [
-            'Lavate las manos con jabón antibacterial y poné guantes descartables.',
-            'Limpiá utensilios y superficies con solución de lavandina al 10 %.',
-            'Después rociá alcohol al 70 % sobre las áreas y utensilios: elimina esporas que la lavandina no alcanza.',
-            'Dejá actuar los desinfectantes al menos 5 minutos antes de empezar.',
+            'Lavate las manos con jabón antibacterial y colocate guantes descartables.',
+            'Desinfectá utensilios y superficies con solución de lavandina al 10 %.',
+            'A continuación aplicá alcohol al 70 % sobre superficies y utensilios: elimina esporas que la lavandina no alcanza.',
+            'Dejá actuar los desinfectantes un mínimo de 5 minutos antes de comenzar.',
           ],
         },
       ],
@@ -942,23 +1217,23 @@ const cultivoDetallado: Guia = {
           filas: [
             { clave: 'Temperatura', valor: '27 a 28 °C' },
             { clave: 'Luz', valor: 'Oscuridad total' },
-            { clave: 'Duración', valor: '7 a 15 días (puede estirarse según condiciones)' },
-            { clave: 'Booster', valor: 'NO se usa en esta etapa' },
+            { clave: 'Duración', valor: '7 a 15 días (puede extenderse según las condiciones)' },
+            { clave: 'Booster', valor: 'No se utiliza en esta etapa' },
           ],
         },
         {
           tipo: 'parrafo',
           texto:
-            'Colocá el recipiente en la incubadora y no lo muevas. El micelio va cubriendo el ' +
-            'sustrato de blanco, de a poco y de forma pareja.',
+            'Colocá el recipiente en la incubadora y no lo manipules. El micelio va cubriendo el ' +
+            'sustrato con una capa blanca, de avance gradual y uniforme.',
         },
         {
           tipo: 'aviso',
           tono: 'cuidado',
           texto:
-            'Señales de que algo va mal: manchas verdes, negras o rosadas, o mal olor. Eso es ' +
-            'contaminación y ese cultivo no se recupera. Retiralo, limpiá bien el área y ' +
-            'escribinos para revisar qué pasó antes del próximo intento.',
+            'Indicadores de contaminación: manchas verdes, negras o rosadas, u olor ' +
+            'desagradable. Ese cultivo no es recuperable. Retiralo, desinfectá el área y ' +
+            'escribinos para analizar la causa antes del próximo intento.',
         },
       ],
     },
@@ -969,49 +1244,50 @@ const cultivoDetallado: Guia = {
         {
           tipo: 'parrafo',
           texto:
-            'Cuando el sustrato está completamente colonizado (blanco y denso), se pasa a la ' +
-            'etapa donde aparecen los hongos. Arranca con un shock térmico.',
+            'Cuando el sustrato está completamente colonizado (blanco y compacto) se inicia la ' +
+            'etapa de desarrollo de los cuerpos fructíferos. Comienza con un shock térmico.',
         },
         {
           tipo: 'pasos',
           items: [
-            'Shock térmico: llevá el recipiente cerrado a la heladera, entre 3 y 5 °C, durante 24 horas. Simula el cambio de estación y despierta la fructificación.',
-            'Hidratá el booster y colocalo sobre la base, con el cultivo encima.',
-            'Colocá el recipiente bajo la cúpula, sin tapa.',
-            'Ajustá la temperatura y dejá que el equipo trabaje.',
+            'Shock térmico: llevá el recipiente cerrado a refrigeración, entre 3 y 5 °C, durante 24 horas. Simula el cambio estacional e induce la fructificación.',
+            'Hidratá el booster y colocalo sobre la base, con el cultivo por encima.',
+            'Ubicá el recipiente bajo la cúpula, sin tapa.',
+            'Ajustá la temperatura y dejá que el equipo estabilice las condiciones.',
           ],
         },
         {
           tipo: 'datos',
           filas: [
-            { clave: 'Temperatura', valor: '20 a 27 °C — ideal 24 °C' },
-            { clave: 'Humedad', valor: '80 a 90 % (la sostiene el booster)' },
-            { clave: 'Luz', valor: '12 h de luz indirecta y 12 h de oscuridad (no necesita ser exacto)' },
-            { clave: 'Ventilación', valor: 'Pasiva, por los orificios con Micropore' },
-            { clave: 'Rehidratar booster', valor: 'Cada 6 a 7 días' },
+            { clave: 'Temperatura', valor: '20 a 27 °C — óptimo 24 °C' },
+            { clave: 'Humedad relativa', valor: '80 a 90 % (la sostiene el booster)' },
+            { clave: 'Fotoperíodo', valor: '12 h de luz indirecta y 12 h de oscuridad (no requiere precisión horaria)' },
+            { clave: 'Ventilación', valor: 'Pasiva, por los orificios con cinta Micropore' },
+            { clave: 'Rehidratación del booster', valor: 'Cada 6 a 7 días' },
           ],
         },
         {
           tipo: 'aviso',
           tono: 'cuidado',
           texto:
-            'No pases de 27 °C: por encima de esa temperatura la formación de setas se inhibe. Y ' +
-            'no rocíes agua ni destapes el recipiente para ventilar — el equipo ya lo resuelve solo.',
+            'No superes los 27 °C: por encima de ese valor la formación de cuerpos fructíferos ' +
+            'se inhibe. Tampoco rocíes agua ni destapes el recipiente para ventilar — el equipo ' +
+            'ya regula el intercambio gaseoso.',
         },
         {
           tipo: 'faq',
           items: [
             {
               p: '¿Cuándo aparecen los primeros hongos?',
-              r: 'Entre los días 10 y 15 de esta etapa aparecen los pines (puntitos blancos) y después los primordios (setas bebé). No manipules el cultivo mientras tanto.',
+              r: 'Entre los días 10 y 15 de esta etapa se forman los pines (puntos blancos iniciales) y luego los primordios, los cuerpos fructíferos en formación. Durante ese período no corresponde manipular el cultivo.',
             },
             {
-              p: 'Se junta mucha agua en la cúpula, ¿está mal?',
-              r: 'Algo de condensación es normal. Si ves gotas en exceso sobre el sustrato, escurrí el recipiente y secá la base de la incubadora, que retiene agua.',
+              p: 'Se acumula agua en la cúpula, ¿es normal?',
+              r: 'Cierto nivel de condensación es esperable. Ante gotas en exceso sobre el sustrato, escurrí el recipiente y secá la base de la incubadora, donde el agua se acumula.',
             },
             {
-              p: '¿Cuándo cosecho?',
-              r: 'Cuando el sombrero se abre y el velo se despega. Cosechá una por una, girando suavemente desde la base. No uses cuchillo: dañás el micelio que todavía tiene que darte más cosechas.',
+              p: '¿Cuál es el punto de cosecha?',
+              r: 'Cuando el sombrero se abre y el velo se desprende. Cosechá de a una pieza, girando con suavidad desde la base. No utilices cuchillo: daña el micelio, que aún debe producir las oleadas siguientes.',
             },
           ],
         },
@@ -1019,13 +1295,13 @@ const cultivoDetallado: Guia = {
     },
     {
       id: 'cronograma',
-      titulo: '5. Cronograma: qué esperar cada día',
+      titulo: '5. Cronograma del ciclo',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'Esta es la referencia para saber si vas bien. Si tu cultivo está dentro de estos ' +
-            'rangos, andá tranquilo aunque parezca que no pasa nada.',
+            'Esta es la referencia para evaluar el avance. Si tu cultivo se encuentra dentro de ' +
+            'estos rangos, la ausencia de cambios visibles no indica un problema.',
         },
         {
           tipo: 'cronograma',
@@ -1033,38 +1309,38 @@ const cultivoDetallado: Guia = {
             {
               etapa: 'Armado',
               dias: 'Día 1',
-              que: 'Mezclás sustrato y micelio con todo desinfectado.',
-              ojo: 'Anotá la fecha y sacá una foto. Te va a servir para comparar.',
+              que: 'Mezcla de sustrato y micelio, con todo el material desinfectado.',
+              ojo: 'Registrá la fecha y tomá una fotografía. Sirve como referencia comparativa.',
             },
             {
               etapa: 'Colonización',
               dias: 'Días 2 a 20',
-              que: 'El recipiente va a la incubadora a 27-28 °C, en oscuridad. No lo muevas.',
-              ojo: 'Foto cada 5 días. El blanco avanza parejo.',
+              que: 'El recipiente permanece en la incubadora a 27-28 °C, en oscuridad, sin manipulación.',
+              ojo: 'Fotografía cada 5 días. El avance del micelio debe ser uniforme.',
             },
             {
               etapa: 'Shock térmico',
               dias: 'Día 21',
-              que: 'Recipiente cerrado a la heladera (3-5 °C) por 24 horas.',
-              ojo: 'Es lo que activa la fructificación.',
+              que: 'Recipiente cerrado en refrigeración (3-5 °C) durante 24 horas.',
+              ojo: 'Es el estímulo que induce la fructificación.',
             },
             {
               etapa: 'Fructificación',
               dias: 'Días 22 a 35',
-              que: 'Vuelve a la incubadora con el booster hidratado, 24 °C y 80-90 % de humedad.',
-              ojo: 'Los pines aparecen entre el día 10 y 15 de esta etapa.',
+              que: 'Retorno a la incubadora con el booster hidratado, 24 °C y 80-90 % de humedad relativa.',
+              ojo: 'Los pines se forman entre el día 10 y 15 de esta etapa.',
             },
             {
               etapa: 'Primera cosecha',
               dias: 'Días 35 a 40',
-              que: 'Cosechás cuando el sombrero abre y el velo se despega.',
-              ojo: 'De a una, girando desde la base.',
+              que: 'Cosecha al abrirse el sombrero y desprenderse el velo.',
+              ojo: 'De a una pieza, girando desde la base.',
             },
             {
-              etapa: 'Siguientes cosechas',
+              etapa: 'Oleadas siguientes',
               dias: 'Días 41 a 50',
-              que: 'Rehidratás el sustrato y repetís el shock térmico.',
-              ojo: 'Un cultivo sano da hasta 3 cosechas.',
+              que: 'Rehidratación del sustrato y repetición del shock térmico.',
+              ojo: 'Un cultivo sano produce hasta 3 oleadas.',
             },
           ],
         },
@@ -1072,30 +1348,31 @@ const cultivoDetallado: Guia = {
     },
     {
       id: 'flushes',
-      titulo: '6. Cómo sacar más cosechas del mismo sustrato',
+      titulo: '6. Oleadas sucesivas sobre el mismo sustrato',
       bloques: [
         {
           tipo: 'parrafo',
           texto:
-            'Después de la primera cosecha, el micelio sigue vivo y puede darte hasta tres ' +
-            'oleadas. La clave es rehidratarlo bien.',
+            'Tras la primera cosecha el micelio permanece viable y puede producir hasta tres ' +
+            'oleadas. El factor determinante es una rehidratación correcta.',
         },
         {
           tipo: 'pasos',
           items: [
-            'Preparación: herví agua y dejala enfriar. Agregá 1 ml de agua oxigenada por cada litro.',
-            'Volcá esa mezcla sobre el sustrato hasta que el pan flote completamente.',
-            'Tapá el recipiente y llevalo a la heladera (3-5 °C) por 24 horas.',
-            'Sacalo, eliminá el exceso de agua y escurrí unos minutos hasta que deje de gotear.',
-            'Volvé a las condiciones de fructificación: 24 °C, booster hidratado, luz 12/12.',
+            'Preparación: herví agua y dejala enfriar. Agregá 1 ml de agua oxigenada por litro.',
+            'Volcá la solución sobre el sustrato hasta que el pan quede completamente sumergido.',
+            'Tapá el recipiente y llevalo a refrigeración (3-5 °C) durante 24 horas.',
+            'Retiralo, eliminá el excedente de agua y escurrí unos minutos hasta que deje de gotear.',
+            'Restituí las condiciones de fructificación: 24 °C, booster hidratado y fotoperíodo 12/12.',
           ],
         },
         {
           tipo: 'aviso',
           tono: 'dato',
           texto:
-            'Se puede repetir para cada oleada. En general un cultivo saludable rinde hasta 3 ' +
-            'cosechas; después el sustrato se agota y conviene arrancar uno nuevo.',
+            'El procedimiento se repite en cada oleada. Un cultivo saludable rinde en general ' +
+            'hasta 3 cosechas; a partir de ahí el sustrato agota sus nutrientes y corresponde ' +
+            'iniciar uno nuevo.',
         },
       ],
     },
@@ -1182,6 +1459,18 @@ export function guiasParaPrompt(incluirPrivadas = false): string {
               b.filas.map(f => `${f.etapa} (${f.dias}): ${f.que}${f.ojo ? ` — ${f.ojo}` : ''}`).join('\n'),
             )
             break
+          case 'especies':
+            partes.push(
+              b.filas
+                .map(
+                  f =>
+                    `${f.nombre} (${f.cientifico}) — dificultad ${f.nivel}. ` +
+                    `Colonización: ${f.colonizacion}. Fructificación: ${f.fructificacion}. ` +
+                    `Ciclo: ${f.ciclo}. ${f.nota}`,
+                )
+                .join('\n'),
+            )
+            break
         }
       }
     }
@@ -1218,6 +1507,9 @@ export function minutosLectura(g: Guia): number {
           break
         case 'cronograma':
           palabras += b.filas.map(f => f.etapa + ' ' + f.que + ' ' + (f.ojo ?? '')).join(' ').split(/\s+/).length
+          break
+        case 'especies':
+          palabras += b.filas.map(f => f.nombre + ' ' + f.nota).join(' ').split(/\s+/).length
           break
       }
     }
