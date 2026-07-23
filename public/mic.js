@@ -43,7 +43,11 @@
     catch (e) { return null; }
   }
 
+  var PREVIEW = !!(script && script.hasAttribute('data-preview'));
+
   function evento(id, tipo) {
+    // En vista previa no se registra nada: inflaría las métricas del widget real.
+    if (PREVIEW) return;
     try {
       var body = JSON.stringify({ widget_id: id, tipo: tipo, vid: vid() });
       if (navigator.sendBeacon) navigator.sendBeacon(BASE + '/api/widgets/evento', body);
@@ -67,17 +71,71 @@
     return true;
   }
 
-  /* Contenedor aislado. Los widgets de bloque van al slot; los flotantes, al body. */
+  /* ¿Cuál es el texto principal de esta página? Se prueba de lo más específico a lo más
+     general para no terminar insertando dentro del menú o del pie. */
+  function contenido() {
+    var candidatos = [
+      '[data-mic-contenido]',      // marca explícita, gana siempre
+      'article',
+      '.mic-ancho main',
+      'main',
+      '.js-product-description',   // ficha de producto de Tiendanube
+      '.product-description'
+    ];
+    for (var i = 0; i < candidatos.length; i++) {
+      var el = document.querySelector(candidatos[i]);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  /* Inserta el host en el lugar elegido desde el panel. Reemplaza al viejo data-mic-slot:
+     antes había que pegar un <div> a mano en cada página para mover un widget. */
+  function insertar(host, ubicacion) {
+    var cont = contenido();
+    if (!cont) return false;
+
+    // Los hijos "de texto" son la referencia para medir la página. Se excluye lo que ya
+    // puso este mismo motor, si no cada widget correría de lugar al siguiente.
+    var hijos = [];
+    for (var i = 0; i < cont.children.length; i++) {
+      var h = cont.children[i];
+      if (h.hasAttribute('data-mic')) continue;
+      hijos.push(h);
+    }
+    if (!hijos.length) { cont.appendChild(host); return true; }
+
+    var idx;
+    switch (ubicacion) {
+      case 'inicio':      idx = 0; break;
+      case 'tras_intro':  idx = Math.min(1, hijos.length - 1); break;
+      case 'medio':       idx = Math.floor(hijos.length / 2); break;
+      case 'antes_final': idx = Math.max(0, hijos.length - 1); break;
+      default:            cont.appendChild(host); return true; // 'final'
+    }
+    cont.insertBefore(host, hijos[idx]);
+    return true;
+  }
+
+  /* Contenedor aislado. Los flotantes van al body; los de bloque, al lugar elegido. */
   function montar(w, flotante) {
     var host = document.createElement('div');
     host.setAttribute('data-mic', w.tipo);
+
     if (flotante) {
       document.body.appendChild(host);
-    } else {
-      var slot = document.querySelector('[data-mic-slot="' + w.tipo + '"]');
-      if (!slot) return null; // sin lugar donde ir: no se inventa una posición
-      slot.appendChild(host);
+      return host.attachShadow({ mode: 'open' });
     }
+
+    // Un <div data-mic-slot="TIPO"> en la página sigue mandando si existe: sirve para
+    // ubicar un widget en un punto exacto que la lista no contempla.
+    var slot = document.querySelector('[data-mic-slot="' + w.tipo + '"]');
+    if (slot) {
+      slot.appendChild(host);
+      return host.attachShadow({ mode: 'open' });
+    }
+
+    if (!insertar(host, (w.config && w.config.ubicacion) || 'final')) return null;
     return host.attachShadow({ mode: 'open' });
   }
 
@@ -355,6 +413,26 @@
       if (!fn) continue; // tipo nuevo en la base, script viejo en caché: se ignora, no rompe
       try { fn(w); } catch (e) { console.warn('[mic] falló', w.tipo, e); }
     }
+  }
+
+  /* Modo vista previa: el panel dibuja el widget con la config que se está editando, sin
+     pasar por la base. Es el mismo código que corre en el sitio — si acá se ve bien, allá
+     se ve bien. Un preview que dibuja aparte es un preview que miente. */
+  if (PREVIEW) {
+    window.MIC = {
+      dibujar: function (w) {
+        var viejos = document.querySelectorAll('[data-mic]');
+        for (var i = 0; i < viejos.length; i++) viejos[i].remove();
+        var fn = R[w.tipo];
+        if (!fn) return;
+        try { fn(w); } catch (e) { console.warn('[mic] preview', w.tipo, e); }
+      }
+    };
+    window.addEventListener('message', function (e) {
+      if (e.data && e.data.mic === 'preview') window.MIC.dibujar(e.data.widget);
+    });
+    if (window.parent !== window) window.parent.postMessage({ mic: 'listo' }, '*');
+    return;
   }
 
   fetch(BASE + '/api/widgets/config?ctx=' + encodeURIComponent(CTX))

@@ -1,6 +1,6 @@
 'use client'
 
-import { PALETA, type Campo } from '@/lib/widgets/tipos'
+import { PALETA, UBICACIONES, DESTINOS, EMOJIS, type Campo } from '@/lib/widgets/tipos'
 
 // Formulario genérico: dibuja UN campo a partir de su declaración en lib/widgets/tipos.ts.
 // Ningún tipo de widget tiene formulario propio. Agregar un tipo nuevo no toca este archivo
@@ -36,6 +36,106 @@ export function CampoEditor({ campo, valor, onChange }: Props) {
   }
 
   const etiqueta = <label className="mb-1 block text-xs font-medium text-neutral-600">{campo.label}</label>
+
+  // Dónde se inserta el widget: se elige mirando un dibujo de la página, no escribiendo
+  // HTML. Antes esto era un <div data-mic-slot="..."> que había que pegar a mano en cada
+  // página; el dibujo dice exactamente lo mismo sin pedirle código a nadie.
+  if (campo.tipo === 'ubicacion') {
+    const actual = String(valor ?? 'final')
+    const elegida = UBICACIONES.find(u => u.value === actual) ?? UBICACIONES[4]
+    return (
+      <div>
+        {etiqueta}
+        <div className="flex flex-wrap gap-2">
+          {UBICACIONES.map(u => {
+            const activo = u.value === actual
+            // Miniatura de la página: renglones grises de texto y una banda de color donde
+            // caería el widget.
+            const filas = ['inicio', 'tras_intro', 'medio', 'antes_final', 'final']
+            const posicion = filas.indexOf(u.value)
+            return (
+              <button
+                key={u.value}
+                type="button"
+                onClick={() => onChange(u.value)}
+                title={u.ayuda}
+                className={`w-[104px] rounded border-2 p-2 text-left ${
+                  activo ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200'
+                }`}
+              >
+                <div className="mb-1.5 space-y-[3px] rounded bg-white p-1.5 ring-1 ring-neutral-200">
+                  {[0, 1, 2, 3, 4].map(i => (
+                    <div
+                      key={i}
+                      className={
+                        i === posicion
+                          ? 'h-2 rounded-sm bg-emerald-600'
+                          : `h-[3px] rounded-sm bg-neutral-300 ${i % 2 ? 'w-3/4' : 'w-full'}`
+                      }
+                    />
+                  ))}
+                </div>
+                <span className="block text-[11px] leading-tight text-neutral-700">{u.label}</span>
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-1 text-xs leading-relaxed text-neutral-500">{elegida.ayuda}</p>
+        {ayuda}
+      </div>
+    )
+  }
+
+  // Destino de un enlace: lista cerrada de páginas reales. Escribir la dirección a mano es
+  // la forma más fácil de mandar a los visitantes a una página que no existe.
+  if (campo.tipo === 'enlace') {
+    return (
+      <div>
+        {etiqueta}
+        <select className={input} value={String(valor ?? '')} onChange={e => onChange(e.target.value)}>
+          {DESTINOS.map(d => (
+            <option key={d.value} value={d.value}>
+              {d.label}
+            </option>
+          ))}
+        </select>
+        {ayuda}
+      </div>
+    )
+  }
+
+  if (campo.tipo === 'emoji') {
+    return (
+      <div>
+        {etiqueta}
+        <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className={`h-9 w-9 rounded border text-xs ${
+              !valor ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200'
+            }`}
+            title="Sin emoji"
+          >
+            —
+          </button>
+          {EMOJIS.map(e => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => onChange(e)}
+              className={`h-9 w-9 rounded border text-lg ${
+                valor === e ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200'
+              }`}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+        {ayuda}
+      </div>
+    )
+  }
 
   if (campo.tipo === 'lista') {
     const items = Array.isArray(valor) ? (valor as Record<string, unknown>[]) : []

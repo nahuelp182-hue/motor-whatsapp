@@ -17,6 +17,9 @@ export type TipoCampo =
   | 'select'
   | 'color'
   | 'url'
+  | 'enlace'
+  | 'emoji'
+  | 'ubicacion'
   | 'lista'
 
 export type Campo = {
@@ -45,6 +48,12 @@ export type TipoWidget = {
   datosVivos?: 'resenas'
   /** Dónde aparece y qué necesita para funcionar. Se muestra arriba del formulario. */
   uso: string
+  /**
+   * El widget se inserta DENTRO del contenido (no flota). Estos llevan el campo
+   * `ubicacion`, que reemplaza al viejo `data-mic-slot`: el lugar se elige de una lista
+   * y lo resuelve mic.js. Nadie tiene que tocar el HTML de una página para mover un widget.
+   */
+  bloque?: boolean
   /** Cuándo NO conviene usarlo. Se muestra en el panel para no tener que recordarlo. */
   cuidado?: string
   campos: Campo[]
@@ -59,6 +68,39 @@ export const PALETA = [
   { value: 'crema', label: 'Crema', hex: '#f4f2eb' },
   { value: 'tierra', label: 'Tierra', hex: '#7a6a55' },
   { value: 'carbon', label: 'Carbón', hex: '#1c1a17' },
+] as const
+
+// ── Ubicaciones ──────────────────────────────────────────────────────────────
+// Reemplazo del viejo `data-mic-slot`. El lugar se elige de esta lista y lo resuelve
+// mic.js midiendo el contenido de la página. Así mover un widget es un clic, y no editar
+// el HTML de diez guías.
+export const UBICACIONES = [
+  { value: 'inicio', label: 'Arriba de todo', ayuda: 'Antes del primer párrafo.' },
+  { value: 'tras_intro', label: 'Después de la introducción', ayuda: 'Tras el primer párrafo, cuando ya enganchó pero todavía no se fue.' },
+  { value: 'medio', label: 'En el medio', ayuda: 'A mitad del texto, entre dos párrafos.' },
+  { value: 'antes_final', label: 'Antes del cierre', ayuda: 'Justo antes del último párrafo.' },
+  { value: 'final', label: 'Al final', ayuda: 'Después de todo el contenido. Es el lugar más seguro: nunca interrumpe.' },
+] as const
+
+// ── Destinos de enlace ───────────────────────────────────────────────────────
+// Lista cerrada de destinos reales. Evita tener que escribir direcciones a mano (y que
+// una dirección mal tipeada mande a los visitantes a una página que no existe).
+export const DESTINOS = [
+  { value: '', label: 'Sin enlace (el botón no aparece)' },
+  { value: 'https://infomicelium.com.ar', label: 'Tienda — portada' },
+  { value: 'https://infomicelium.com.ar/productos', label: 'Tienda — todos los productos' },
+  { value: '/guia', label: 'Guías — índice' },
+  { value: '/guia/asistente', label: 'Guías — asistente' },
+  { value: '/contacto', label: 'Contacto' },
+  { value: '/acceso', label: 'Mi equipo (área de clientes)' },
+  { value: 'https://wa.me/543512145521', label: 'WhatsApp de Micelium' },
+] as const
+
+// Emojis que se usan de verdad en la marca. Que la lista sea corta es la gracia: evita el
+// desfile de emojis que hace ver improvisado a un sitio.
+export const EMOJIS = [
+  '🌱', '🍃', '🛡️', '✅', '📦', '🚚', '💬', '⏱️', '🌡️', '💧',
+  '🔧', '⭐', '📋', '🏠', '🔬', '📈', '🤝', '💡',
 ] as const
 
 const CAMPO_COLOR: Campo = {
@@ -136,9 +178,18 @@ export const TIPOS: TipoWidget[] = [
       'Recuadro con título, texto y botón. Es el puente entre una guía y el producto: hoy el blog trae visitas y no las deriva.',
     categoria: 'conversion',
     contextos: ['guias', 'tienda', 'producto'],
+    bloque: true,
     uso:
-      'Va dentro del texto, donde vos lo pongas. Necesita un <div data-mic-slot="cta_producto"></div> en la página; si no está, el widget no se dibuja.',
+      'Se inserta dentro del texto de la página, en el lugar que elijas más abajo. No hay que preparar nada en la página.',
     campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'final',
+        ayuda:
+          'Se elige de la lista y listo: no hay que tocar el HTML de ninguna página. El widget se acomoda solo dentro del texto principal.',
+      },
       {
         key: 'titulo',
         label: 'Título',
@@ -161,9 +212,8 @@ export const TIPOS: TipoWidget[] = [
       {
         key: 'url',
         label: 'Enlace del botón',
-        tipo: 'url',
-        ayuda:
-          'A dónde lleva. Puede ser una dirección completa (https://infomicelium.com.ar/...) o interna empezando con barra (/contacto). Si queda vacío, el botón no aparece.',
+        tipo: 'enlace',
+        ayuda: 'Elegí el destino de la lista. Si queda sin destino, el botón no aparece.',
       },
       CAMPO_COLOR,
     ],
@@ -222,8 +272,9 @@ export const TIPOS: TipoWidget[] = [
     categoria: 'confianza',
     contextos: ['tienda', 'producto', 'guias'],
     datosVivos: 'resenas',
+    bloque: true,
     uso:
-      'Necesita un <div data-mic-slot="resenas"></div> en la página. Los textos NO se cargan acá: salen solos de las respuestas que dejan los clientes por WhatsApp tras recibir el equipo. Si todavía no hay ninguna, el widget no dibuja nada en vez de mostrar relleno.',
+      'Se inserta donde elijas más abajo. Los textos NO se cargan acá: salen solos de las respuestas que dejan los clientes por WhatsApp tras recibir el equipo. Si todavía no hay ninguna, el widget no dibuja nada en vez de mostrar relleno.',
     campos: [
       {
         key: 'titulo',
@@ -231,6 +282,14 @@ export const TIPOS: TipoWidget[] = [
         tipo: 'texto',
         porDefecto: 'Lo que dicen quienes ya lo usan',
         ayuda: 'Encabezado de la sección. Vacío = sin encabezado.',
+      },
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'final',
+        ayuda:
+          'Se elige de la lista y listo: no hay que tocar el HTML de ninguna página. El widget se acomoda solo dentro del texto principal.',
       },
       {
         key: 'cantidad',
@@ -260,9 +319,18 @@ export const TIPOS: TipoWidget[] = [
       'Lista de preguntas que se despliegan al tocarlas. Sirve para contestar de antemano lo que frena la compra.',
     categoria: 'confianza',
     contextos: ['guias', 'tienda', 'producto'],
+    bloque: true,
     uso:
-      'Necesita un <div data-mic-slot="faq"></div> en la página. Cargalo con las preguntas que de verdad llegan por WhatsApp, no con las que uno imagina.',
+      'Se inserta donde elijas más abajo. Cargalo con las preguntas que de verdad llegan por WhatsApp, no con las que uno imagina.',
     campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'final',
+        ayuda:
+          'Se elige de la lista y listo: no hay que tocar el HTML de ninguna página. El widget se acomoda solo dentro del texto principal.',
+      },
       {
         key: 'titulo',
         label: 'Título',
@@ -301,7 +369,8 @@ export const TIPOS: TipoWidget[] = [
     descripcion: 'Lista corta con un emoji por línea. Habla de resultados, no de componentes.',
     categoria: 'confianza',
     contextos: ['guias', 'tienda', 'producto'],
-    uso: 'Necesita un <div data-mic-slot="beneficios"></div> en la página.',
+    bloque: true,
+    uso: 'Se inserta dentro del texto de la página, en el lugar que elijas más abajo.',
     cuidado:
       'Nunca listar de qué está hecho el equipo ni cómo se arma: eso le da la receta a quien quiera copiarlo, y al cliente no le mueve la aguja. Hablar de lo que consigue.',
     campos: [
@@ -310,6 +379,14 @@ export const TIPOS: TipoWidget[] = [
         label: 'Título',
         tipo: 'texto',
         ayuda: 'Opcional. Si lo dejás vacío, la lista arranca directamente.',
+      },
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'final',
+        ayuda:
+          'Se elige de la lista y listo: no hay que tocar el HTML de ninguna página. El widget se acomoda solo dentro del texto principal.',
       },
       {
         key: 'items',
@@ -321,9 +398,8 @@ export const TIPOS: TipoWidget[] = [
           {
             key: 'icono',
             label: 'Emoji',
-            tipo: 'texto',
-            placeholder: '🌱',
-            ayuda: 'Un solo emoji, al principio de la línea. Vacío = se usa un punto.',
+            tipo: 'emoji',
+            ayuda: 'Se elige de la lista. Va al principio de la línea. Sin emoji se usa un punto.',
           },
           {
             key: 'texto',
@@ -342,9 +418,18 @@ export const TIPOS: TipoWidget[] = [
     descripcion: 'Recuadro de respaldo: garantía, soporte, quién está atrás del equipo.',
     categoria: 'confianza',
     contextos: ['tienda', 'producto'],
+    bloque: true,
     uso:
-      'Necesita un <div data-mic-slot="garantia"></div>. Rinde justo debajo del botón de compra, que es donde aparece la duda de "¿y si me quedo solo con esto?".',
+      'Se inserta donde elijas más abajo. Rinde justo después del botón de compra, que es donde aparece la duda de "¿y si me quedo solo con esto?".',
     campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'final',
+        ayuda:
+          'Se elige de la lista y listo: no hay que tocar el HTML de ninguna página. El widget se acomoda solo dentro del texto principal.',
+      },
       {
         key: 'titulo',
         label: 'Título',
@@ -361,9 +446,9 @@ export const TIPOS: TipoWidget[] = [
       {
         key: 'icono',
         label: 'Emoji',
-        tipo: 'texto',
+        tipo: 'emoji',
         porDefecto: '🛡️',
-        ayuda: 'Un solo emoji, va grande a la izquierda del recuadro.',
+        ayuda: 'Se elige de la lista. Va grande, a la izquierda del recuadro.',
       },
       CAMPO_COLOR,
     ],
@@ -375,8 +460,9 @@ export const TIPOS: TipoWidget[] = [
       'Pide el correo a cambio de la guía en PDF. Sirve para que una visita que hoy se va sin comprar quede en la lista.',
     categoria: 'captura',
     contextos: ['guias', 'tienda', 'producto'],
+    bloque: true,
     uso:
-      'Como ventana emergente no necesita nada preparado. Como bloque necesita un <div data-mic-slot="captura_email"></div>. El correo se valida (formato y que el dominio exista de verdad) y se envía la guía en PDF; quien la pide queda suscripto para las campañas.',
+      'Como ventana emergente no necesita nada preparado. Como bloque se inserta donde elijas más abajo. El correo se valida (formato y que el dominio exista de verdad) y se envía la guía en PDF; quien la pide queda suscripto para las campañas.',
     cuidado:
       'Una sola ventana emergente por página. Si la persona ya dejó su correo o cerró la ventana, no le vuelve a aparecer.',
     campos: [
@@ -410,6 +496,14 @@ export const TIPOS: TipoWidget[] = [
           { value: 'popup', label: 'Ventana emergente' },
           { value: 'bloque', label: 'Bloque en la página' },
         ],
+      },
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'final',
+        ayuda:
+          'Se elige de la lista y listo: no hay que tocar el HTML de ninguna página. El widget se acomoda solo dentro del texto principal.',
       },
       {
         key: 'demora',
@@ -478,6 +572,12 @@ export function sanearConfig(tipo: TipoWidget, entrada: unknown): Record<string,
         return c.opciones?.some(o => o.value === v) ? v : (c.porDefecto ?? c.opciones?.[0]?.value ?? '')
       case 'color':
         return PALETA.some(p => p.value === v) ? v : 'sage'
+      case 'ubicacion':
+        return UBICACIONES.some(u => u.value === v) ? v : 'final'
+      case 'emoji':
+        return EMOJIS.includes(v as (typeof EMOJIS)[number]) ? v : (c.porDefecto ?? '')
+      case 'enlace':
+        return DESTINOS.some(d => d.value === v) ? v : ''
       case 'url': {
         const s = String(v ?? '').trim().slice(0, 500)
         // Sin esto, un `javascript:` guardado en la config se ejecuta en el navegador

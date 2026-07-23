@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { porSlug, configPorDefecto, sanearConfig, sanearReglas, TIPOS, type Contexto } from '@/lib/widgets/tipos'
+import { GUIAS_PUBLICAS } from '@/lib/guias'
 
 // CRUD del panel. NO figura en API_ABIERTAS del middleware, así que exige sesión de
 // dashboard como cualquier otra ruta privada.
 
 const TN_STORE_ID = process.env.TN_STORE_ID ?? '1957278'
 const CONTEXTOS: Contexto[] = ['guias', 'tienda', 'producto']
+
+// Páginas reales donde se puede acotar un widget. Se manda al panel para que la regla de
+// rutas se elija con casillas y no escribiendo direcciones a mano.
+const PAGINAS = [
+  { ruta: '/guia', titulo: 'Índice de guías' },
+  ...GUIAS_PUBLICAS.map(g => ({ ruta: `/guia/${g.slug}`, titulo: g.titulo })),
+  { ruta: '/contacto', titulo: 'Contacto' },
+]
 
 async function storeId(): Promise<string | null> {
   const s = await prisma.store.findFirst({
@@ -19,7 +28,7 @@ async function storeId(): Promise<string | null> {
 /** Lista los widgets con su rendimiento de los últimos 30 días. */
 export async function GET() {
   const sid = await storeId()
-  if (!sid) return NextResponse.json({ widgets: [], tipos: TIPOS })
+  if (!sid) return NextResponse.json({ widgets: [], tipos: TIPOS, paginas: PAGINAS })
 
   const widgets = await prisma.widget.findMany({
     where: { store_id: sid },
@@ -40,7 +49,7 @@ export async function GET() {
     if (m && e.tipo in m) m[e.tipo as keyof typeof m] = e._count._all
   }
 
-  return NextResponse.json({ widgets, metricas, tipos: TIPOS })
+  return NextResponse.json({ widgets, metricas, tipos: TIPOS, paginas: PAGINAS })
 }
 
 /** Crea un widget con los valores por defecto del tipo. Nace APAGADO a propósito. */

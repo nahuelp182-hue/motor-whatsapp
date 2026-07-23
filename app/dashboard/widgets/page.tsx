@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { CampoEditor } from '@/components/widgets/CampoEditor'
+import { VistaPrevia } from '@/components/widgets/VistaPrevia'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
 
 // Panel de widgets. Todo lo que se ve acá sale del registro de tipos: la lista de widgets
@@ -19,6 +20,7 @@ type Widget = {
   orden: number
 }
 type Metricas = Record<string, { impresion: number; interaccion: number; conversion: number }>
+type Pagina = { ruta: string; titulo: string }
 
 const CONTEXTOS: { key: Contexto; label: string }[] = [
   { key: 'guias', label: 'Guías' },
@@ -30,6 +32,7 @@ export default function WidgetsPage() {
   const [widgets, setWidgets] = useState<Widget[]>([])
   const [metricas, setMetricas] = useState<Metricas>({})
   const [tipos, setTipos] = useState<TipoWidget[]>([])
+  const [paginas, setPaginas] = useState<Pagina[]>([])
   const [ctx, setCtx] = useState<Contexto>('guias')
   const [editando, setEditando] = useState<Widget | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -42,6 +45,7 @@ export default function WidgetsPage() {
     setWidgets(d.widgets ?? [])
     setMetricas(d.metricas ?? {})
     setTipos(d.tipos ?? [])
+    setPaginas(d.paginas ?? [])
     setCargando(false)
   }, [])
 
@@ -182,6 +186,7 @@ export default function WidgetsPage() {
                   <Editor
                     widget={editando}
                     tipo={tipoDe(w.tipo)}
+                    paginas={paginas}
                     guardando={guardando}
                     onCambio={setEditando}
                     onGuardar={() =>
@@ -207,6 +212,7 @@ export default function WidgetsPage() {
 function Editor({
   widget,
   tipo,
+  paginas,
   guardando,
   onCambio,
   onGuardar,
@@ -214,6 +220,7 @@ function Editor({
 }: {
   widget: Widget
   tipo?: TipoWidget
+  paginas: Pagina[]
   guardando: boolean
   onCambio: (w: Widget) => void
   onGuardar: () => void
@@ -254,6 +261,8 @@ function Editor({
         </p>
       </div>
 
+      <VistaPrevia tipo={widget.tipo} config={widget.config} />
+
       {tipo.campos.map(c => (
         <CampoEditor
           key={c.key}
@@ -269,24 +278,40 @@ function Editor({
         </summary>
         <div className="mt-3 space-y-3">
           <div>
-            <label className="mb-1 block text-xs text-neutral-500">
-              Rutas (una por línea, vacío = en todas)
-            </label>
-            <p className="mb-1 text-xs leading-relaxed text-neutral-500">
-              Se compara con el principio de la dirección: <code>/guia/</code> lo muestra en todas
-              las guías, <code>/guia/como-comprar</code> solo en esa.
+            <label className="mb-1 block text-xs text-neutral-500">En qué páginas</label>
+            <p className="mb-2 text-xs leading-relaxed text-neutral-500">
+              Sin marcar ninguna, aparece en todas. Marcá solo si querés acotarlo.
             </p>
-            <textarea
-              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
-              rows={3}
-              value={(reglas.rutas ?? []).join('\n')}
-              onChange={e =>
-                onCambio({
-                  ...widget,
-                  reglas: { ...reglas, rutas: e.target.value.split('\n').filter(Boolean) },
-                })
-              }
-            />
+            {/* Casillas con las páginas que existen de verdad. Antes había que escribir la
+                dirección a mano, que es la forma más fácil de equivocarse en una letra y no
+                enterarse nunca. */}
+            <div className="max-h-44 space-y-1 overflow-y-auto rounded border border-neutral-200 p-2">
+              {paginas.map(p => {
+                const marcada = (reglas.rutas ?? []).includes(p.ruta)
+                return (
+                  <label key={p.ruta} className="flex items-start gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={marcada}
+                      onChange={() => {
+                        const actuales = reglas.rutas ?? []
+                        onCambio({
+                          ...widget,
+                          reglas: {
+                            ...reglas,
+                            rutas: marcada
+                              ? actuales.filter(r => r !== p.ruta)
+                              : [...actuales, p.ruta],
+                          },
+                        })
+                      }}
+                    />
+                    <span>{p.titulo}</span>
+                  </label>
+                )
+              })}
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-xs text-neutral-500">Dispositivo</label>
