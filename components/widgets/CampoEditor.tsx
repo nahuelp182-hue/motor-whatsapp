@@ -6,16 +6,20 @@ import { PALETA, UBICACIONES, DESTINOS, EMOJIS, type Campo } from '@/lib/widgets
 // Ningún tipo de widget tiene formulario propio. Agregar un tipo nuevo no toca este archivo
 // mientras use los tipos de campo ya soportados — que es justo el punto del diseño.
 
+export type Producto = { id: string; nombre: string; precio: number; imagen: string | null }
+
 type Props = {
   campo: Campo
   valor: unknown
+  /** Catálogo real de Tiendanube, para los campos de tipo producto. */
+  productos?: Producto[]
   onChange: (v: unknown) => void
 }
 
 const input =
   'w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none'
 
-export function CampoEditor({ campo, valor, onChange }: Props) {
+export function CampoEditor({ campo, valor, productos = [], onChange }: Props) {
   // La ayuda va SIEMPRE debajo del campo y en renglón aparte, no como texto gris al lado
   // del rótulo. Es la diferencia entre poder configurar un widget sin preguntarle a nadie y
   // tener que acordarse de qué hacía cada casilla.
@@ -99,6 +103,42 @@ export function CampoEditor({ campo, valor, onChange }: Props) {
             </option>
           ))}
         </select>
+        {ayuda}
+      </div>
+    )
+  }
+
+  // Producto del catálogo real. Nunca se escribe un id: un id mal tipeado no falla a la
+  // vista, deja el widget ofreciendo algo que no existe.
+  if (campo.tipo === 'producto') {
+    const elegido = productos.find(p => p.id === String(valor ?? ''))
+    return (
+      <div>
+        {etiqueta}
+        <div className="flex items-center gap-2">
+          {elegido?.imagen && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={elegido.imagen} alt="" className="h-10 w-10 rounded object-cover" />
+          )}
+          <select
+            className={input}
+            value={String(valor ?? '')}
+            onChange={e => onChange(e.target.value)}
+          >
+            <option value="">Elegí un producto…</option>
+            {productos.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+                {p.precio ? ` — $${p.precio.toLocaleString('es-AR')}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        {productos.length === 0 && (
+          <p className="mt-1 text-xs text-amber-700">
+            No se pudo leer el catálogo de Tiendanube. Recargá en un rato.
+          </p>
+        )}
         {ayuda}
       </div>
     )
@@ -189,6 +229,7 @@ export function CampoEditor({ campo, valor, onChange }: Props) {
                     key={sub.key}
                     campo={sub}
                     valor={item[sub.key]}
+                    productos={productos}
                     onChange={v => {
                       const c = [...items]
                       c[i] = { ...c[i], [sub.key]: v }

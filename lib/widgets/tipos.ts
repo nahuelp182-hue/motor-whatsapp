@@ -20,6 +20,7 @@ export type TipoCampo =
   | 'enlace'
   | 'emoji'
   | 'ubicacion'
+  | 'producto'
   | 'lista'
 
 export type Campo = {
@@ -45,7 +46,7 @@ export type TipoWidget = {
   categoria: 'conversion' | 'confianza' | 'contenido' | 'captura'
   contextos: Contexto[]
   /** El widget se sirve con datos vivos de la base (reseñas, stock). Ver lib/widgets/datos.ts */
-  datosVivos?: 'resenas'
+  datosVivos?: 'resenas' | 'productos'
   /** Dónde aparece y qué necesita para funcionar. Se muestra arriba del formulario. */
   uso: string
   /**
@@ -858,6 +859,119 @@ export const TIPOS: TipoWidget[] = [
       CAMPO_COLOR,
     ],
   },
+  {
+    slug: 'progreso_envio',
+    nombre: 'Progreso a envío gratis',
+    descripcion:
+      'Barra que dice cuánto falta para llegar al envío gratis. Sube el ticket promedio sin descuentos: la persona agrega para no perder el beneficio.',
+    categoria: 'conversion',
+    contextos: ['tienda', 'producto'],
+    bloque: true,
+    uso:
+      'Lee el total del carrito de Tiendanube en vivo y se actualiza sola cuando agregan o sacan algo. Con el carrito vacío no se muestra: sin nada adentro el mensaje no significa nada.',
+    cuidado:
+      'El monto de acá tiene que ser el mismo que tenés configurado como envío gratis en Tiendanube. Si no coinciden, prometés un beneficio que el checkout no da.',
+    campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'inicio',
+        ayuda: 'Se elige de la lista. Rinde arriba, donde se ve antes de seguir comprando.',
+      },
+      {
+        key: 'objetivo',
+        label: 'Monto para envío gratis',
+        tipo: 'numero',
+        porDefecto: 0,
+        min: 0,
+        max: 100000000,
+        ayuda: 'En pesos, sin puntos ni signo. Tiene que ser exactamente el que configuraste en Tiendanube.',
+      },
+      {
+        key: 'texto_falta',
+        label: 'Mensaje mientras falta',
+        tipo: 'texto',
+        porDefecto: 'Te falta',
+        ayuda: 'El monto que falta se agrega solo después de este texto.',
+      },
+      {
+        key: 'texto_logrado',
+        label: 'Mensaje al llegar',
+        tipo: 'texto',
+        porDefecto: '¡Listo! Tenés envío gratis',
+        ayuda: 'Lo que se lee cuando ya superó el monto. Corto y celebratorio.',
+      },
+      {
+        key: 'fijo',
+        label: 'Fijar al borde inferior',
+        tipo: 'booleano',
+        porDefecto: false,
+        ayuda:
+          'Queda flotando abajo, siempre visible. Ojo: si también usás la barra de acción fija, las dos pelean por el mismo lugar.',
+      },
+      CAMPO_COLOR,
+    ],
+  },
+  {
+    slug: 'pack_complementarios',
+    datosVivos: 'productos',
+    nombre: 'Pack de complementarios',
+    descripcion:
+      'Casillas con productos que suman al principal, y un botón que agrega todo junto. Es el "comprados juntos habitualmente" de Amazon: el momento de mayor disposición a sumar es justo antes de comprar.',
+    categoria: 'conversion',
+    contextos: ['tienda', 'producto'],
+    bloque: true,
+    uso:
+      'Los productos se eligen de un desplegable con tu catálogo real de Tiendanube. El precio se lee en vivo del catálogo, no se carga acá. Al tocar el botón se agregan al carrito los que estén tildados.',
+    cuidado:
+      'Tres productos como máximo funcionan mejor que cinco. Y que sean de verdad complementarios: ofrecer algo que no tiene que ver hace dudar de todo lo demás.',
+    campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'antes_final',
+        ayuda: 'Rinde cerca del botón de compra, cuando ya decidió llevarlo.',
+      },
+      {
+        key: 'titulo',
+        label: 'Título',
+        tipo: 'texto',
+        porDefecto: 'Sumá lo que te va a hacer falta',
+        ayuda: 'Que hable de la necesidad, no de la venta.',
+      },
+      {
+        key: 'items',
+        label: 'Productos',
+        tipo: 'lista',
+        maxItems: 4,
+        ayuda: 'Se muestran en este orden, todos tildados de entrada. El visitante destilda lo que no quiera.',
+        campos: [
+          {
+            key: 'producto',
+            label: 'Producto',
+            tipo: 'producto',
+            ayuda: 'Se elige de tu catálogo de Tiendanube. El nombre y el precio salen de ahí, siempre actualizados.',
+          },
+          {
+            key: 'nota',
+            label: 'Por qué conviene',
+            tipo: 'texto',
+            ayuda: 'Media línea explicando para qué le sirve. Sin esto es solo otro producto más.',
+          },
+        ],
+      },
+      {
+        key: 'etiqueta',
+        label: 'Texto del botón',
+        tipo: 'texto',
+        porDefecto: 'Agregar al carrito',
+        ayuda: 'El botón agrega los tildados y lleva al carrito.',
+      },
+      CAMPO_COLOR,
+    ],
+  },
 ]
 
 export const porSlug = (slug: string): TipoWidget | undefined => TIPOS.find(t => t.slug === slug)
@@ -897,6 +1011,9 @@ export function sanearConfig(tipo: TipoWidget, entrada: unknown): Record<string,
         return c.opciones?.some(o => o.value === v) ? v : (c.porDefecto ?? c.opciones?.[0]?.value ?? '')
       case 'color':
         return PALETA.some(p => p.value === v) ? v : 'sage'
+      case 'producto':
+        // Solo el id numérico de Tiendanube; el nombre y el precio se leen en vivo.
+        return /^\d{1,12}$/.test(String(v ?? '')) ? String(v) : ''
       case 'ubicacion':
         return UBICACIONES.some(u => u.value === v) ? v : 'final'
       case 'emoji':

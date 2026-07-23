@@ -21,6 +21,7 @@ type Widget = {
 }
 type Metricas = Record<string, { impresion: number; interaccion: number; conversion: number }>
 type Pagina = { ruta: string; titulo: string }
+type Producto = { id: string; nombre: string; precio: number; imagen: string | null }
 
 const CONTEXTOS: { key: Contexto; label: string }[] = [
   { key: 'guias', label: 'Guías' },
@@ -33,6 +34,7 @@ export default function WidgetsPage() {
   const [metricas, setMetricas] = useState<Metricas>({})
   const [tipos, setTipos] = useState<TipoWidget[]>([])
   const [paginas, setPaginas] = useState<Pagina[]>([])
+  const [productos, setProductos] = useState<Producto[]>([])
   const [ctx, setCtx] = useState<Contexto>('guias')
   const [editando, setEditando] = useState<Widget | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -46,6 +48,7 @@ export default function WidgetsPage() {
     setMetricas(d.metricas ?? {})
     setTipos(d.tipos ?? [])
     setPaginas(d.paginas ?? [])
+    setProductos(d.productos ?? [])
     setCargando(false)
   }, [])
 
@@ -187,6 +190,7 @@ export default function WidgetsPage() {
                     widget={editando}
                     tipo={tipoDe(w.tipo)}
                     paginas={paginas}
+                    productos={productos}
                     guardando={guardando}
                     onCambio={setEditando}
                     onGuardar={() =>
@@ -213,6 +217,7 @@ function Editor({
   widget,
   tipo,
   paginas,
+  productos,
   guardando,
   onCambio,
   onGuardar,
@@ -221,6 +226,7 @@ function Editor({
   widget: Widget
   tipo?: TipoWidget
   paginas: Pagina[]
+  productos: Producto[]
   guardando: boolean
   onCambio: (w: Widget) => void
   onGuardar: () => void
@@ -268,6 +274,7 @@ function Editor({
           key={c.key}
           campo={c}
           valor={widget.config?.[c.key]}
+          productos={productos}
           onChange={v => onCambio({ ...widget, config: { ...widget.config, [c.key]: v } })}
         />
       ))}

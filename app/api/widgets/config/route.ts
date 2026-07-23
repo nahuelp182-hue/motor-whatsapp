@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { porSlug, type Contexto } from '@/lib/widgets/tipos'
 import { resenasPublicas } from '@/lib/widgets/datos'
+import { productosTN } from '@/lib/widgets/productos'
 
 // Config que consume public/mic.js. Pública y con CORS abierto: la pide el storefront de
 // Tiendanube, que es otro origen. Devuelve SOLO widgets activos y solo lo que se dibuja
@@ -57,6 +58,20 @@ export async function GET(req: NextRequest) {
       tipo: w.tipo,
       config: w.config,
       reglas: { rutas: (w.reglas as { rutas?: string[] })?.rutas ?? [], dispositivo: (w.reglas as { dispositivo?: string })?.dispositivo ?? 'todos' },
+    }
+
+    if (tipo.datosVivos === 'productos') {
+      // Nombre, precio e imagen se resuelven acá contra el catálogo real. El widget guarda
+      // solo el id: así un cambio de precio en Tiendanube se ve en la página sin que nadie
+      // toque el widget.
+      const catalogo = await productosTN()
+      const items = ((w.config as Record<string, unknown>)?.items ?? []) as Array<Record<string, unknown>>
+      salida.datos = items
+        .map(i => {
+          const p = catalogo.find(x => x.id === String(i.producto ?? ''))
+          return p ? { ...p, nota: String(i.nota ?? '') } : null
+        })
+        .filter(Boolean)
     }
 
     if (tipo.datosVivos === 'resenas') {

@@ -661,6 +661,150 @@
     verUnaVez(sh, w.id);
   };
 
+  /* ── Carrito de Tiendanube ──
+     `LS.cart.subtotal` viene en CENTAVOS. Es el error clásico con esta API: usarlo tal cual
+     multiplica todo por cien y el widget promete un envío gratis que no existe. */
+  function totalCarrito() {
+    try {
+      var c = window.LS && window.LS.cart;
+      if (!c || typeof c.subtotal !== 'number') return null;
+      return c.subtotal / 100;
+    } catch (e) { return null; }
+  }
+
+  /* El total cambia por muchas vías (agregar, quitar, cambiar cantidad, panel lateral) y no
+     todas emiten evento. Se consulta cada tanto: es una lectura de memoria, no cuesta nada,
+     y evita perderse un cambio y quedar mostrando un número viejo. */
+  function alCambiarCarrito(fn) {
+    var ultimo = totalCarrito();
+    fn(ultimo);
+    setInterval(function () {
+      var t = totalCarrito();
+      if (t !== ultimo) { ultimo = t; fn(t); }
+    }, 700);
+    try {
+      if (window.LS && window.LS.on && window.LS.events) {
+        window.LS.on(window.LS.events.productAddedToCart, function () {
+          setTimeout(function () { fn(totalCarrito()); }, 250);
+        });
+      }
+    } catch (e) {}
+  }
+
+  R.progreso_envio = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var objetivo = Number(c.objetivo) || 0;
+    if (!objetivo) return; // sin meta no hay nada que medir
+    if (totalCarrito() === null) return; // no estamos en la tienda
+
+    var sh = montar(w, !!c.fijo); if (!sh) return;
+    pintar(sh,
+      (c.fijo
+        ? '.c{position:fixed;left:0;right:0;bottom:0;z-index:99995;border-top:1px solid #e6e2da;' +
+          'background:#fff;box-shadow:0 -6px 20px rgba(0,0,0,.08);padding:11px 16px}'
+        : '.c{background:' + p.suave + ';border-radius:10px;padding:14px 18px;margin:18px 0}') +
+      '.t{font-size:14px;color:#2a2620;margin-bottom:8px}b{color:' + p.bg + '}' +
+      '.b{height:8px;border-radius:999px;background:#e2ded6;overflow:hidden}' +
+      '.f{height:100%;width:0;background:' + p.bg + ';border-radius:999px;transition:width .4s}',
+      '<div class="c"><div class="t"></div><div class="b"><div class="f"></div></div></div>');
+
+    var caja = sh.querySelector('.c');
+    var txt = sh.querySelector('.t');
+    var barra = sh.querySelector('.f');
+    var contado = false;
+
+    alCambiarCarrito(function (total) {
+      // Con el carrito vacío el mensaje no significa nada: se esconde en vez de mostrar
+      // "te falta todo".
+      if (!total) { caja.style.display = 'none'; return; }
+      caja.style.display = '';
+      var falta = objetivo - total;
+      barra.style.width = Math.min(100, (total / objetivo) * 100) + '%';
+      txt.innerHTML = falta > 0
+        ? esc(c.texto_falta || 'Te falta') + ' <b>' + esc(pesos(falta)) + '</b>'
+        : '<b>' + esc(c.texto_logrado || '¡Envío gratis!') + '</b>';
+      if (!contado) { contado = true; evento(w.id, 'impresion'); }
+    });
+  };
+
+  R.pack_complementarios = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var items = w.datos || [];
+    if (!items.length) return;
+    var sh = montar(w, false); if (!sh) return;
+
+    var filas = items.map(function (it, i) {
+      return '<label class="it"><input type="checkbox" checked data-id="' + esc(it.id) + '" data-precio="' + it.precio + '">' +
+        (it.imagen ? '<img src="' + esc(it.imagen) + '" alt="">' : '<span class="ph"></span>') +
+        '<span class="d"><b>' + esc(it.nombre) + '</b>' +
+        (it.nota ? '<span class="n">' + esc(it.nota) + '</span>' : '') + '</span>' +
+        '<span class="pr">' + esc(pesos(it.precio)) + '</span></label>';
+    }).join('');
+
+    pintar(sh,
+      'h3{margin:0 0 12px;font-size:18px;color:#2a2620}' +
+      '.c{border:1px solid #e6e2da;border-radius:12px;padding:16px;margin:20px 0}' +
+      '.it{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid #f0ece5;cursor:pointer}' +
+      '.it:last-of-type{border-bottom:none}' +
+      'img,.ph{width:44px;height:44px;border-radius:7px;object-fit:cover;background:#f0ece5;flex:0 0 auto}' +
+      '.d{flex:1;min-width:0}' +
+      'b{display:block;font-size:14px;color:#2a2620}' +
+      '.n{font-size:12.5px;color:#6a6157;line-height:1.4}' +
+      '.pr{font-size:14px;font-weight:600;color:#2a2620;white-space:nowrap}' +
+      '.tot{display:flex;justify-content:space-between;align-items:baseline;margin:12px 0 10px;font-size:14px;color:#5a534a}' +
+      '.tot b{font-size:18px;color:' + p.bg + '}' +
+      'button{width:100%;padding:13px;background:' + p.bg + ';color:' + p.texto + ';border-radius:9px;font-size:15px;font-weight:700}' +
+      'button:disabled{opacity:.5}',
+      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
+      '<div class="c">' + filas +
+      '<div class="tot"><span>Total de lo seleccionado</span><b class="s">—</b></div>' +
+      '<button>' + esc(c.etiqueta || 'Agregar al carrito') + '</button></div>');
+
+    var casillas = [].slice.call(sh.querySelectorAll('input[type=checkbox]'));
+    var suma = sh.querySelector('.s');
+    var boton = sh.querySelector('button');
+
+    function recalcular() {
+      var t = 0, n = 0;
+      casillas.forEach(function (ch) {
+        if (ch.checked) { t += Number(ch.getAttribute('data-precio')) || 0; n++; }
+      });
+      suma.textContent = pesos(t);
+      boton.disabled = n === 0;
+    }
+    casillas.forEach(function (ch) { ch.addEventListener('change', recalcular); });
+    recalcular();
+
+    boton.addEventListener('click', function () {
+      var elegidos = casillas.filter(function (ch) { return ch.checked; });
+      if (!elegidos.length) return;
+      evento(w.id, 'interaccion');
+      boton.disabled = true;
+      boton.textContent = 'Agregando…';
+
+      // Tiendanube agrega de a un producto por POST a /comprar/. Se mandan en secuencia y
+      // recién al terminar se va al carrito: si se dispararan en paralelo, el carrito se
+      // queda con el último que contestó.
+      var i = 0;
+      (function siguiente() {
+        if (i >= elegidos.length) {
+          evento(w.id, 'conversion');
+          location.href = '/carrito/';
+          return;
+        }
+        var fd = new FormData();
+        fd.append('add_to_cart', elegidos[i].getAttribute('data-id'));
+        fd.append('quantity', '1');
+        i++;
+        fetch('/comprar/', { method: 'POST', body: fd, credentials: 'same-origin' })
+          .then(siguiente)
+          .catch(siguiente);
+      })();
+    });
+
+    verUnaVez(sh, w.id);
+  };
+
   /* ══════════════ ARRANQUE ══════════════ */
   function arrancar(lista) {
     for (var i = 0; i < lista.length; i++) {
