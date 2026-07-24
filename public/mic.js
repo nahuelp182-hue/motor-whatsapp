@@ -532,6 +532,16 @@
       })(i);
     }
 
+    // Deep-link: si la persona llega con ?calificar (o #resena) en la URL —el link que
+    // manda el mensaje de WhatsApp post-entrega— se le abre el formulario solo. Una sola vez
+    // por página, aunque haya más de un widget de reseñas.
+    try {
+      if (!window.__micCalificar && (/[?&]calificar\b/.test(location.search) || location.hash === '#resena')) {
+        window.__micCalificar = true;
+        ov.classList.add('on'); evento(w.id, 'interaccion');
+      }
+    } catch (e) {}
+
     var fo = sh.querySelector('.fo'), fop = sh.querySelector('.fop');
     if (fo) {
       fo.addEventListener('change', function () {
