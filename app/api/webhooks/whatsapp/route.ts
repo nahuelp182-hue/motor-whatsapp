@@ -60,6 +60,18 @@ function wdiag(kind: string, sender: string, detail: Record<string, unknown>): P
   return diag(kind, sender, { ...detail, ch: 'wa' })
 }
 
+// Intenta deducir el puntaje del texto de la reseña por WhatsApp (que no viene estructurado):
+// cuenta estrellas en emoji, o lee patrones tipo "5 estrellas", "5/5", "le doy un 5". Si no
+// encuentra nada claro devuelve null: se guarda sin puntaje y se le pone a mano en el panel,
+// que es mejor que inventar un número.
+function estrellasDelTexto(texto: string): number | null {
+  const emojis = (texto.match(/[⭐🌟★]/gu) ?? []).length
+  if (emojis >= 1 && emojis <= 5) return emojis
+  const m = texto.match(/\b([1-5])\s*(?:\/\s*5|de\s*5|estrellas?|puntos?)\b/i)
+  if (m) return Number(m[1])
+  return null
+}
+
 // Si "from" respondió después de un review_request enviado (ventana 14 días) y todavía
 // no guardamos su reseña, se guarda el texto tal cual. No interfiere con la respuesta
 // normal del bot — el cliente igual recibe una respuesta conversacional.
@@ -81,7 +93,12 @@ async function capturarResenaSiCorresponde(from: string, texto: string): Promise
     if (yaTiene) return
 
     await prisma.review.create({
-      data: { store_id: match.store_id, customer_id: match.customer_id, texto: texto.slice(0, 1000) },
+      data: {
+        store_id: match.store_id,
+        customer_id: match.customer_id,
+        texto: texto.slice(0, 1000),
+        rating: estrellasDelTexto(texto),
+      },
     })
   } catch {
     // no romper el flujo del bot si falla la captura de reseña

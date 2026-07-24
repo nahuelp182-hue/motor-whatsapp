@@ -14,6 +14,8 @@ type Resena = {
   rating: number | null
   source: 'whatsapp' | 'google' | 'form'
   approved: boolean
+  producto: string | null
+  foto: string | null
   fecha: string
 }
 
@@ -23,13 +25,26 @@ const FUENTE: Record<string, { label: string; color: string }> = {
   form: { label: 'Formulario', color: '#8a6a2f' },
 }
 
-function Estrellas({ n }: { n: number | null }) {
-  if (!n) return <span className="text-[#a3a3a0] text-xs">sin puntaje</span>
+/** Estrellas editables: clic fija el puntaje. Sirve sobre todo para las de WhatsApp, que
+    llegan sin estrellas y conviene puntuar a mano según lo que dice el texto. */
+function Estrellas({ n, onSet }: { n: number | null; onSet: (v: number) => void }) {
   return (
-    <span className="tracking-[1px] text-[15px]">
-      {[1, 2, 3, 4, 5].map(i => (
-        <span key={i} style={{ color: i <= n ? '#e8a838' : '#d9d4cb' }}>★</span>
-      ))}
+    <span className="inline-flex items-center gap-2">
+      <span className="tracking-[1px] text-[17px]">
+        {[1, 2, 3, 4, 5].map(i => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onSet(i)}
+            title={`${i} estrella${i > 1 ? 's' : ''}`}
+            style={{ color: n && i <= n ? '#e8a838' : '#d9d4cb', lineHeight: 1 }}
+            className="cursor-pointer hover:scale-110 transition-transform"
+          >
+            ★
+          </button>
+        ))}
+      </span>
+      {!n && <span className="text-[#a3a3a0] text-[11px]">sin puntaje — clic para asignar</span>}
     </span>
   )
 }
@@ -58,6 +73,16 @@ export default function ResenasPage() {
       body: JSON.stringify({ id, approved }),
     })
     cargar()
+  }
+
+  async function fijarRating(id: string, rating: number) {
+    // Optimista: se ve el cambio al toque y se persiste en segundo plano.
+    setResenas(rs => rs.map(r => (r.id === id ? { ...r, rating } : r)))
+    await fetch('/api/resenas', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, rating }),
+    })
   }
 
   async function descartar(id: string) {
@@ -122,10 +147,19 @@ export default function ResenasPage() {
                       </span>
                     )}
                   </div>
-                  <div className="mt-1"><Estrellas n={r.rating} /></div>
+                  <div className="mt-1"><Estrellas n={r.rating} onSet={v => fijarRating(r.id, v)} /></div>
+                  {r.producto && (
+                    <div className="mt-1 text-[11px] text-[#8a8a86]">📦 {r.producto}</div>
+                  )}
                 </div>
                 <span className="shrink-0 text-[11px] text-[#a3a3a0]">{r.fecha}</span>
               </div>
+              {r.foto && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <a href={r.foto} target="_blank" rel="noopener noreferrer">
+                  <img src={r.foto} alt="" className="mt-2 max-h-40 rounded-lg border border-[#e7e7e2]" />
+                </a>
+              )}
               <p className="mt-2 text-sm leading-relaxed text-[#3f3f3c]">{r.texto}</p>
               <div className="mt-3 flex gap-2">
                 {r.approved ? (

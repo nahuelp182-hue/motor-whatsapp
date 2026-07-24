@@ -26,6 +26,9 @@ export async function GET(req: NextRequest) {
   if (!CONTEXTOS.includes(ctx as Contexto)) {
     return NextResponse.json({ error: 'contexto inválido' }, { status: 400, headers: CORS })
   }
+  // Producto que se está viendo (lo manda mic.js en la ficha). Solo dígitos: es un id de
+  // Tiendanube y así no entra nada raro en la consulta de reseñas.
+  const productoActual = (req.nextUrl.searchParams.get('producto') ?? '').replace(/\D/g, '').slice(0, 12)
 
   const store = await prisma.store.findFirst({
     where: { tiendanube_store_id: TN_STORE_ID, is_active: true },
@@ -81,8 +84,20 @@ export async function GET(req: NextRequest) {
     }
 
     if (tipo.datosVivos === 'resenas') {
-      const cantidad = Number((w.config as Record<string, unknown>)?.cantidad ?? 6)
-      const bloque = await resenasPublicas(store.id, cantidad)
+      const cfg = (w.config ?? {}) as Record<string, unknown>
+      const cantidad = Number(cfg.cantidad ?? 6)
+      const modo = (['todas', 'este', 'elegidos'].includes(String(cfg.filtroProducto))
+        ? cfg.filtroProducto
+        : 'todas') as 'todas' | 'este' | 'elegidos'
+      // Ids de la lista "productos elegidos" del panel (cada item es { id }).
+      const elegidos = Array.isArray(cfg.productos)
+        ? (cfg.productos as Record<string, unknown>[]).map(p => String(p?.id ?? '')).filter(Boolean)
+        : []
+      const bloque = await resenasPublicas(store.id, cantidad, {
+        modo,
+        productoActual: productoActual || null,
+        productosElegidos: elegidos,
+      })
       salida.datos = bloque.items
       salida.resumen = { promedio: bloque.promedio, total: bloque.total }
     }

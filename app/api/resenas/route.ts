@@ -41,27 +41,34 @@ export async function GET(req: NextRequest) {
     rating: r.rating,
     source: r.source,
     approved: r.approved,
+    producto: r.product_nombre ?? (r.product_id ? `#${r.product_id}` : null),
+    foto: r.foto_url,
     fecha: (r.fecha ?? r.createdAt).toISOString().slice(0, 10),
   }))
 
   return NextResponse.json({ resenas, pendientes })
 }
 
-/** Aprueba o vuelve a ocultar una reseña. */
+/** Aprueba/oculta una reseña y/o le fija el puntaje (útil para las de WhatsApp, que llegan
+    sin estrellas). Cada campo es opcional: se toca solo lo que venga en el cuerpo. */
 export async function PATCH(req: NextRequest) {
   const sid = await storeId()
   if (!sid) return NextResponse.json({ error: 'tienda no encontrada' }, { status: 400 })
 
-  const b = (await req.json().catch(() => ({}))) as { id?: string; approved?: boolean }
+  const b = (await req.json().catch(() => ({}))) as { id?: string; approved?: boolean; rating?: number | null }
   const id = String(b.id ?? '')
   // El where lleva store_id: sin eso, un id de otra tienda se podría moderar desde acá.
   const actual = await prisma.review.findFirst({ where: { id, store_id: sid } })
   if (!actual) return NextResponse.json({ error: 'no existe' }, { status: 404 })
 
-  const review = await prisma.review.update({
-    where: { id },
-    data: { approved: b.approved === true },
-  })
+  const data: { approved?: boolean; rating?: number | null } = {}
+  if (b.approved !== undefined) data.approved = b.approved === true
+  if (b.rating !== undefined) {
+    const n = Math.round(Number(b.rating))
+    data.rating = Number.isFinite(n) && n >= 1 && n <= 5 ? n : null
+  }
+
+  const review = await prisma.review.update({ where: { id }, data })
   return NextResponse.json({ review })
 }
 

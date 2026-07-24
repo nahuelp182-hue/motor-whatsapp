@@ -17,6 +17,17 @@ export type ResenaPublica = {
   rating: number | null
   fuente: 'whatsapp' | 'google' | 'form'
   verificada: boolean
+  foto: string | null
+}
+
+// Cómo se acota el conjunto de reseñas del widget:
+//   todas    → todas las de la tienda
+//   este     → solo las del producto que se está viendo (requiere productoActual)
+//   elegidos → solo las de una lista de productos elegida en el panel
+export type FiltroResenas = {
+  modo: 'todas' | 'este' | 'elegidos'
+  productoActual?: string | null
+  productosElegidos?: string[]
 }
 
 export type ResenasBloque = {
@@ -32,14 +43,32 @@ function nombreCorto(completo: string): string {
   return `${partes[0]} ${partes[1][0].toUpperCase()}.`
 }
 
-export async function resenasPublicas(storeId: string, cantidad: number): Promise<ResenasBloque> {
+export async function resenasPublicas(
+  storeId: string,
+  cantidad: number,
+  filtro: FiltroResenas = { modo: 'todas' },
+): Promise<ResenasBloque> {
+  const where: {
+    store_id: string
+    approved: boolean
+    product_id?: string | { in: string[] }
+  } = { store_id: storeId, approved: true }
+
+  // "Este producto" solo puede acotar si sabemos cuál es; si no llega (no estamos en una
+  // ficha, o el tema no expone el producto), se cae a mostrar todas en vez de nada.
+  if (filtro.modo === 'este' && filtro.productoActual) {
+    where.product_id = filtro.productoActual
+  } else if (filtro.modo === 'elegidos' && filtro.productosElegidos?.length) {
+    where.product_id = { in: filtro.productosElegidos }
+  }
+
   // Orden por createdAt (siempre presente) y no por `fecha`: en Postgres, ORDER BY fecha
   // DESC pone los NULL primero, y como WhatsApp/formulario no traen `fecha`, las de Google
   // (que sí la traen) quedarían al fondo y podrían no entrar en el corte. Cuando el cron de
   // Google ingesta una reseña, le pone createdAt = fecha real de la reseña, así la mezcla
   // por recencia sigue siendo correcta.
   const filas = await prisma.review.findMany({
-    where: { store_id: storeId, approved: true },
+    where,
     orderBy: { createdAt: 'desc' },
     include: { customer: { select: { nombre: true } } },
   })
@@ -67,6 +96,7 @@ export async function resenasPublicas(storeId: string, cantidad: number): Promis
         // Solo whatsapp y google son verificables como compra/reseña real de terceros.
         // Una del formulario público NO lleva sello aunque esté aprobada.
         verificada: fuente === 'whatsapp' || fuente === 'google',
+        foto: r.foto_url ?? null,
       }
     })
 

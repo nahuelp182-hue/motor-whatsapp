@@ -41,6 +41,20 @@
   }
   var CTX = (script && script.getAttribute('data-ctx')) || contextoAuto();
 
+  /* Id del producto que se está viendo. Sirve para dos cosas: registrar de qué producto
+     viene una reseña nueva, y filtrar el widget a "solo las de este producto". Tiendanube lo
+     expone en `LS.product.id` dentro de la ficha; si el tema no lo trae, se devuelve vacío y
+     el filtro por producto se cae a mostrar todas (nunca a mostrar nada). */
+  function productoActual() {
+    try {
+      if (window.LS && window.LS.product && window.LS.product.id != null) {
+        return String(window.LS.product.id).replace(/\D/g, '');
+      }
+    } catch (e) {}
+    return '';
+  }
+  var PRODUCTO = productoActual();
+
   var PALETA = {
     sage:     { bg: '#6f8a5f', texto: '#ffffff', suave: '#eef1ea' },
     profundo: { bg: '#3f4f38', texto: '#ffffff', suave: '#e9ede7' },
@@ -339,11 +353,41 @@
     verUnaVez(sh, w.id);
   };
 
-  /* Fila de 5 estrellas para un rating dado (o para elegir uno). `n` es cuántas van llenas. */
-  function estrellas(n) {
+  /* Fila de 5 estrellas para un rating dado (o para elegir uno). `n` es cuántas van llenas.
+     `size` (opcional) fija el tamaño en px con estilo en línea; sin él manda el CSS —así el
+     selector del formulario puede ser grande sin que las de las tarjetas lo hereden. El color
+     de las llenas lo pone la clase `.st.on` (se setea una vez por widget). */
+  function estrellas(n, size) {
+    var st = size ? ' style="font-size:' + size + 'px"' : '';
     var s = '';
-    for (var i = 1; i <= 5; i++) s += '<span class="st' + (i <= n ? ' on' : '') + '">★</span>';
+    for (var i = 1; i <= 5; i++) s += '<span class="st' + (i <= n ? ' on' : '') + '"' + st + '>★</span>';
     return s;
+  }
+
+  function colorEstrella(v, p) {
+    if (v === 'ambar') return '#f59e0b';
+    if (v === 'negro') return '#2a2620';
+    if (v === 'marca') return p.bg;
+    return '#e8a838'; // dorado, el estándar
+  }
+
+  /* Achica la foto en el navegador antes de subirla: una serverless no acepta cuerpos grandes
+     y no tiene sentido mandar 5 MB de un celular. Máx 1200px, JPEG 0.82 → queda liviana. */
+  function comprimirFoto(file, cb) {
+    if (!file || !/^image\//.test(file.type)) { cb(null); return; }
+    var img = new Image(), url = URL.createObjectURL(file);
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      var max = 1200, w = img.width, h = img.height;
+      if (w > max || h > max) {
+        if (w > h) { h = Math.round(h * max / w); w = max; } else { w = Math.round(w * max / h); h = max; }
+      }
+      var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      cv.toBlob(function (b) { cb(b); }, 'image/jpeg', 0.82);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); cb(null); };
+    img.src = url;
   }
 
   R.resenas = function (w) {
@@ -356,14 +400,20 @@
     if (!datos.length && !conForm) return;
     var sh = montar(w, false); if (!sh) return;
 
+    var sc = colorEstrella(c.estrellaColor, p);
+    var tam = Math.max(10, Math.min(30, Number(c.estrellaTamano) || 15));
+    var alin = c.estrellaAlineacion === 'centro' ? 'center' : c.estrellaAlineacion === 'derecha' ? 'right' : 'left';
+    var verFotos = c.mostrarFotos !== false;
+
     var cards = datos.map(function (r) {
       var sello = '';
       if (c.sello && r.verificada) {
         sello = '<span class="v">✓ ' + (r.fuente === 'google' ? 'Google' : 'compra verificada') + '</span>';
       }
-      var estr = (r.rating ? '<div class="rs">' + estrellas(r.rating) + '</div>' : '');
+      var estr = (r.rating ? '<div class="rs">' + estrellas(r.rating, tam) + '</div>' : '');
+      var foto = (verFotos && r.foto ? '<img class="ph" src="' + esc(r.foto) + '" loading="lazy" alt="">' : '');
       var fecha = (c.mostrarFecha && r.fecha ? '<span class="fx">' + esc(r.fecha) + '</span>' : '');
-      return '<article>' + estr + '<p>' + esc(r.texto) + '</p><footer><b>' + esc(r.nombre) + '</b>' +
+      return '<article>' + estr + foto + '<p>' + esc(r.texto) + '</p><footer><b>' + esc(r.nombre) + '</b>' +
         sello + fecha + '</footer></article>';
     }).join('');
 
@@ -371,12 +421,17 @@
     var cab = '';
     if (c.promedio && resumen.promedio) {
       cab = '<div class="avg"><div class="num">' + String(resumen.promedio).replace('.', ',') + '</div>' +
-        '<div class="am"><div class="rs">' + estrellas(Math.round(resumen.promedio)) + '</div>' +
+        '<div class="am"><div class="rs">' + estrellas(Math.round(resumen.promedio), 16) + '</div>' +
         '<div class="cnt">' + resumen.total + (resumen.total === 1 ? ' reseña' : ' reseñas') + '</div></div></div>';
     }
 
     var boton = conForm
       ? '<button class="wr">' + esc(c.botonTexto || 'Escribir reseña') + '</button>'
+      : '';
+
+    var campoFoto = (conForm && c.permitirFoto)
+      ? '<label class="fol"><input class="fo" type="file" accept="image/*">' +
+        '<span class="fob">📷 Agregar una foto (opcional)</span></label><div class="fop"></div>'
       : '';
 
     // Formulario (oculto hasta tocar el botón). Vive dentro del mismo Shadow DOM.
@@ -386,10 +441,14 @@
         '<div class="pick" role="radiogroup">' + estrellas(0) + '</div>' +
         '<input class="nm" type="text" maxlength="80" placeholder="Tu nombre">' +
         '<textarea class="tx" maxlength="1000" placeholder="¿Qué te pareció? Contá tu experiencia."></textarea>' +
+        campoFoto +
         '<input class="hp" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">' +
         '<button class="sb">Enviar reseña</button>' +
         '<div class="msg"></div></div></div>'
       : '';
+
+    // Lightbox para ver la foto en grande (siempre presente por si hay fotos en las tarjetas).
+    var lightbox = '<div class="lb"><img alt=""></div>';
 
     pintar(sh,
       'h3{margin:0 0 4px;font-size:20px;color:#2a2620}' +
@@ -398,10 +457,11 @@
       '.avg{display:flex;align-items:center;gap:12px}' +
       '.num{font-size:38px;font-weight:700;color:#2a2620;line-height:1}' +
       '.cnt{font-size:12.5px;color:#6a6157;margin-top:2px}' +
-      '.rs{letter-spacing:1px}.st{color:#d9d4cb;font-size:15px}.st.on{color:#e8a838}' +
+      '.rs{letter-spacing:1px;text-align:' + alin + '}.st{color:#d9d4cb;font-size:15px}.st.on{color:' + sc + '}' +
       '.g{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}' +
       'article{background:#fff;border:1px solid #e6e2da;border-radius:10px;padding:18px}' +
       'article .rs{margin-bottom:9px}' +
+      '.ph{width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin:0 0 12px;cursor:pointer;display:block}' +
       'p{margin:0 0 12px;font-size:14.5px;line-height:1.6;color:#3a352e}' +
       'footer{display:flex;flex-direction:column;gap:3px}' +
       'b{font-size:13.5px;color:#2a2620}' +
@@ -411,32 +471,53 @@
       // Modal
       '.ov{display:none;position:fixed;inset:0;z-index:99999;background:rgba(20,18,15,.55);align-items:center;justify-content:center;padding:16px}' +
       '.ov.on{display:flex}' +
-      '.md{background:#fff;border-radius:14px;padding:24px;max-width:400px;width:100%;position:relative;box-shadow:0 18px 50px rgba(0,0,0,.3)}' +
+      '.md{background:#fff;border-radius:14px;padding:24px;max-width:400px;width:100%;position:relative;box-shadow:0 18px 50px rgba(0,0,0,.3);max-height:92vh;overflow:auto}' +
       '.md h4{margin:0 0 14px;font-size:18px;color:#2a2620}' +
       '.x{position:absolute;top:12px;right:14px;background:none;font-size:24px;color:#a89c8e;line-height:1}' +
-      '.pick{margin-bottom:14px}.pick .st{font-size:30px;cursor:pointer}' +
+      '.pick{margin-bottom:14px}.pick .st{font-size:30px;cursor:pointer;color:#d9d4cb}.pick .st.on{color:' + sc + '}' +
       '.md input.nm,.md textarea{width:100%;border:1px solid #d9d4cb;border-radius:8px;padding:11px;font-size:14px;margin-bottom:11px;color:#2a2620}' +
       '.md textarea{min-height:96px;resize:vertical}' +
+      '.fol{display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:11px}' +
+      '.fol .fo{display:none}.fob{font-size:13px;color:' + p.bg + ';font-weight:600}' +
+      '.fop{margin-bottom:11px}.fop img{max-height:120px;border-radius:8px;display:block}' +
       '.hp{position:absolute;left:-9999px;width:1px;height:1px}' +
       '.sb{width:100%;background:' + p.bg + ';color:' + p.texto + ';padding:12px;border-radius:8px;font-size:15px;font-weight:600}' +
       '.msg{margin-top:12px;font-size:13.5px;text-align:center;color:#3a352e}' +
-      '.msg.ok{color:' + p.bg + '}.msg.err{color:#b0341d}',
+      '.msg.ok{color:' + p.bg + '}.msg.err{color:#b0341d}' +
+      // Lightbox
+      '.lb{display:none;position:fixed;inset:0;z-index:100000;background:rgba(10,9,7,.88);align-items:center;justify-content:center;padding:20px;cursor:zoom-out}' +
+      '.lb.on{display:flex}.lb img{max-width:100%;max-height:100%;border-radius:8px}',
       (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
       (c.subtitulo ? '<div class="sub">' + esc(c.subtitulo) + '</div>' : '') +
       '<div class="top">' + cab + boton + '</div>' +
-      '<div class="g">' + cards + '</div>' + form);
+      '<div class="g">' + cards + '</div>' + form + lightbox);
 
+    if (verFotos) montarLightbox(sh);
     if (conForm) montarFormResena(sh, w, c);
     verUnaVez(sh, w.id);
   };
 
-  /* Interacción del formulario de reseña: elegir estrellas, enviar, y bloquear el reenvío.
-     El envío queda pendiente de moderación en el panel; por eso el mensaje habla de revisión. */
+  /* Clic en una foto de reseña → se ve en grande. Un solo overlay reutilizado. */
+  function montarLightbox(sh) {
+    var lb = sh.querySelector('.lb'); if (!lb) return;
+    var lbi = lb.querySelector('img');
+    var fotos = sh.querySelectorAll('.ph');
+    for (var i = 0; i < fotos.length; i++) {
+      (function (el) {
+        el.addEventListener('click', function () { lbi.src = el.src; lb.classList.add('on'); });
+      })(fotos[i]);
+    }
+    lb.addEventListener('click', function () { lb.classList.remove('on'); lbi.src = ''; });
+  }
+
+  /* Interacción del formulario de reseña: elegir estrellas, foto opcional, enviar y bloquear
+     el reenvío. El envío queda pendiente de moderación en el panel; por eso el mensaje habla
+     de revisión. Va como multipart porque puede llevar la foto adjunta. */
   function montarFormResena(sh, w, c) {
     var ov = sh.querySelector('.ov'), abrir = sh.querySelector('.wr');
     if (!ov || !abrir) return;
     var cerrar = sh.querySelector('.x'), enviar = sh.querySelector('.sb'), msg = sh.querySelector('.msg');
-    var estrs = sh.querySelectorAll('.pick .st'), elegido = 0;
+    var estrs = sh.querySelectorAll('.pick .st'), elegido = 0, fotoBlob = null;
 
     abrir.addEventListener('click', function () { ov.classList.add('on'); evento(w.id, 'interaccion'); });
     cerrar.addEventListener('click', function () { ov.classList.remove('on'); });
@@ -451,6 +532,20 @@
       })(i);
     }
 
+    var fo = sh.querySelector('.fo'), fop = sh.querySelector('.fop');
+    if (fo) {
+      fo.addEventListener('change', function () {
+        var f = fo.files && fo.files[0];
+        fotoBlob = null; if (fop) fop.innerHTML = '';
+        if (!f) return;
+        comprimirFoto(f, function (b) {
+          if (!b) return;
+          fotoBlob = b;
+          if (fop) { var im = new Image(); im.src = URL.createObjectURL(b); fop.innerHTML = ''; fop.appendChild(im); }
+        });
+      });
+    }
+
     enviar.addEventListener('click', function () {
       var nm = sh.querySelector('.nm').value.trim();
       var tx = sh.querySelector('.tx').value.trim();
@@ -460,27 +555,31 @@
       if (nm.length < 2) { msg.textContent = 'Poné tu nombre.'; msg.className = 'msg err'; return; }
       if (tx.length < 10) { msg.textContent = 'Contá un poco más tu experiencia.'; msg.className = 'msg err'; return; }
       enviar.disabled = true; msg.textContent = 'Enviando…';
-      fetch(BASE + '/api/widgets/resena', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ autor: nm, texto: tx, rating: elegido, website: hp }),
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (d && d.ok) {
-          msg.className = 'msg ok';
-          msg.textContent = c.mensajeGracias || '¡Gracias! Tu reseña se publicará luego de una breve revisión.';
-          evento(w.id, 'conversion');
-          var f = sh.querySelector('.pick'); if (f) f.style.display = 'none';
-          sh.querySelector('.nm').style.display = 'none';
-          sh.querySelector('.tx').style.display = 'none';
-          enviar.style.display = 'none';
-        } else {
+
+      var fd = new FormData();
+      fd.append('autor', nm); fd.append('texto', tx); fd.append('rating', String(elegido));
+      fd.append('website', hp);
+      if (PRODUCTO) fd.append('product_id', PRODUCTO);
+      if (fotoBlob) fd.append('foto', fotoBlob, 'resena.jpg');
+
+      // Sin Content-Type manual: el navegador pone el boundary del multipart.
+      fetch(BASE + '/api/widgets/resena', { method: 'POST', body: fd })
+        .then(function (r) { return r.json(); }).then(function (d) {
+          if (d && d.ok) {
+            msg.className = 'msg ok';
+            msg.textContent = c.mensajeGracias || '¡Gracias! Tu reseña se publicará luego de una breve revisión.';
+            evento(w.id, 'conversion');
+            var oc = ['.pick', '.nm', '.tx', '.fol', '.fop'];
+            for (var k = 0; k < oc.length; k++) { var el = sh.querySelector(oc[k]); if (el) el.style.display = 'none'; }
+            enviar.style.display = 'none';
+          } else {
+            msg.className = 'msg err'; enviar.disabled = false;
+            msg.textContent = 'No se pudo enviar. Probá de nuevo en un rato.';
+          }
+        }).catch(function () {
           msg.className = 'msg err'; enviar.disabled = false;
-          msg.textContent = 'No se pudo enviar. Probá de nuevo en un rato.';
-        }
-      }).catch(function () {
-        msg.className = 'msg err'; enviar.disabled = false;
-        msg.textContent = 'No se pudo enviar. Revisá tu conexión.';
-      });
+          msg.textContent = 'No se pudo enviar. Revisá tu conexión.';
+        });
     });
   }
 
@@ -1478,7 +1577,8 @@
     return;
   }
 
-  fetch(BASE + '/api/widgets/config?ctx=' + encodeURIComponent(CTX))
+  fetch(BASE + '/api/widgets/config?ctx=' + encodeURIComponent(CTX) +
+        (PRODUCTO ? '&producto=' + encodeURIComponent(PRODUCTO) : ''))
     .then(function (r) { return r.json(); })
     .then(function (d) {
       var lista = (d && d.widgets) || [];
