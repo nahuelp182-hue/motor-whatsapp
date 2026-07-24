@@ -153,6 +153,32 @@
     var cont = contenido();
     if (!cont) return false;
 
+    // Ficha de producto de Tiendanube: la columna se arma en el cliente y termina con solo
+    // 2-3 hijos directos enormes (todo el precio, las variantes y el botón viven anidados
+    // dentro de UNO). Contar índices sobre esos hijos deja cualquier ubicación pegada arriba
+    // o al fondo —nunca "en el medio"— porque no hay hermanos intermedios a los que apuntar.
+    // Cuando existen anclas reales se inserta contra ellas y ahí sí hay posiciones distintas.
+    var precio = cont.querySelector('.js-price-display');
+    var boton  = cont.querySelector('.js-addtocart');
+    if (precio || boton) {
+      // El host ocupa su propia línea completa aunque el ancla esté dentro de un flex/grid.
+      host.style.cssText = 'display:block;width:100%;flex:0 0 100%;margin:0';
+      var ref, antes;
+      switch (ubicacion) {
+        case 'inicio':      ref = precio || boton; antes = true;  break; // arriba del precio
+        case 'tras_intro':  ref = precio || boton; antes = false; break; // pegado bajo el precio
+        case 'medio':       ref = boton  || precio; antes = true;  break; // justo arriba del botón
+        case 'antes_final': ref = boton  || precio; antes = false; break; // debajo del botón
+        default:            ref = null; // 'final' → al fondo de la columna
+      }
+      if (ref && ref.parentNode) {
+        ref.parentNode.insertBefore(host, antes ? ref : ref.nextSibling);
+      } else {
+        cont.appendChild(host);
+      }
+      return true;
+    }
+
     // Los hijos "de texto" son la referencia para medir la página. Se excluye lo que ya
     // puso este mismo motor, si no cada widget correría de lugar al siguiente.
     var hijos = [];
