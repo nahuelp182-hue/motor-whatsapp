@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CampoEditor } from '@/components/widgets/CampoEditor'
 import { VistaPrevia } from '@/components/widgets/VistaPrevia'
 import { Metricas } from '@/components/widgets/Metricas'
-import { CARD, INPUT, LABEL, AYUDA, AVISO, BTN, ACENTO, TITULO, SECCION, SECCION_SUB, SUBSECCION, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
+import { CARD, INPUT, LABEL, AYUDA, AVISO, BTN, ACENTO, TITULO, SECCION, SECCION_SUB, SUBSECCION, TONOS, type TonoKey, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
 
 // Panel de widgets. Todo lo que se ve acá sale del registro de tipos: la lista de widgets
@@ -176,14 +176,15 @@ export default function WidgetsPage() {
       {/* ── Resumen del contexto ───────────────────────────────────── */}
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
+          tono="salvia"
           label="Prendidos"
           valor={`${total.activos}/${delCtx.length}`}
           sub={delCtx.length === 0 ? 'Todavía no hay widgets acá' : `en ${ctxActual.label.toLowerCase()}`}
-          destacado
         />
-        <Kpi label="Vistas" valor={NUM(total.impresion)} sub="últimos 30 días" />
-        <Kpi label="Clics" valor={NUM(total.interaccion)} sub="interacciones registradas" />
+        <Kpi tono="celeste" label="Vistas" valor={NUM(total.impresion)} sub="últimos 30 días" />
+        <Kpi tono="durazno" label="Clics" valor={NUM(total.interaccion)} sub="interacciones registradas" />
         <Kpi
+          tono="violeta"
           label="Interacción"
           valor={total.tasa === null ? '—' : `${total.tasa.toFixed(1)}%`}
           sub={total.conversion > 0 ? `${NUM(total.conversion)} conversiones` : 'de cada vista, un clic'}
@@ -292,44 +293,33 @@ export default function WidgetsPage() {
 }
 
 // ── Tarjeta de indicador ──────────────────────────────────────────────────────
+// Fondo tonal + número negro grande, al estilo del dashboard de referencia. El tono
+// distingue de un vistazo (menta / celeste / durazno / violeta); el negro manda la lectura.
 function Kpi({
   label,
   valor,
   sub,
-  destacado,
+  tono,
 }: {
   label: string
   valor: string
   sub?: string
-  destacado?: boolean
+  tono: TonoKey
 }) {
+  const t = TONOS[tono]
   return (
     <div
-      className="relative flex min-h-[104px] flex-col justify-between rounded-2xl border p-4"
-      style={
-        destacado
-          ? {
-              background: '#eef1e9',
-              borderColor: 'rgb(var(--ac) / 0.25)',
-            }
-          : {
-              background: '#fff',
-              borderColor: '#e7e7e2',
-              boxShadow: '0 1px 3px rgba(23,23,23,0.04)',
-            }
-      }
+      className="relative flex min-h-[116px] flex-col justify-between rounded-2xl border p-4"
+      style={{ background: t.fondo, borderColor: t.borde }}
     >
-      <p className="text-[11px] font-semibold uppercase leading-none tracking-[0.15em] text-[#8a8a86]">
+      <p className="text-[11px] font-semibold uppercase leading-none tracking-[0.15em] text-[#6b6b68]">
         {label}
       </p>
       <div>
-        <p
-          className="font-mono text-[32px] font-bold leading-none tracking-tight"
-          style={{ color: destacado ? ACENTO : '#171717' }}
-        >
+        <p className="font-mono text-[34px] font-bold leading-none tracking-tight text-[#171717]">
           {valor}
         </p>
-        {sub && <p className="mt-2 text-[12px] leading-snug text-[#8a8a86]">{sub}</p>}
+        {sub && <p className="mt-2 text-[12px] leading-snug text-[#787874]">{sub}</p>}
       </div>
     </div>
   )

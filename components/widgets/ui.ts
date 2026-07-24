@@ -38,7 +38,7 @@ export const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-
 //   EYEBROW  11px mayúsc muted   →  rótulos y unidades, el piso de la escala
 
 /** Título de sección: el nivel que ordena la página. Grande y oscuro, se lee de un vistazo. */
-export const SECCION = 'text-lg font-semibold tracking-tight text-[#171717]'
+export const SECCION = 'text-xl font-semibold tracking-tight text-[#171717]'
 
 /** Bajada de sección: una línea de contexto debajo del título, en cuerpo legible. */
 export const SECCION_SUB = 'text-[13px] leading-relaxed text-[#6b6b68]'
@@ -48,6 +48,23 @@ export const SUBSECCION = 'text-[15px] font-semibold tracking-tight text-[#17171
 
 /** Micro-rótulo (unidades, contadores, "apagado"). El piso de la escala. */
 export const EYEBROW = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8a8a86]'
+
+// ── Tonos de panel ───────────────────────────────────────────────────────────
+// Fondos tonales suaves para las tarjetas de indicador, al estilo del dashboard de
+// referencia (menta / celeste / durazno). No es candy: son lavados desaturados de los
+// MISMOS colores de categoría de más abajo, así el panel sigue leyéndose "neutro premium".
+// El número va siempre en negro (#171717) sobre el tono — el color titula, no grita.
+export const TONOS = {
+  salvia:  { fondo: '#eaf0e4', borde: '#d3e0c8' },
+  celeste: { fondo: '#e7eef4', borde: '#d0dde8' },
+  durazno: { fondo: '#f6ece2', borde: '#ecd9c8' },
+  violeta: { fondo: '#ecebf5', borde: '#dcd8ee' },
+} as const
+
+export type TonoKey = keyof typeof TONOS
+
+/** Panel oscuro de contraste (como el "Sell Order" de la referencia): ink casi negro. */
+export const PANEL_OSCURO = '#191917'
 
 /** Texto de ayuda debajo del campo. */
 export const AYUDA = 'mt-1.5 text-[13px] leading-relaxed text-[#6b6b68]'
