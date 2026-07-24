@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { validarConfig } from '@/lib/widgets/validacion'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
-import { RefreshCw, Plus, Trash2 } from 'lucide-react'
+import { RefreshCw, Plus, Trash2, Check } from 'lucide-react'
 
 // Panel de widgets. Todo lo que se ve acá sale del registro de tipos: la lista de widgets
 // que se pueden crear, y el formulario de cada uno. Este archivo no conoce ningún widget
@@ -55,6 +55,7 @@ export default function WidgetsPage() {
   const [guardando, setGuardando] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [creando, setCreando] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
     const r = await fetch('/api/widgets/admin')
@@ -70,6 +71,13 @@ export default function WidgetsPage() {
   useEffect(() => {
     void cargar()
   }, [cargar])
+
+  // El toast de confirmación se borra solo: es un acuse, no un cartel que haya que cerrar.
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 2200)
+    return () => clearTimeout(t)
+  }, [toast])
 
   const patch = async (body: Record<string, unknown>) => {
     setGuardando(true)
@@ -211,17 +219,23 @@ export default function WidgetsPage() {
                   setCreando(false)
                 }}
                 title={c.donde}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-[14px] transition-all ${activo ? 'font-semibold' : 'font-medium'}`}
-                style={
-                  activo
-                    ? { background: 'rgb(var(--ac) / 0.15)', color: ACENTO }
-                    : { color: 'rgba(255,255,255,0.5)' }
-                }
+                className={`relative flex items-center gap-2 rounded-xl px-4 py-2.5 text-[14px] transition-colors ${activo ? 'font-semibold' : 'font-medium'}`}
+                style={{ color: activo ? ACENTO : 'rgba(255,255,255,0.5)' }}
               >
-                <span className="text-base leading-none">{c.icono}</span>
-                {c.label}
+                {/* La píldora se desliza entre pestañas: un solo elemento con layoutId que
+                    motion mueve de una posición a la otra en vez de aparecer y desaparecer. */}
+                {activo && (
+                  <motion.span
+                    layoutId="ctxPill"
+                    className="absolute inset-0 rounded-xl"
+                    style={{ background: 'rgb(var(--ac) / 0.15)' }}
+                    transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10 text-base leading-none">{c.icono}</span>
+                <span className="relative z-10">{c.label}</span>
                 <span
-                  className="rounded-md px-1.5 py-0.5 font-mono text-[10px]"
+                  className="relative z-10 rounded-md px-1.5 py-0.5 font-mono text-[10px]"
                   style={{ background: activo ? 'rgb(var(--ac) / 0.22)' : 'rgba(255,255,255,0.06)', color: activo ? ACENTO : 'rgba(255,255,255,0.5)' }}
                 >
                   {n}
@@ -257,14 +271,15 @@ export default function WidgetsPage() {
           onToggle={() =>
             patch({ id: editando.id, activo: !(widgets.find(w => w.id === editando.id)?.activo ?? false) })
           }
-          onGuardar={() =>
-            patch({
+          onGuardar={async () => {
+            await patch({
               id: editando.id,
               nombre: editando.nombre,
               config: editando.config,
               reglas: editando.reglas ?? {},
             })
-          }
+            setToast('Cambios guardados')
+          }}
           onBorrar={() => void borrar(editando)}
         />
       ) : delCtx.length === 0 ? (
@@ -289,6 +304,21 @@ export default function WidgetsPage() {
           ))}
         </div>
       )}
+
+      {/* Acuse de guardado: confirmación breve, sale y entra con motion, se borra solo. */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 14, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 14, scale: 0.96 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+            className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.12] px-4 py-2.5 text-sm font-medium text-emerald-300 shadow-lg backdrop-blur-md"
+          >
+            <Check className="size-4" /> {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }
@@ -438,8 +468,12 @@ function TarjetaWidget({
   const cat = catDe(tipo?.categoria ?? 'contenido')
   const tasa = m.impresion > 0 ? (m.interaccion / m.impresion) * 100 : null
   return (
-    <div
-      className={`${CARD} p-4 transition-all hover:border-white/15 ${w.activo ? '' : 'opacity-60'}`}
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: w.activo ? 1 : 0.6, y: 0 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+      className={`${CARD} p-4 hover:border-white/15`}
       style={{ borderLeft: `2px solid ${w.activo ? cat.color : 'rgba(255,255,255,0.15)'}` }}
     >
       <div className="flex items-start gap-3">
@@ -474,16 +508,15 @@ function TarjetaWidget({
         {m.conversion > 0 && <Dato valor={NUM(m.conversion)} label="conversiones" acento="#34d399" />}
       </div>
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full rounded-full transition-all"
-          style={{
-            width: `${Math.min(100, (m.impresion / maxImpresion) * 100)}%`,
-            background: cat.color,
-            opacity: w.activo ? 0.85 : 0.35,
-          }}
+        <motion.div
+          className="h-full rounded-full"
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(100, (m.impresion / maxImpresion) * 100)}%` }}
+          transition={{ duration: 0.7, ease: [0.22, 0.61, 0.36, 1] }}
+          style={{ background: cat.color, opacity: w.activo ? 0.85 : 0.35 }}
         />
       </div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -491,7 +524,7 @@ function Dato({ valor, label, acento }: { valor: string; label: string; acento?:
   return (
     <div>
       <p className="font-mono text-lg font-bold leading-none" style={{ color: acento ?? '#fff' }}>
-        {valor}
+        <NumeroRodante value={valor} />
       </p>
       <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-white/45">{label}</p>
     </div>
