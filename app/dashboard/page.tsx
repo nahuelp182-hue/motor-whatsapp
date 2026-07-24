@@ -275,15 +275,32 @@ export default function DashboardPage() {
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 mb-7 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: acStr(0.65) }}>Motor WhatsApp</p>
-          <h1 className="text-lg font-bold tracking-tight">Panel de métricas</h1>
-          <div className="flex gap-3">
-            <a href="/conversaciones" className="text-xs text-white/45 hover:text-white/80">💬 Conversaciones del bot →</a>
-            <a href="/marketing-automatico" className="text-xs text-white/45 hover:text-white/80">📣 Marketing automático →</a>
-            <a href="/calendario" className="text-xs text-white/45 hover:text-white/80">📅 Calendario comercial →</a>
-            <a href="/radar" className="text-xs text-white/45 hover:text-white/80">🌱 Radar de tendencias →</a>
-            <a href="/dashboard/widgets" className="text-xs text-white/45 hover:text-white/80">🧩 Widgets del sitio →</a>
-          </div>
+          <p className="text-[11px] uppercase tracking-[0.2em] mb-1.5 font-semibold" style={{ color: acStr(0.7) }}>Motor WhatsApp</p>
+          <h1 className="text-[26px] font-bold tracking-tight leading-none">Panel de métricas</h1>
+          {/* Navegación a las otras secciones del motor. Tiles y no links sueltos: son los
+              accesos que más se usan, tienen que verse de un vistazo aunque uno esté cansado. */}
+          <nav className="mt-4 flex flex-wrap gap-2">
+            {[
+              { href: '/conversaciones', icono: '💬', label: 'Conversaciones del bot' },
+              { href: '/marketing-automatico', icono: '📣', label: 'Marketing automático' },
+              { href: '/calendario', icono: '📅', label: 'Calendario comercial' },
+              { href: '/radar', icono: '🌱', label: 'Radar de tendencias' },
+              { href: '/dashboard/widgets', icono: '🧩', label: 'Widgets del sitio' },
+            ].map(n => (
+              <a
+                key={n.href}
+                href={n.href}
+                className="group flex items-center gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium transition-all hover:-translate-y-0.5"
+                style={{ borderColor: 'var(--t-border)', background: 'var(--t-card-bg)', color: 'var(--t-text)' }}
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg text-sm leading-none" style={{ background: acStr(0.14) }}>
+                  {n.icono}
+                </span>
+                {n.label}
+                <span className="text-[13px] transition-transform group-hover:translate-x-0.5" style={{ color: acStr(0.75) }}>→</span>
+              </a>
+            ))}
+          </nav>
         </div>
 
         {/* Controles de fecha */}
