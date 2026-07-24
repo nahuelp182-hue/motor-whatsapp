@@ -6,6 +6,7 @@ import { CampoEditor } from '@/components/widgets/CampoEditor'
 import { VistaPrevia } from '@/components/widgets/VistaPrevia'
 import { Metricas } from '@/components/widgets/Metricas'
 import { CARD, LABEL, AYUDA, AVISO, ACENTO, TITULO, SECCION, SECCION_SUB, SUBSECCION, TONOS, type TonoKey, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
+import { NumeroRodante } from '@/components/widgets/NumeroRodante'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
@@ -317,7 +318,7 @@ function Kpi({
       </p>
       <div>
         <p className="font-mono text-[34px] font-bold leading-none tracking-tight text-white">
-          {valor}
+          <NumeroRodante value={valor} />
         </p>
         {sub && <p className="mt-2 text-[12px] leading-snug text-white/50">{sub}</p>}
       </div>
