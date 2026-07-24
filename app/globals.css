@@ -284,3 +284,28 @@ main[data-light] .rounded-xl[class*="border-white"] {
     @apply bg-background text-foreground;
   }
 }
+
+/* ═══════════════ Gráficos futuristas (glass sci-fi) ═══════════════
+   Glow holográfico sobre curvas/barras/dots + grilla punteada. Scoped a .fx-charts (el <main>
+   del dashboard) para no tocar recharts de otras pantallas. En modo claro se desactiva. */
+.fx-charts .recharts-area-curve,
+.fx-charts .recharts-line-curve {
+  filter: drop-shadow(0 0 4px rgba(125, 195, 255, 0.4));
+}
+.fx-charts .recharts-rectangle,
+.fx-charts .recharts-bar-rectangle path {
+  filter: drop-shadow(0 0 3px rgba(125, 195, 255, 0.28));
+}
+.fx-charts .recharts-cartesian-grid line {
+  stroke-dasharray: 3 7;
+}
+.fx-charts .recharts-active-dot circle {
+  filter: drop-shadow(0 0 6px rgba(125, 195, 255, 0.9));
+}
+main[data-light].fx-charts .recharts-area-curve,
+main[data-light].fx-charts .recharts-line-curve,
+main[data-light].fx-charts .recharts-rectangle,
+main[data-light].fx-charts .recharts-bar-rectangle path,
+main[data-light].fx-charts .recharts-active-dot circle {
+  filter: none;
+}

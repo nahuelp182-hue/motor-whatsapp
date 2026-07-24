@@ -256,7 +256,7 @@ export default function DashboardPage() {
 
   return (
     <main
-      className="relative isolate min-h-screen p-5 md:p-8 font-sans"
+      className="fx-charts relative isolate min-h-screen p-5 md:p-8 font-sans"
       data-light={isLight ? '' : undefined}
       data-grayscale={isGrayscale ? '' : undefined}
       style={{
@@ -318,14 +318,16 @@ export default function DashboardPage() {
               <a
                 key={n.href}
                 href={n.href}
-                className="group flex items-center gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium transition-all hover:-translate-y-0.5"
-                style={{ borderColor: 'var(--t-border)', background: 'var(--t-card-bg)', color: 'var(--t-text)' }}
+                data-isolated=""
+                className="group relative rounded-xl bg-gradient-to-br from-cyan-400/30 via-white/10 to-violet-400/30 p-px transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgba(56,189,248,0.5)]"
               >
-                <span className="flex h-6 w-6 items-center justify-center rounded-lg text-sm leading-none" style={{ background: acStr(0.14) }}>
-                  {n.icono}
+                <span className="flex items-center gap-2 rounded-[11px] bg-[#0a0a14]/85 px-3 py-2 text-[13px] font-medium text-white/85 backdrop-blur-sm transition-colors group-hover:bg-[#0a0a14]/70">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500/25 to-violet-500/25 text-sm leading-none shadow-[0_0_12px_-2px_rgba(56,189,248,0.55)]">
+                    {n.icono}
+                  </span>
+                  {n.label}
+                  <span className="text-[13px] text-cyan-300/80 transition-transform group-hover:translate-x-0.5">→</span>
                 </span>
-                {n.label}
-                <span className="text-[13px] transition-transform group-hover:translate-x-0.5" style={{ color: acStr(0.75) }}>→</span>
               </a>
             ))}
           </nav>
@@ -543,7 +545,8 @@ export default function DashboardPage() {
               <AreaChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%"   stopColor={cc.color} stopOpacity={0.4} />
+                    <stop offset="0%"   stopColor={cc.color} stopOpacity={0.45} />
+                    <stop offset="45%"  stopColor={cc.color} stopOpacity={0.12} />
                     <stop offset="100%" stopColor={cc.color} stopOpacity={0} />
                   </linearGradient>
                 </defs>
@@ -556,9 +559,9 @@ export default function DashboardPage() {
                   axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: `${cc.color}40`, strokeWidth: 1 }} />
                 <Area type="monotone" dataKey={cc.key} name={cc.label}
-                  stroke={cc.color} strokeWidth={2}
+                  stroke={cc.color} strokeWidth={2.5}
                   fill="url(#areaGrad)" dot={false}
-                  activeDot={{ r: 4, fill: cc.color, strokeWidth: 0 }} />
+                  activeDot={{ r: 5, fill: cc.color, stroke: '#fff', strokeWidth: 1.5 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -569,6 +572,16 @@ export default function DashboardPage() {
               <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/60 mb-5">Ingresos TN vs Gasto Meta · {since} → {until}</h3>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barGap={2}>
+                  <defs>
+                    <linearGradient id="barRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stopColor={theme.acHex} stopOpacity={0.95} />
+                      <stop offset="100%" stopColor={theme.acHex} stopOpacity={0.3} />
+                    </linearGradient>
+                    <linearGradient id="barSpend" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stopColor="#a78bfa" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#818cf8" stopOpacity={0.25} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid vertical={false} stroke={cGrid} />
                   <XAxis dataKey="date" tick={cTick}
                     tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
@@ -577,8 +590,8 @@ export default function DashboardPage() {
                     tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
                     axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
-                  <Bar dataKey="revenue" name="Ingresos TN" fill={theme.acHex} opacity={0.85} radius={[2,2,0,0]} />
-                  <Bar dataKey="spend"   name="Gasto Meta"  fill="#818cf8" opacity={0.7}  radius={[2,2,0,0]} />
+                  <Bar dataKey="revenue" name="Ingresos TN" fill="url(#barRev)"   radius={[3,3,0,0]} />
+                  <Bar dataKey="spend"   name="Gasto Meta"  fill="url(#barSpend)" radius={[3,3,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -603,8 +616,8 @@ export default function DashboardPage() {
                     axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(52,211,153,0.3)', strokeWidth: 1 }} />
                   <Line type="monotone" dataKey="clicks" name="Clicks"
-                    stroke="#34d399" strokeWidth={2} dot={false}
-                    activeDot={{ r: 3, fill: '#34d399', strokeWidth: 0 }} />
+                    stroke="#34d399" strokeWidth={2.5} dot={false}
+                    activeDot={{ r: 4, fill: '#34d399', stroke: '#fff', strokeWidth: 1.5 }} />
                 </LineChart>
               </ResponsiveContainer>
               <div className="mt-3 pt-3 border-t border-white/5 flex justify-between text-[10px] text-white/50">
