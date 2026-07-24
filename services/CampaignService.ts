@@ -93,9 +93,24 @@ async function sendWhatsAppTemplate(
   to: string,
   templateName: string,
   languageCode: string,
-  bodyParams: string[]
+  bodyParams: string[],
+  // Sufijo del botón URL dinámico ({{1}} de la URL base de la plantilla). Solo lo usa la
+  // plantilla de reseña, que tiene un botón "Dejar mi reseña" con URL base
+  // https://infomicelium.com.ar/{{1}}. Si la plantilla no tiene botón, se omite.
+  buttonUrlSuffix?: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    const components: unknown[] = [
+      { type: 'body', parameters: bodyParams.map((text) => ({ type: 'text', text })) },
+    ]
+    if (buttonUrlSuffix) {
+      components.push({
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: buttonUrlSuffix }],
+      })
+    }
     const res = await fetch(`${WA_API_URL}/${phoneNumberId}/messages`, {
       method: 'POST',
       headers: {
@@ -110,9 +125,7 @@ async function sendWhatsAppTemplate(
         template: {
           name: templateName,
           language: { code: languageCode },
-          components: [
-            { type: 'body', parameters: bodyParams.map((text) => ({ type: 'text', text })) },
-          ],
+          components,
         },
       }),
     })
@@ -448,6 +461,35 @@ export class CampaignService {
     return (await res.json()) as TNOrder[]
   }
 
+  // Sufijo para el botón URL de la plantilla de reseña: ruta de la ficha del producto +
+  // ?calificar. Sale del canonical_url del producto en Tiendanube. Si no se puede resolver,
+  // cae a la ficha de la incubadora (el producto que compra la mayoría), así el botón
+  // siempre abre un formulario de reseña válido.
+  private async linkResenaSuffix(productId?: number): Promise<string> {
+    const FALLBACK = 'productos/pack-oferta-incubadora-automatica-inc101?calificar'
+    if (!productId) return FALLBACK
+    try {
+      const r = await fetch(
+        `https://api.tiendanube.com/v1/${this.store.tiendanube_store_id}/products/${productId}`,
+        {
+          headers: {
+            Authentication: `bearer ${this.store.tiendanube_access_token}`,
+            'User-Agent': 'MotorWhatsApp (nahuelp182@gmail.com)',
+          },
+        }
+      )
+      if (!r.ok) return FALLBACK
+      const p = (await r.json()) as { canonical_url?: string }
+      if (!p.canonical_url) return FALLBACK
+      // Meta arma la URL como base + sufijo; la base ya es https://infomicelium.com.ar/, así
+      // que acá va solo la ruta (sin dominio) + el parámetro que abre el formulario.
+      const ruta = p.canonical_url.replace(/^https?:\/\/[^/]+\//, '').replace(/\/+$/, '')
+      return `${ruta}?calificar`
+    } catch {
+      return FALLBACK
+    }
+  }
+
   /**
    * REVIEW — pide reseña/testimonio una vez que el pedido está realmente
    * entregado (shipping_status === 'delivered', dato que Tiendanube ya trae
@@ -495,18 +537,26 @@ export class CampaignService {
 
       const customer = await this.upsertCustomer(o)
 
+      // Solo un envío EXITOSO bloquea el reintento. Antes bloqueaba cualquier log (incluso
+      // FAILED), así que un fallo puntual dejaba al cliente sin pedido de reseña para siempre.
       const existing = await prisma.messageLog.findFirst({
         where: {
           store_id: this.store.id,
           customer_id: customer.id,
           campaign_id: campaign.id,
           tipo_evento: 'review_request',
+          estado: 'SENT',
         },
       })
       if (existing) continue
 
       const firstName = o.contact_name.split(' ')[0]
       const product = o.products[0]?.name?.split(' - ')[0] ?? 'tu pedido'
+      // Link del botón "Dejar mi reseña": la ficha del producto comprado + ?calificar, para
+      // que el formulario abra en ESE producto y la reseña quede atribuida a él. La plantilla
+      // (con botón URL dinámico) ya está APROBADA, así que el parámetro va siempre: sin él,
+      // Meta rechaza el envío por falta del valor del botón.
+      const linkSuffix = await this.linkResenaSuffix(o.products[0]?.product_id)
 
       const log = await prisma.messageLog.create({
         data: {
@@ -524,7 +574,8 @@ export class CampaignService {
         customer.telefono,
         config.template_name,
         config.template_lang,
-        [firstName, product]
+        [firstName, product],
+        linkSuffix
       )
 
       await prisma.messageLog.update({
