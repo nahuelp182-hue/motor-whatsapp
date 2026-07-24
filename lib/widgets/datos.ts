@@ -4,15 +4,25 @@ import { prisma } from '@/lib/prisma'
 // viajan dentro de la misma respuesta de /api/widgets/config, así el sitio hace UNA sola
 // petición y el widget no queda parpadeando mientras carga.
 //
-// La reseña sale de `Review`: es la respuesta real de un comprador a la plantilla de
-// post-entrega por WhatsApp. Por eso el sello de "compra verificada" es cierto y no un
-// adorno — es la diferencia con cualquier app de reseñas cargadas a mano.
+// Las reseñas salen de `Review` y son de tres fuentes, todas reales:
+//   - whatsapp: respuesta del comprador a la plantilla post-entrega → "compra verificada".
+//   - google:   reseña de la ficha de Google Business, traída por el cron (sello Google).
+//   - form:     dejada desde el formulario público del sitio; NO se publica hasta aprobarla.
+// Por eso solo viajan las aprobadas (`approved`), y el sello depende de la fuente.
 
 export type ResenaPublica = {
   nombre: string
   texto: string
   fecha: string
+  rating: number | null
+  fuente: 'whatsapp' | 'google' | 'form'
   verificada: boolean
+}
+
+export type ResenasBloque = {
+  items: ResenaPublica[]
+  promedio: number | null // 4.9 — solo cuenta las que tienen estrellas
+  total: number           // total de reseñas publicadas (con o sin estrellas)
 }
 
 /** Nombre de pila + inicial: "Laura G.". Publicar el apellido entero es PII innecesaria. */
@@ -22,21 +32,43 @@ function nombreCorto(completo: string): string {
   return `${partes[0]} ${partes[1][0].toUpperCase()}.`
 }
 
-export async function resenasPublicas(storeId: string, cantidad: number): Promise<ResenaPublica[]> {
+export async function resenasPublicas(storeId: string, cantidad: number): Promise<ResenasBloque> {
+  // Orden por createdAt (siempre presente) y no por `fecha`: en Postgres, ORDER BY fecha
+  // DESC pone los NULL primero, y como WhatsApp/formulario no traen `fecha`, las de Google
+  // (que sí la traen) quedarían al fondo y podrían no entrar en el corte. Cuando el cron de
+  // Google ingesta una reseña, le pone createdAt = fecha real de la reseña, así la mezcla
+  // por recencia sigue siendo correcta.
   const filas = await prisma.review.findMany({
-    where: { store_id: storeId },
+    where: { store_id: storeId, approved: true },
     orderBy: { createdAt: 'desc' },
-    take: Math.min(30, Math.max(1, cantidad)),
     include: { customer: { select: { nombre: true } } },
   })
 
-  return filas
-    // Una respuesta de dos palabras ("gracias", "ok") no construye confianza: ocupa lugar.
-    .filter(r => r.texto.trim().length >= 25)
-    .map(r => ({
-      nombre: nombreCorto(r.customer.nombre),
-      texto: r.texto.trim().slice(0, 600),
-      fecha: r.createdAt.toISOString().slice(0, 10),
-      verificada: true,
-    }))
+  // Una respuesta de dos palabras ("gracias", "ok") no construye confianza: ocupa lugar.
+  const utiles = filas.filter(r => r.texto.trim().length >= 25)
+
+  const conEstrella = utiles.filter(r => typeof r.rating === 'number')
+  const promedio = conEstrella.length
+    ? Math.round((conEstrella.reduce((s, r) => s + (r.rating ?? 0), 0) / conEstrella.length) * 10) / 10
+    : null
+
+  const items: ResenaPublica[] = utiles
+    .slice(0, Math.min(30, Math.max(1, cantidad)))
+    .map(r => {
+      const fuente = (r.source as ResenaPublica['fuente']) ?? 'whatsapp'
+      // El autor sale del Customer cuando existe; si no (Google/form), del campo `autor`.
+      const nombre = r.customer?.nombre ? nombreCorto(r.customer.nombre) : (r.autor ?? 'Cliente')
+      return {
+        nombre,
+        texto: r.texto.trim().slice(0, 600),
+        fecha: (r.fecha ?? r.createdAt).toISOString().slice(0, 10),
+        rating: typeof r.rating === 'number' ? r.rating : null,
+        fuente,
+        // Solo whatsapp y google son verificables como compra/reseña real de terceros.
+        // Una del formulario público NO lleva sello aunque esté aprobada.
+        verificada: fuente === 'whatsapp' || fuente === 'google',
+      }
+    })
+
+  return { items, promedio, total: utiles.length }
 }

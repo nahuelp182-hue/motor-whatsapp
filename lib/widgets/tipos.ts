@@ -295,7 +295,7 @@ export const TIPOS: TipoWidget[] = [
     datosVivos: 'resenas',
     bloque: true,
     uso:
-      'Se inserta donde elijas más abajo. Los textos NO se cargan acá: salen solos de las respuestas que dejan los clientes por WhatsApp tras recibir el equipo. Si todavía no hay ninguna, el widget no dibuja nada en vez de mostrar relleno.',
+      'Se inserta donde elijas más abajo. Los textos salen solos de tres fuentes reales: las respuestas por WhatsApp tras la entrega, las reseñas de Google, y las que dejen desde el formulario del sitio (estas últimas no se publican hasta que las apruebes en Reseñas). Si todavía no hay ninguna, el widget no dibuja nada en vez de mostrar relleno.',
     campos: [
       {
         key: 'titulo',
@@ -303,6 +303,13 @@ export const TIPOS: TipoWidget[] = [
         tipo: 'texto',
         porDefecto: 'Lo que dicen quienes ya lo usan',
         ayuda: 'Encabezado de la sección. Vacío = sin encabezado.',
+      },
+      {
+        key: 'subtitulo',
+        label: 'Subtítulo',
+        tipo: 'texto',
+        porDefecto: '',
+        ayuda: 'Línea chica bajo el título. Vacío = sin subtítulo.',
       },
       {
         key: 'ubicacion',
@@ -328,7 +335,44 @@ export const TIPOS: TipoWidget[] = [
         tipo: 'booleano',
         porDefecto: true,
         ayuda:
-          'Agrega "✓ compra verificada" bajo cada nombre. Es cierto: cada reseña viene de una entrega real, por eso se puede afirmar.',
+          'Agrega "✓ compra verificada" (WhatsApp) o "✓ Google" bajo cada nombre. Es cierto: esas reseñas vienen de una entrega o de la ficha de Google.',
+      },
+      {
+        key: 'promedio',
+        label: 'Mostrar promedio de estrellas',
+        tipo: 'booleano',
+        porDefecto: true,
+        ayuda:
+          'Encabeza el bloque con el promedio (ej. 4,9) y la cantidad de reseñas. Solo aparece si hay reseñas con estrellas.',
+      },
+      {
+        key: 'mostrarFecha',
+        label: 'Mostrar la fecha de cada reseña',
+        tipo: 'booleano',
+        porDefecto: false,
+        ayuda: 'Agrega la fecha bajo cada reseña.',
+      },
+      {
+        key: 'formulario',
+        label: 'Mostrar botón "Escribir reseña"',
+        tipo: 'booleano',
+        porDefecto: false,
+        ayuda:
+          'Deja que cualquiera envíe una reseña desde el sitio. NO se publica sola: queda pendiente hasta que la aprobás en la sección Reseñas del panel.',
+      },
+      {
+        key: 'botonTexto',
+        label: 'Texto del botón',
+        tipo: 'texto',
+        porDefecto: 'Escribir reseña',
+        ayuda: 'Solo se usa si el botón está activado.',
+      },
+      {
+        key: 'mensajeGracias',
+        label: 'Mensaje al enviar',
+        tipo: 'texto',
+        porDefecto: '¡Gracias! Tu reseña se publicará luego de una breve revisión.',
+        ayuda: 'Lo que ve la persona después de enviar su reseña.',
       },
       CAMPO_COLOR,
     ],

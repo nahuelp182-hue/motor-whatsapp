@@ -77,8 +77,9 @@ export async function GET(req: NextRequest) {
 
   const resenas = reviews.map((r) => ({
     ts: r.createdAt,
-    cliente: r.customer.nombre,
-    telefono: r.customer.telefono,
+    // Una reseña de Google o del formulario no tiene Customer: se cae al nombre/fuente.
+    cliente: r.customer?.nombre ?? r.autor ?? r.source,
+    telefono: r.customer?.telefono ?? null,
     texto: r.texto,
   }))
 

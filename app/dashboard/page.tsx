@@ -286,6 +286,7 @@ export default function DashboardPage() {
               { href: '/calendario', icono: '📅', label: 'Calendario comercial' },
               { href: '/radar', icono: '🌱', label: 'Radar de tendencias' },
               { href: '/dashboard/widgets', icono: '🧩', label: 'Widgets del sitio' },
+              { href: '/dashboard/resenas', icono: '⭐', label: 'Reseñas' },
             ].map(n => (
               <a
                 key={n.href}

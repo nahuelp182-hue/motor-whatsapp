@@ -339,26 +339,150 @@
     verUnaVez(sh, w.id);
   };
 
+  /* Fila de 5 estrellas para un rating dado (o para elegir uno). `n` es cuántas van llenas. */
+  function estrellas(n) {
+    var s = '';
+    for (var i = 1; i <= 5; i++) s += '<span class="st' + (i <= n ? ' on' : '') + '">★</span>';
+    return s;
+  }
+
   R.resenas = function (w) {
     var c = w.config, p = paleta(c.color);
     var datos = w.datos || [];
-    if (!datos.length) return; // sin reseñas reales no se dibuja nada: no hay relleno
+    var resumen = w.resumen || { promedio: null, total: 0 };
+    var conForm = !!c.formulario;
+    // Sin reseñas reales no se dibuja relleno. Pero si el formulario está prendido, el bloque
+    // igual aparece para que se pueda dejar la primera.
+    if (!datos.length && !conForm) return;
     var sh = montar(w, false); if (!sh) return;
+
     var cards = datos.map(function (r) {
-      return '<article><p>' + esc(r.texto) + '</p><footer><b>' + esc(r.nombre) + '</b>' +
-        (c.sello && r.verificada ? '<span class="v">✓ compra verificada</span>' : '') + '</footer></article>';
+      var sello = '';
+      if (c.sello && r.verificada) {
+        sello = '<span class="v">✓ ' + (r.fuente === 'google' ? 'Google' : 'compra verificada') + '</span>';
+      }
+      var estr = (r.rating ? '<div class="rs">' + estrellas(r.rating) + '</div>' : '');
+      var fecha = (c.mostrarFecha && r.fecha ? '<span class="fx">' + esc(r.fecha) + '</span>' : '');
+      return '<article>' + estr + '<p>' + esc(r.texto) + '</p><footer><b>' + esc(r.nombre) + '</b>' +
+        sello + fecha + '</footer></article>';
     }).join('');
+
+    // Encabezado con el promedio, estilo el de las apps de reseñas.
+    var cab = '';
+    if (c.promedio && resumen.promedio) {
+      cab = '<div class="avg"><div class="num">' + String(resumen.promedio).replace('.', ',') + '</div>' +
+        '<div class="am"><div class="rs">' + estrellas(Math.round(resumen.promedio)) + '</div>' +
+        '<div class="cnt">' + resumen.total + (resumen.total === 1 ? ' reseña' : ' reseñas') + '</div></div></div>';
+    }
+
+    var boton = conForm
+      ? '<button class="wr">' + esc(c.botonTexto || 'Escribir reseña') + '</button>'
+      : '';
+
+    // Formulario (oculto hasta tocar el botón). Vive dentro del mismo Shadow DOM.
+    var form = conForm
+      ? '<div class="ov"><div class="md"><button class="x" aria-label="Cerrar">×</button>' +
+        '<h4>Dejá tu reseña</h4>' +
+        '<div class="pick" role="radiogroup">' + estrellas(0) + '</div>' +
+        '<input class="nm" type="text" maxlength="80" placeholder="Tu nombre">' +
+        '<textarea class="tx" maxlength="1000" placeholder="¿Qué te pareció? Contá tu experiencia."></textarea>' +
+        '<input class="hp" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">' +
+        '<button class="sb">Enviar reseña</button>' +
+        '<div class="msg"></div></div></div>'
+      : '';
+
     pintar(sh,
-      'h3{margin:0 0 18px;font-size:20px;color:#2a2620}' +
+      'h3{margin:0 0 4px;font-size:20px;color:#2a2620}' +
+      '.sub{margin:0 0 16px;font-size:13.5px;color:#6a6157}' +
+      '.top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px}' +
+      '.avg{display:flex;align-items:center;gap:12px}' +
+      '.num{font-size:38px;font-weight:700;color:#2a2620;line-height:1}' +
+      '.cnt{font-size:12.5px;color:#6a6157;margin-top:2px}' +
+      '.rs{letter-spacing:1px}.st{color:#d9d4cb;font-size:15px}.st.on{color:#e8a838}' +
       '.g{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}' +
       'article{background:#fff;border:1px solid #e6e2da;border-radius:10px;padding:18px}' +
+      'article .rs{margin-bottom:9px}' +
       'p{margin:0 0 12px;font-size:14.5px;line-height:1.6;color:#3a352e}' +
       'footer{display:flex;flex-direction:column;gap:3px}' +
       'b{font-size:13.5px;color:#2a2620}' +
-      '.v{font-size:11.5px;color:' + p.bg + ';font-weight:600}',
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') + '<div class="g">' + cards + '</div>');
+      '.v{font-size:11.5px;color:' + p.bg + ';font-weight:600}' +
+      '.fx{font-size:11px;color:#a89c8e}' +
+      '.wr{background:' + p.bg + ';color:' + p.texto + ';padding:11px 20px;border-radius:8px;font-size:14px;font-weight:600}' +
+      // Modal
+      '.ov{display:none;position:fixed;inset:0;z-index:99999;background:rgba(20,18,15,.55);align-items:center;justify-content:center;padding:16px}' +
+      '.ov.on{display:flex}' +
+      '.md{background:#fff;border-radius:14px;padding:24px;max-width:400px;width:100%;position:relative;box-shadow:0 18px 50px rgba(0,0,0,.3)}' +
+      '.md h4{margin:0 0 14px;font-size:18px;color:#2a2620}' +
+      '.x{position:absolute;top:12px;right:14px;background:none;font-size:24px;color:#a89c8e;line-height:1}' +
+      '.pick{margin-bottom:14px}.pick .st{font-size:30px;cursor:pointer}' +
+      '.md input.nm,.md textarea{width:100%;border:1px solid #d9d4cb;border-radius:8px;padding:11px;font-size:14px;margin-bottom:11px;color:#2a2620}' +
+      '.md textarea{min-height:96px;resize:vertical}' +
+      '.hp{position:absolute;left:-9999px;width:1px;height:1px}' +
+      '.sb{width:100%;background:' + p.bg + ';color:' + p.texto + ';padding:12px;border-radius:8px;font-size:15px;font-weight:600}' +
+      '.msg{margin-top:12px;font-size:13.5px;text-align:center;color:#3a352e}' +
+      '.msg.ok{color:' + p.bg + '}.msg.err{color:#b0341d}',
+      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
+      (c.subtitulo ? '<div class="sub">' + esc(c.subtitulo) + '</div>' : '') +
+      '<div class="top">' + cab + boton + '</div>' +
+      '<div class="g">' + cards + '</div>' + form);
+
+    if (conForm) montarFormResena(sh, w, c);
     verUnaVez(sh, w.id);
   };
+
+  /* Interacción del formulario de reseña: elegir estrellas, enviar, y bloquear el reenvío.
+     El envío queda pendiente de moderación en el panel; por eso el mensaje habla de revisión. */
+  function montarFormResena(sh, w, c) {
+    var ov = sh.querySelector('.ov'), abrir = sh.querySelector('.wr');
+    if (!ov || !abrir) return;
+    var cerrar = sh.querySelector('.x'), enviar = sh.querySelector('.sb'), msg = sh.querySelector('.msg');
+    var estrs = sh.querySelectorAll('.pick .st'), elegido = 0;
+
+    abrir.addEventListener('click', function () { ov.classList.add('on'); evento(w.id, 'interaccion'); });
+    cerrar.addEventListener('click', function () { ov.classList.remove('on'); });
+    ov.addEventListener('click', function (e) { if (e.target === ov) ov.classList.remove('on'); });
+
+    for (var i = 0; i < estrs.length; i++) {
+      (function (idx) {
+        estrs[idx].addEventListener('click', function () {
+          elegido = idx + 1;
+          for (var j = 0; j < estrs.length; j++) estrs[j].classList.toggle('on', j < elegido);
+        });
+      })(i);
+    }
+
+    enviar.addEventListener('click', function () {
+      var nm = sh.querySelector('.nm').value.trim();
+      var tx = sh.querySelector('.tx').value.trim();
+      var hp = sh.querySelector('.hp').value;
+      msg.className = 'msg';
+      if (!elegido) { msg.textContent = 'Elegí cuántas estrellas.'; msg.className = 'msg err'; return; }
+      if (nm.length < 2) { msg.textContent = 'Poné tu nombre.'; msg.className = 'msg err'; return; }
+      if (tx.length < 10) { msg.textContent = 'Contá un poco más tu experiencia.'; msg.className = 'msg err'; return; }
+      enviar.disabled = true; msg.textContent = 'Enviando…';
+      fetch(BASE + '/api/widgets/resena', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autor: nm, texto: tx, rating: elegido, website: hp }),
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d && d.ok) {
+          msg.className = 'msg ok';
+          msg.textContent = c.mensajeGracias || '¡Gracias! Tu reseña se publicará luego de una breve revisión.';
+          evento(w.id, 'conversion');
+          var f = sh.querySelector('.pick'); if (f) f.style.display = 'none';
+          sh.querySelector('.nm').style.display = 'none';
+          sh.querySelector('.tx').style.display = 'none';
+          enviar.style.display = 'none';
+        } else {
+          msg.className = 'msg err'; enviar.disabled = false;
+          msg.textContent = 'No se pudo enviar. Probá de nuevo en un rato.';
+        }
+      }).catch(function () {
+        msg.className = 'msg err'; enviar.disabled = false;
+        msg.textContent = 'No se pudo enviar. Revisá tu conexión.';
+      });
+    });
+  }
 
   R.barra_accion = function (w) {
     var c = w.config, p = paleta(c.color);

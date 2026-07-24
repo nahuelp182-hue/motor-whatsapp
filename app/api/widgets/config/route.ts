@@ -82,7 +82,9 @@ export async function GET(req: NextRequest) {
 
     if (tipo.datosVivos === 'resenas') {
       const cantidad = Number((w.config as Record<string, unknown>)?.cantidad ?? 6)
-      salida.datos = await resenasPublicas(store.id, cantidad)
+      const bloque = await resenasPublicas(store.id, cantidad)
+      salida.datos = bloque.items
+      salida.resumen = { promedio: bloque.promedio, total: bloque.total }
     }
 
     widgets.push(salida)

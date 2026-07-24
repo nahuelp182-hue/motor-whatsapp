@@ -25,7 +25,7 @@ const PUBLICOS = new Set([
 // OJO: el prefijo se compara con startsWith. Por eso acá van las dos rutas concretas del
 // motor de widgets y NO '/api/widgets': ese prefijo dejaría abierto también
 // /api/widgets/admin, que es el CRUD del panel.
-const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks', '/api/asistente', '/api/acceso', '/api/contacto', '/api/widgets/config', '/api/widgets/evento', '/api/presencia']
+const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks', '/api/asistente', '/api/acceso', '/api/contacto', '/api/widgets/config', '/api/widgets/evento', '/api/widgets/resena', '/api/presencia']
 
 // Capa pública de contenido: indexable y sin login a propósito. El conocimiento general es
 // lo que construye confianza antes de la compra; lo privado (manuales del equipo, pedidos)

@@ -89,14 +89,23 @@ model MessageLog {
 // Respuesta de un cliente tras la plantilla resena_post_entrega — capturada
 // por el webhook de WhatsApp cuando contesta dentro de la ventana de espera.
 model Review {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   store_id    String
-  customer_id String
+  customer_id String?
+  autor       String?
+  rating      Int?
   texto       String
-  createdAt   DateTime @default(now())
+  source      String    @default("whatsapp") // whatsapp | google | form
+  approved    Boolean   @default(true)
+  fecha       DateTime? // fecha real de la reseña (Google la trae; WhatsApp usa createdAt)
+  external_id String?   // id de la reseña en su fuente (Google) para no duplicar en cada sync
+  createdAt   DateTime  @default(now())
 
-  store    Store    @relation(fields: [store_id], references: [id])
-  customer Customer @relation(fields: [customer_id], references: [id])
+  store    Store     @relation(fields: [store_id], references: [id])
+  customer Customer? @relation(fields: [customer_id], references: [id])
+
+  @@unique([source, external_id])
+  @@index([store_id, approved, source])
 }
 
 enum CampaignType {
