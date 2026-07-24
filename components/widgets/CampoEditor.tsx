@@ -41,7 +41,7 @@ type Props = {
 // Texto de ayuda debajo del campo, siempre en renglón aparte: es la diferencia entre poder
 // configurar un widget sin preguntarle a nadie y tener que adivinar qué hace cada casilla.
 const AYUDA = 'mt-1.5 text-[13px] leading-relaxed text-muted-foreground'
-const AVISO = 'text-xs leading-relaxed text-amber-600'
+const AVISO = 'text-xs leading-relaxed text-amber-400'
 const ETIQUETA = 'mb-1.5 text-[13px] font-medium text-foreground'
 
 // base-ui Select trata el string vacío como "sin selección". Varios campos usan '' como un

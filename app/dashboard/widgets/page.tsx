@@ -128,11 +128,11 @@ export default function WidgetsPage() {
 
   return (
     <main
-      className="min-h-screen p-5 font-sans text-[#3f3f3c] md:p-8"
+      className="dark min-h-screen p-5 font-sans text-white/70 md:p-8"
       style={{
         '--ac': '111 138 95',
         background:
-          'radial-gradient(ellipse 90% 40% at 50% -5%, rgb(111 138 95 / 0.06) 0%, transparent 60%), #fafafa',
+          'radial-gradient(ellipse 90% 40% at 50% -5%, rgb(111 138 95 / 0.10) 0%, transparent 55%), #07070f',
       } as React.CSSProperties}
     >
       {/* ── Encabezado ─────────────────────────────────────────────── */}
@@ -144,22 +144,22 @@ export default function WidgetsPage() {
           >
             Motor de widgets
           </p>
-          <h1 className="text-[32px] font-semibold leading-none tracking-tight text-[#171717] md:text-[36px]" style={{ fontFamily: TITULO }}>
+          <h1 className="text-[32px] font-semibold leading-none tracking-tight text-white md:text-[36px]" style={{ fontFamily: TITULO }}>
             Panel de widgets
           </h1>
-          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-[#525250]">
+          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/70">
             Prendés, apagás y editás desde acá. Los cambios salen al sitio en menos de un minuto,
             sin desplegar nada.
           </p>
           <div className="mt-3 flex gap-3">
-            <a href="/dashboard" className="text-xs text-[#a3a3a0] transition-colors hover:text-[#171717]">
+            <a href="/dashboard" className="text-xs text-white/35 transition-colors hover:text-white">
               ← Panel de métricas
             </a>
             <a
               href="https://guias.infomicelium.com.ar/guia"
               target="_blank"
               rel="noreferrer"
-              className="text-xs text-[#a3a3a0] transition-colors hover:text-[#171717]"
+              className="text-xs text-white/35 transition-colors hover:text-white"
             >
               Ver el sitio →
             </a>
@@ -213,15 +213,15 @@ export default function WidgetsPage() {
                 className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-[14px] transition-all ${activo ? 'font-semibold' : 'font-medium'}`}
                 style={
                   activo
-                    ? { background: '#eef1e9', color: ACENTO }
-                    : { color: '#737373' }
+                    ? { background: 'rgb(var(--ac) / 0.15)', color: ACENTO }
+                    : { color: 'rgba(255,255,255,0.5)' }
                 }
               >
                 <span className="text-base leading-none">{c.icono}</span>
                 {c.label}
                 <span
                   className="rounded-md px-1.5 py-0.5 font-mono text-[10px]"
-                  style={{ background: activo ? '#dfe6d6' : '#f4f4f1', color: activo ? ACENTO : '#737373' }}
+                  style={{ background: activo ? 'rgb(var(--ac) / 0.22)' : 'rgba(255,255,255,0.06)', color: activo ? ACENTO : 'rgba(255,255,255,0.5)' }}
                 >
                   {n}
                 </span>
@@ -230,7 +230,7 @@ export default function WidgetsPage() {
           })}
         </div>
       </div>
-      <p className="-mt-4 mb-6 text-[13px] text-[#8a8a86]">{ctxActual.donde}.</p>
+      <p className="-mt-4 mb-6 text-[13px] text-white/45">{ctxActual.donde}.</p>
 
       {/* ── Catálogo por categoría ─────────────────────────────────── */}
       {creando && <Catalogo tipos={disponibles} onElegir={t => void crear(t)} />}
@@ -242,7 +242,7 @@ export default function WidgetsPage() {
 
       {/* ── Lista o editor ─────────────────────────────────────────── */}
       {cargando ? (
-        <p className="text-sm text-[#a3a3a0]">Cargando…</p>
+        <p className="text-sm text-white/35">Cargando…</p>
       ) : editando ? (
         <Editor
           widget={editando}
@@ -267,8 +267,8 @@ export default function WidgetsPage() {
           onBorrar={() => void borrar(editando)}
         />
       ) : delCtx.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#d9d9d3] bg-white/50 p-12 text-center">
-          <p className="text-sm text-[#737373]">Todavía no hay widgets en {ctxActual.label.toLowerCase()}.</p>
+        <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-12 text-center">
+          <p className="text-sm text-white/50">Todavía no hay widgets en {ctxActual.label.toLowerCase()}.</p>
           <Button size="sm" className="mt-3" onClick={() => setCreando(true)}>
             Ver el catálogo
           </Button>
@@ -312,14 +312,14 @@ function Kpi({
       className="relative flex min-h-[116px] flex-col justify-between rounded-2xl border p-4"
       style={{ background: t.fondo, borderColor: t.borde }}
     >
-      <p className="text-[11px] font-semibold uppercase leading-none tracking-[0.15em] text-[#6b6b68]">
+      <p className="text-[11px] font-semibold uppercase leading-none tracking-[0.15em] text-white/50">
         {label}
       </p>
       <div>
-        <p className="font-mono text-[34px] font-bold leading-none tracking-tight text-[#171717]">
+        <p className="font-mono text-[34px] font-bold leading-none tracking-tight text-white">
           {valor}
         </p>
-        {sub && <p className="mt-2 text-[12px] leading-snug text-[#787874]">{sub}</p>}
+        {sub && <p className="mt-2 text-[12px] leading-snug text-white/50">{sub}</p>}
       </div>
     </div>
   )
@@ -359,7 +359,7 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
                 </span>
                 <span className="h-px flex-1" style={{ background: `${cat.color}33` }} />
               </div>
-              <p className="mb-3 ml-[38px] text-[13px] leading-relaxed text-[#8a8a86]">{cat.para}</p>
+              <p className="mb-3 ml-[38px] text-[13px] leading-relaxed text-white/45">{cat.para}</p>
               <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                 {delGrupo.map((t, i) => (
                   <motion.button
@@ -374,7 +374,7 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
                     title={[t.descripcion, t.uso, t.cuidado && `⚠ ${t.cuidado}`]
                       .filter(Boolean)
                       .join('\n\n')}
-                    className="group flex items-start gap-3 rounded-xl border border-[#e7e7e2] bg-white p-3.5 text-left transition-all hover:border-[#d9d9d3] hover:bg-[#f4f4f1]"
+                    className="group flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3.5 text-left transition-all hover:border-white/20 hover:bg-white/[0.06]"
                     style={{ borderLeft: `2px solid ${cat.color}88` }}
                   >
                     <span
@@ -385,7 +385,7 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5">
-                        <span className="truncate text-[15px] font-semibold text-[#171717]">{t.nombre}</span>
+                        <span className="truncate text-[15px] font-semibold text-white">{t.nombre}</span>
                         {t.cuidado && (
                           <span className="text-[11px] text-amber-600" title={t.cuidado}>
                             ⚠
@@ -397,7 +397,7 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
                           </span>
                         )}
                       </span>
-                      <span className="mt-1 line-clamp-2 block text-[13px] leading-relaxed text-[#6b6b68]">
+                      <span className="mt-1 line-clamp-2 block text-[13px] leading-relaxed text-white/50">
                         {t.descripcion}
                       </span>
                     </span>
@@ -438,8 +438,8 @@ function TarjetaWidget({
   const tasa = m.impresion > 0 ? (m.interaccion / m.impresion) * 100 : null
   return (
     <div
-      className={`${CARD} p-4 transition-all hover:border-[#d9d9d3] ${w.activo ? '' : 'opacity-60'}`}
-      style={{ borderLeft: `2px solid ${w.activo ? cat.color : '#d9d9d3'}` }}
+      className={`${CARD} p-4 transition-all hover:border-white/15 ${w.activo ? '' : 'opacity-60'}`}
+      style={{ borderLeft: `2px solid ${w.activo ? cat.color : 'rgba(255,255,255,0.15)'}` }}
     >
       <div className="flex items-start gap-3">
         <div className="mt-0.5" title={w.activo ? 'Prendido — se está viendo en el sitio' : 'Apagado'}>
@@ -455,8 +455,8 @@ function TarjetaWidget({
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold text-[#171717]">{w.nombre}</p>
-          <p className="mt-0.5 truncate text-[12px] text-[#8a8a86]">{tipo?.nombre ?? w.tipo}</p>
+          <p className="truncate text-[15px] font-semibold text-white">{w.nombre}</p>
+          <p className="mt-0.5 truncate text-[12px] text-white/45">{tipo?.nombre ?? w.tipo}</p>
         </div>
 
         <Button variant="outline" size="sm" onClick={onEditar}>
@@ -470,9 +470,9 @@ function TarjetaWidget({
         <Dato valor={NUM(m.impresion)} label="vistas" />
         <Dato valor={NUM(m.interaccion)} label="clics" />
         <Dato valor={tasa === null ? '—' : `${tasa.toFixed(1)}%`} label="interacción" acento={ACENTO} />
-        {m.conversion > 0 && <Dato valor={NUM(m.conversion)} label="conversiones" acento="#059669" />}
+        {m.conversion > 0 && <Dato valor={NUM(m.conversion)} label="conversiones" acento="#34d399" />}
       </div>
-      <div className="mt-3 h-1 overflow-hidden rounded-full bg-[#eeeeea]">
+      <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/10">
         <div
           className="h-full rounded-full transition-all"
           style={{
@@ -489,10 +489,10 @@ function TarjetaWidget({
 function Dato({ valor, label, acento }: { valor: string; label: string; acento?: string }) {
   return (
     <div>
-      <p className="font-mono text-lg font-bold leading-none" style={{ color: acento ?? '#171717' }}>
+      <p className="font-mono text-lg font-bold leading-none" style={{ color: acento ?? '#fff' }}>
         {valor}
       </p>
-      <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[#8a8a86]">{label}</p>
+      <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-white/45">{label}</p>
     </div>
   )
 }
@@ -584,16 +584,16 @@ function Editor({
             transition={{ duration: 0.22, ease: 'easeOut' }}
             className="mb-4 overflow-hidden"
           >
-            <div className="space-y-1.5 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5">
+            <div className="space-y-1.5 rounded-2xl border border-amber-500/25 bg-amber-500/[0.08] p-3.5">
               {avisos.map((a, i) => (
                 <div key={i} className="flex items-start gap-2 text-[13px] leading-relaxed">
                   <span
-                    className={`mt-px text-[10px] leading-4 ${a.nivel === 'error' ? 'text-red-500' : 'text-amber-600'}`}
+                    className={`mt-px text-[10px] leading-4 ${a.nivel === 'error' ? 'text-red-400' : 'text-amber-400'}`}
                     aria-hidden
                   >
                     {a.nivel === 'error' ? '●' : '▲'}
                   </span>
-                  <span className="text-[#5b4a2f]">{a.mensaje}</span>
+                  <span className="text-amber-100/90">{a.mensaje}</span>
                 </div>
               ))}
             </div>
@@ -607,8 +607,8 @@ function Editor({
           {/* Qué hace y qué necesita, arriba de todo: configurar un widget no debería
               requerir acordarse de nada ni preguntar. */}
           <div className={`${CARD} p-4`} style={{ borderLeft: `2px solid ${cat.color}88` }}>
-            <p className="text-[14px] leading-relaxed text-[#3f3f3c]">{tipo.descripcion}</p>
-            <p className="mt-2 text-[13px] leading-relaxed text-[#6b6b68]">{tipo.uso}</p>
+            <p className="text-[14px] leading-relaxed text-white/70">{tipo.descripcion}</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-white/50">{tipo.uso}</p>
             {tipo.cuidado && <p className={`mt-2 ${AVISO}`}>⚠ {tipo.cuidado}</p>}
           </div>
 
@@ -635,25 +635,25 @@ function Editor({
           </div>
 
           <details className={`${CARD} p-4`}>
-            <summary className="cursor-pointer text-[14px] font-semibold tracking-tight text-[#171717]">
+            <summary className="cursor-pointer text-[14px] font-semibold tracking-tight text-white">
               Dónde y cuándo aparece
             </summary>
             <div className="mt-4 space-y-5">
               <div>
                 <label className={LABEL}>En qué páginas</label>
-                <p className="mb-2 text-[13px] leading-relaxed text-[#6b6b68]">
+                <p className="mb-2 text-[13px] leading-relaxed text-white/50">
                   Sin marcar ninguna, aparece en todas. Marcá solo si querés acotarlo.
                 </p>
                 {/* Casillas con las páginas que existen de verdad. Antes había que escribir la
                     dirección a mano, que es la forma más fácil de equivocarse en una letra y no
                     enterarse nunca. */}
-                <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-[#e7e7e2] bg-[#fafafa] p-2.5">
+                <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-white/[0.02] p-2.5">
                   {paginas.map(p => {
                     const marcada = (reglas.rutas ?? []).includes(p.ruta)
                     return (
                       <label
                         key={p.ruta}
-                        className="flex cursor-pointer items-start gap-2 rounded-lg px-1.5 py-1 text-xs text-[#3f3f3c] hover:bg-[#f0f0ec]"
+                        className="flex cursor-pointer items-start gap-2 rounded-lg px-1.5 py-1 text-xs text-white/70 hover:bg-white/[0.06]"
                       >
                         <input
                           type="checkbox"
@@ -698,13 +698,13 @@ function Editor({
 
               <div>
                 <label className={LABEL}>Ventana de fechas</label>
-                <p className="mb-2 text-[13px] leading-relaxed text-[#6b6b68]">
+                <p className="mb-2 text-[13px] leading-relaxed text-white/50">
                   Opcional. Fuera de la ventana el widget ni siquiera se envía a la página, así que
                   una promoción vencida no queda escondida en el código a la vista de nadie.
                 </p>
                 <div className="flex gap-3">
                   <div>
-                    <label className="mb-1 block text-[11px] text-[#737373]">Desde</label>
+                    <label className="mb-1 block text-[11px] text-white/50">Desde</label>
                     <Input
                       type="date"
                       value={(reglas.desde ?? '').slice(0, 10)}
@@ -712,7 +712,7 @@ function Editor({
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[11px] text-[#737373]">Hasta</label>
+                    <label className="mb-1 block text-[11px] text-white/50">Hasta</label>
                     <Input
                       type="date"
                       value={(reglas.hasta ?? '').slice(0, 10)}

@@ -9,23 +9,28 @@
 //          ink #171717 · cuerpo #3f3f3c · muted #737373 · faint #a3a3a0
 //          acento salvia #6f8a5f · texto-acento #57704a · wash #eef1e9
 
-/** Color de la salvia para texto sobre fondo claro (el #6f8a5f puro queda flojo en blanco). */
-export const ACENTO = '#57704a'
+// ── Modo premium oscuro (24/07/26) ────────────────────────────────────────────
+// El panel dejó de ser una isla clara: ahora comparte el tema oscuro glass del resto del
+// dashboard (fondo #07070f, tarjetas white/[0.02], acento salvia vía --ac). Los componentes
+// shadcn se dan vuelta con la clase `dark` en el <main>; estos tokens cubren lo hardcodeado.
+
+/** Salvia legible sobre oscuro (el #57704a de antes era para fondo blanco). */
+export const ACENTO = '#9cbb84'
 /** Fuente de títulos — Fraunces, servida por el layout como variable. */
 export const TITULO = 'var(--font-fraunces), Georgia, serif'
 
-/** Tarjeta base: blanca, borde hairline, sombra mínima. */
+/** Tarjeta base: glass sutil, igual que las del dashboard. */
 export const CARD =
-  'rounded-2xl border border-[#e7e7e2] bg-white shadow-[0_1px_3px_rgba(23,23,23,0.04)]'
+  'rounded-2xl border border-white/[0.06] bg-white/[0.02]'
 
-/** Campo de formulario sobre fondo claro. */
+/** Campo de formulario glass sobre oscuro. */
 export const INPUT =
-  'w-full rounded-xl border border-[#e7e7e2] bg-white px-3 py-2 text-sm text-[#171717] ' +
-  'placeholder:text-[#a3a3a0] focus:border-[#6f8a5f] focus:ring-2 focus:ring-[#6f8a5f]/15 ' +
+  'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/80 ' +
+  'placeholder:text-white/30 focus:border-white/25 focus:ring-2 focus:ring-white/10 ' +
   'focus:outline-none transition-colors'
 
 /** Rótulo de campo — eyebrow Manrope. */
-export const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#737373]'
+export const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/45'
 
 // ── Escala de encabezados ────────────────────────────────────────────────────
 // La regla para que la vista descanse: cada nivel tiene que verse claramente más
@@ -37,45 +42,44 @@ export const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-
 //   SUBSECCION  15px semibold    →  título de una tarjeta o grupo
 //   EYEBROW  11px mayúsc muted   →  rótulos y unidades, el piso de la escala
 
-/** Título de sección: el nivel que ordena la página. Grande y oscuro, se lee de un vistazo. */
-export const SECCION = 'text-xl font-semibold tracking-tight text-[#171717]'
+/** Título de sección: el nivel que ordena la página. Grande y claro, se lee de un vistazo. */
+export const SECCION = 'text-xl font-semibold tracking-tight text-white'
 
 /** Bajada de sección: una línea de contexto debajo del título, en cuerpo legible. */
-export const SECCION_SUB = 'text-[13px] leading-relaxed text-[#6b6b68]'
+export const SECCION_SUB = 'text-[13px] leading-relaxed text-white/55'
 
 /** Título de una tarjeta o grupo dentro de una sección. */
-export const SUBSECCION = 'text-[15px] font-semibold tracking-tight text-[#171717]'
+export const SUBSECCION = 'text-[15px] font-semibold tracking-tight text-white'
 
 /** Micro-rótulo (unidades, contadores, "apagado"). El piso de la escala. */
-export const EYEBROW = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8a8a86]'
+export const EYEBROW = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45'
 
 // ── Tonos de panel ───────────────────────────────────────────────────────────
-// Fondos tonales suaves para las tarjetas de indicador, al estilo del dashboard de
-// referencia (menta / celeste / durazno). No es candy: son lavados desaturados de los
-// MISMOS colores de categoría de más abajo, así el panel sigue leyéndose "neutro premium".
-// El número va siempre en negro (#171717) sobre el tono — el color titula, no grita.
+// Tarjetas de indicador glass, tintadas con el color de su categoría (menta / celeste /
+// durazno / violeta) sobre el fondo oscuro. Tintes muy bajos: el color titula, el número —en
+// blanco— manda la lectura. Mismos colores de categoría de más abajo.
 export const TONOS = {
-  salvia:  { fondo: '#eaf0e4', borde: '#d3e0c8' },
-  celeste: { fondo: '#e7eef4', borde: '#d0dde8' },
-  durazno: { fondo: '#f6ece2', borde: '#ecd9c8' },
-  violeta: { fondo: '#ecebf5', borde: '#dcd8ee' },
+  salvia:  { fondo: 'rgb(111 138 95 / 0.13)', borde: 'rgb(111 138 95 / 0.22)' },
+  celeste: { fondo: 'rgb(95 168 211 / 0.11)', borde: 'rgb(95 168 211 / 0.20)' },
+  durazno: { fondo: 'rgb(240 160 60 / 0.11)', borde: 'rgb(240 160 60 / 0.20)' },
+  violeta: { fondo: 'rgb(155 140 240 / 0.11)', borde: 'rgb(155 140 240 / 0.20)' },
 } as const
 
 export type TonoKey = keyof typeof TONOS
 
-/** Panel oscuro de contraste (como el "Sell Order" de la referencia): ink casi negro. */
+/** Panel oscuro de contraste: ink casi negro. */
 export const PANEL_OSCURO = '#191917'
 
 /** Texto de ayuda debajo del campo. */
-export const AYUDA = 'mt-1.5 text-[13px] leading-relaxed text-[#6b6b68]'
+export const AYUDA = 'mt-1.5 text-[13px] leading-relaxed text-white/50'
 
-/** Advertencia: ámbar legible sobre fondo claro. */
-export const AVISO = 'text-xs leading-relaxed text-amber-700'
+/** Advertencia: ámbar legible sobre oscuro. */
+export const AVISO = 'text-xs leading-relaxed text-amber-400'
 
-/** Botón secundario. */
+/** Botón secundario glass. */
 export const BTN =
-  'rounded-md border border-[#e7e7e2] bg-white px-3 py-1.5 text-xs font-medium text-[#3f3f3c] ' +
-  'hover:border-[#171717]/25 hover:text-[#171717] transition-all disabled:opacity-30'
+  'rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/70 ' +
+  'hover:border-white/25 hover:text-white transition-all disabled:opacity-30'
 
 // ── Categorías ───────────────────────────────────────────────────────────────
 // Cada widget declara su categoría en lib/widgets/tipos.ts. Acá se le pone nombre, color y

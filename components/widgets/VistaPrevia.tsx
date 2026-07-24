@@ -41,14 +41,14 @@ export function VistaPrevia({ tipo, config }: Props) {
 
   return (
     <div className={`${CARD} overflow-hidden`}>
-      <div className="flex items-center gap-2 border-b border-[#e7e7e2] px-3.5 py-2.5">
+      <div className="flex items-center gap-2 border-b border-white/10 px-3.5 py-2.5">
         <span
           className={`h-1.5 w-1.5 rounded-full transition-colors ${
-            listo ? 'bg-emerald-500' : 'bg-[#c9c9c4]'
+            listo ? 'bg-emerald-500' : 'bg-white/25'
           }`}
           title={listo ? 'Dibujando con el motor real' : 'Cargando el motor…'}
         />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#737373]">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/50">
           Vista previa en vivo
         </span>
         <div className="ml-auto flex gap-1 rounded-lg bg-muted p-0.5">
@@ -67,17 +67,17 @@ export function VistaPrevia({ tipo, config }: Props) {
         </div>
       </div>
 
-      <div className="flex justify-center bg-[#f0f0ec] p-3">
+      <div className="flex justify-center bg-black/20 p-3">
         <iframe
           ref={ref}
           src="/dashboard/widgets/vista-previa"
           title="Vista previa del widget"
-          className="h-[560px] rounded-xl border border-[#e7e7e2] bg-white shadow-[0_8px_30px_rgba(23,23,23,0.10)]"
+          className="h-[560px] rounded-xl border border-white/10 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]"
           style={{ width: ancho === 'movil' ? 390 : '100%' }}
         />
       </div>
 
-      <p className="border-t border-[#e7e7e2] px-3.5 py-2.5 text-[11px] leading-relaxed text-[#737373]">
+      <p className="border-t border-white/10 px-3.5 py-2.5 text-[11px] leading-relaxed text-white/50">
         Es el mismo código que corre en el sitio, sobre un texto de ejemplo. Los widgets que
         aparecen tras unos segundos o al intentar salir se dibujan acá enseguida.
       </p>
