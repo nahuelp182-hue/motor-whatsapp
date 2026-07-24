@@ -19,6 +19,7 @@ import { PerformanceSection } from '@/components/PerformanceSection'
 import { AttributionSection } from '@/components/AttributionSection'
 import { CuriososSection } from '@/components/CuriososSection'
 import { GlobalRoasGauge } from '@/components/GlobalRoasGauge'
+import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = {
@@ -255,7 +256,7 @@ export default function DashboardPage() {
 
   return (
     <main
-      className="min-h-screen p-5 md:p-8 font-sans"
+      className="relative isolate min-h-screen p-5 md:p-8 font-sans"
       data-light={isLight ? '' : undefined}
       data-grayscale={isGrayscale ? '' : undefined}
       style={{
@@ -271,6 +272,32 @@ export default function DashboardPage() {
           : `radial-gradient(ellipse 90% 40% at 50% -5%, rgb(${theme.ac} / 0.07) 0%, transparent 60%), ${theme.bg}`,
       } as React.CSSProperties}
     >
+
+      {/* Ambiente holográfico: grilla animada + auroras difusas. Decorativo puro, detrás del
+          contenido y sin capturar el puntero — no toca la legibilidad de los datos. Solo en
+          modo oscuro; en los temas claros el fondo queda limpio. */}
+      {!isLight && (
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          <AnimatedGridPattern
+            numSquares={26}
+            maxOpacity={0.05}
+            duration={5}
+            className="absolute inset-x-0 -top-1/4 h-[140%] skew-y-12 text-cyan-300/40 [mask-image:radial-gradient(ellipse_at_top,white,transparent_75%)]"
+          />
+          <div
+            className="absolute -top-40 left-[15%] h-[520px] w-[520px] rounded-full bg-cyan-500/10 blur-[130px]"
+            style={{ animation: 'aurora 11s ease-in-out infinite alternate' }}
+          />
+          <div
+            className="absolute top-24 right-[12%] h-[460px] w-[460px] rounded-full bg-violet-500/10 blur-[130px]"
+            style={{ animation: 'aurora 13s ease-in-out infinite alternate' }}
+          />
+          <div
+            className="absolute bottom-0 left-1/3 h-[420px] w-[420px] rounded-full bg-fuchsia-500/[0.07] blur-[130px]"
+            style={{ animation: 'aurora 15s ease-in-out infinite alternate' }}
+          />
+        </div>
+      )}
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 mb-7 sm:flex-row sm:items-center sm:justify-between">

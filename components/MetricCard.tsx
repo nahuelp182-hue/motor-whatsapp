@@ -1,6 +1,8 @@
 'use client'
 import { SparklineChart } from './SparklineChart'
 import { HelpTip } from './HelpTip'
+import { BorderBeam } from '@/components/ui/border-beam'
+import { NumeroRodante } from '@/components/widgets/NumeroRodante'
 
 interface MetricCardProps {
   label: string
@@ -40,6 +42,27 @@ export function MetricCard({
         />
       )}
 
+      {/* Haz holográfico que recorre el borde (Magic UI). Más marcado en la card destacada. */}
+      <BorderBeam
+        size={highlight ? 130 : 90}
+        duration={highlight ? 7 : 10}
+        borderWidth={1.5}
+        colorFrom="#22d3ee"
+        colorTo="#a78bfa"
+        className="opacity-70"
+      />
+      {highlight && (
+        <BorderBeam
+          size={130}
+          duration={7}
+          delay={3.5}
+          borderWidth={1.5}
+          colorFrom="#a78bfa"
+          colorTo="#22d3ee"
+          className="opacity-70"
+        />
+      )}
+
       {/* Label + MoM badge */}
       <div className="flex items-start justify-between gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/50 leading-none flex items-center">
@@ -63,7 +86,7 @@ export function MetricCard({
           className="text-2xl font-bold tracking-tight leading-none font-mono"
           style={{ color: highlight ? 'rgb(var(--ac))' : 'var(--t-text)' }}
         >
-          {value}
+          <NumeroRodante value={value} />
         </p>
         {sub && (
           <p className="mt-1.5 text-[10px] text-white/55 leading-snug">{sub}</p>
