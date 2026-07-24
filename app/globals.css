@@ -212,9 +212,9 @@ main[data-light] .rounded-xl[class*="border-white"] {
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  /* Salvia de marca (#6f8a5f) como color primario de shadcn: botones, foco y switches
-     salen on-brand en vez del negro neutro por defecto. Ver components/widgets/ui.ts. */
-  --primary: oklch(0.62 0.058 140);
+  /* Acento holográfico violeta (#a78bfa) como primario de shadcn: botones, foco y switches
+     del panel de widgets salen a tono con el dashboard futurista. Ver components/widgets/ui.ts. */
+  --primary: oklch(0.72 0.15 292);
   --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -224,8 +224,8 @@ main[data-light] .rounded-xl[class*="border-white"] {
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
-  --input: oklch(0.9 0.008 140);
-  --ring: oklch(0.62 0.058 140);
+  --input: oklch(0.9 0.02 292);
+  --ring: oklch(0.72 0.15 292);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -308,4 +308,36 @@ main[data-light].fx-charts .recharts-rectangle,
 main[data-light].fx-charts .recharts-bar-rectangle path,
 main[data-light].fx-charts .recharts-active-dot circle {
   filter: none;
+}
+
+/* ═══════════════ Cards de sección holográficas ═══════════════
+   Un hilo de luz cyan→violeta en el borde de cada tarjeta, vía ::before enmascarado (solo se
+   ve el anillo de 1px, el centro queda transparente). Toca TODAS las .rounded-2xl del panel
+   sin editar cada componente. Scoped a .fx-holo, desactivado en modo claro y en data-isolated. */
+.fx-holo:not([data-light]) .rounded-2xl:not([data-isolated]) {
+  position: relative;
+  border-color: rgba(125, 195, 255, 0.09);
+}
+.fx-holo:not([data-light]) .rounded-2xl:not([data-isolated])::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(34, 211, 238, 0.45) 0%,
+    rgba(34, 211, 238, 0) 38%,
+    rgba(167, 139, 250, 0) 62%,
+    rgba(167, 139, 250, 0.45) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.65;
+  transition: opacity 0.3s;
+}
+.fx-holo:not([data-light]) .rounded-2xl:not([data-isolated]):hover::before {
+  opacity: 1;
 }

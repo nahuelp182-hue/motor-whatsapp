@@ -256,7 +256,7 @@ export default function DashboardPage() {
 
   return (
     <main
-      className="fx-charts relative isolate min-h-screen p-5 md:p-8 font-sans"
+      className="fx-charts fx-holo relative isolate min-h-screen p-5 md:p-8 font-sans"
       data-light={isLight ? '' : undefined}
       data-grayscale={isGrayscale ? '' : undefined}
       style={{

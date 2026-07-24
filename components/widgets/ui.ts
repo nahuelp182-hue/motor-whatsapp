@@ -14,8 +14,8 @@
 // dashboard (fondo #07070f, tarjetas white/[0.02], acento salvia vía --ac). Los componentes
 // shadcn se dan vuelta con la clase `dark` en el <main>; estos tokens cubren lo hardcodeado.
 
-/** Salvia legible sobre oscuro (el #57704a de antes era para fondo blanco). */
-export const ACENTO = '#9cbb84'
+/** Acento holográfico (violeta-índigo) legible sobre oscuro, a tono con el dashboard. */
+export const ACENTO = '#a5b4fc'
 /** Fuente de títulos — Fraunces, servida por el layout como variable. */
 export const TITULO = 'var(--font-fraunces), Georgia, serif'
 

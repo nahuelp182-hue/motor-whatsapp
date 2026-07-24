@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { BorderBeam } from '@/components/ui/border-beam'
+import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern'
 import { validarConfig } from '@/lib/widgets/validacion'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
 import { RefreshCw, Plus, Trash2, Check } from 'lucide-react'
@@ -137,13 +139,32 @@ export default function WidgetsPage() {
 
   return (
     <main
-      className="dark min-h-screen p-5 font-sans text-white/70 md:p-8"
+      className="dark fx-holo relative isolate min-h-screen p-5 font-sans text-white/70 md:p-8"
       style={{
-        '--ac': '111 138 95',
+        '--ac': '167 139 250',
         background:
-          'radial-gradient(ellipse 90% 40% at 50% -5%, rgb(111 138 95 / 0.10) 0%, transparent 55%), #07070f',
+          'radial-gradient(ellipse 90% 40% at 50% -5%, rgb(167 139 250 / 0.10) 0%, transparent 55%), #07070f',
       } as React.CSSProperties}
     >
+      {/* Ambiente holográfico igual que el dashboard: grilla animada + auroras difusas,
+          decorativo, detrás del contenido, sin capturar el puntero. */}
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <AnimatedGridPattern
+          numSquares={22}
+          maxOpacity={0.05}
+          duration={5}
+          className="absolute inset-x-0 -top-1/4 h-[140%] skew-y-12 text-cyan-300/40 [mask-image:radial-gradient(ellipse_at_top,white,transparent_75%)]"
+        />
+        <div
+          className="absolute -top-40 left-[18%] h-[480px] w-[480px] rounded-full bg-cyan-500/10 blur-[130px]"
+          style={{ animation: 'aurora 12s ease-in-out infinite alternate' }}
+        />
+        <div
+          className="absolute top-24 right-[14%] h-[440px] w-[440px] rounded-full bg-violet-500/10 blur-[130px]"
+          style={{ animation: 'aurora 14s ease-in-out infinite alternate' }}
+        />
+      </div>
+
       {/* ── Encabezado ─────────────────────────────────────────────── */}
       <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -340,9 +361,10 @@ function Kpi({
   const t = TONOS[tono]
   return (
     <div
-      className="relative flex min-h-[116px] flex-col justify-between rounded-2xl border p-4"
+      className="relative flex min-h-[116px] flex-col justify-between overflow-hidden rounded-2xl border p-4"
       style={{ background: t.fondo, borderColor: t.borde }}
     >
+      <BorderBeam size={80} duration={9} borderWidth={1.5} colorFrom="#22d3ee" colorTo="#a78bfa" className="opacity-60" />
       <p className="text-[11px] font-semibold uppercase leading-none tracking-[0.15em] text-white/50">
         {label}
       </p>
