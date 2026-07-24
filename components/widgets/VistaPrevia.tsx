@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CARD, ACENTO } from './ui'
+import { CARD } from './ui'
+import { Button } from '@/components/ui/button'
 
 // Vista previa en vivo. El iframe corre el mic.js real, así que lo que se ve acá es
 // literalmente lo que va a ver un visitante: mismo código de dibujo, mismas medidas.
@@ -50,21 +51,18 @@ export function VistaPrevia({ tipo, config }: Props) {
         <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#737373]">
           Vista previa en vivo
         </span>
-        <div className="ml-auto flex gap-1 rounded-lg bg-[#f4f4f1] p-0.5">
+        <div className="ml-auto flex gap-1 rounded-lg bg-muted p-0.5">
           {(['escritorio', 'movil'] as const).map(a => (
-            <button
+            <Button
               key={a}
               type="button"
+              size="xs"
+              variant={ancho === a ? 'secondary' : 'ghost'}
               onClick={() => setAncho(a)}
-              className="rounded-md px-2.5 py-1 text-[11px] font-medium transition-all"
-              style={
-                ancho === a
-                  ? { background: '#eef1e9', color: ACENTO }
-                  : { color: '#737373' }
-              }
+              className="text-[11px]"
             >
               {a === 'movil' ? '📱 Celular' : '🖥 Escritorio'}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

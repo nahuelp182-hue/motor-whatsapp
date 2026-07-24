@@ -114,6 +114,24 @@ const CAMPO_COLOR: Campo = {
     'La paleta de marca es lo normal. El código propio está para un evento o una fecha puntual: si termina quedándose, el sitio deja de verse como una sola marca.',
 }
 
+// Gesto con el que el widget entra en pantalla la primera vez que se lo ve al bajar. Es una
+// opción de bloque: los flotantes (WhatsApp, banner, barra) tienen su propia aparición y no lo
+// usan. Se agrega una sola vez a los tipos `bloque` más abajo, no se repite en cada uno.
+const CAMPO_ANIMACION: Campo = {
+  key: 'animacion',
+  label: 'Animación de entrada',
+  tipo: 'select',
+  porDefecto: 'subir',
+  ayuda:
+    'Cómo aparece cuando el visitante llega a él al bajar. Sutil a propósito: se nota sin distraer. «Ninguna» lo deja fijo. A quien pidió menos movimiento en su sistema se le muestra sin animar.',
+  opciones: [
+    { value: 'subir', label: 'Subir con suavidad' },
+    { value: 'escala', label: 'Aparecer creciendo' },
+    { value: 'lado', label: 'Entrar desde el costado' },
+    { value: 'ninguna', label: 'Sin animación' },
+  ],
+}
+
 // Proporciones con su medida sugerida. El panel muestra la medida ANTES de subir, que es
 // cuando sirve: después de subir una foto mal encuadrada ya no hay nada que hacer.
 export const PROPORCIONES = [
@@ -133,7 +151,7 @@ export const MARCOS = [
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
-export const TIPOS: TipoWidget[] = [
+const TIPOS_BASE: TipoWidget[] = [
   {
     slug: 'whatsapp_flotante',
     nombre: 'Botón de WhatsApp',
@@ -1502,6 +1520,15 @@ export const TIPOS: TipoWidget[] = [
     ],
   },
 ]
+
+// La animación de entrada es común a todos los widgets de bloque: se suma acá una sola vez, al
+// final de cada uno, en vez de repetir el campo veinte veces. Los flotantes no la llevan porque
+// no pasan por verUnaVez (tienen su propia aparición).
+export const TIPOS: TipoWidget[] = TIPOS_BASE.map(t =>
+  t.bloque && !t.campos.some(c => c.key === 'animacion')
+    ? { ...t, campos: [...t.campos, CAMPO_ANIMACION] }
+    : t,
+)
 
 /**
  * Ids de producto referenciados por una config, mirando la declaración del tipo.

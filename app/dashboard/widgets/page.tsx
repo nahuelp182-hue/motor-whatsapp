@@ -1,11 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
 import { CampoEditor } from '@/components/widgets/CampoEditor'
 import { VistaPrevia } from '@/components/widgets/VistaPrevia'
 import { Metricas } from '@/components/widgets/Metricas'
-import { CARD, INPUT, LABEL, AYUDA, AVISO, BTN, ACENTO, TITULO, SECCION, SECCION_SUB, SUBSECCION, TONOS, type TonoKey, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
+import { CARD, LABEL, AYUDA, AVISO, ACENTO, TITULO, SECCION, SECCION_SUB, SUBSECCION, TONOS, type TonoKey, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { validarConfig } from '@/lib/widgets/validacion'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
+import { RefreshCw, Plus, Trash2 } from 'lucide-react'
 
 // Panel de widgets. Todo lo que se ve acá sale del registro de tipos: la lista de widgets
 // que se pueden crear, y el formulario de cada uno. Este archivo no conoce ningún widget
@@ -160,16 +167,13 @@ export default function WidgetsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={() => void cargar()} className={BTN}>
-            ↻ Actualizar
-          </button>
-          <button
-            onClick={() => setCreando(v => !v)}
-            className="rounded-md px-4 py-1.5 text-xs font-semibold text-white transition-all hover:opacity-90"
-            style={{ background: '#171717' }}
-          >
-            {creando ? 'Cerrar catálogo' : '+ Agregar widget'}
-          </button>
+          <Button variant="outline" size="sm" onClick={() => void cargar()}>
+            <RefreshCw />
+            Actualizar
+          </Button>
+          <Button size="sm" onClick={() => setCreando(v => !v)}>
+            {creando ? 'Cerrar catálogo' : (<><Plus />Agregar widget</>)}
+          </Button>
         </div>
       </div>
 
@@ -265,13 +269,9 @@ export default function WidgetsPage() {
       ) : delCtx.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#d9d9d3] bg-white/50 p-12 text-center">
           <p className="text-sm text-[#737373]">Todavía no hay widgets en {ctxActual.label.toLowerCase()}.</p>
-          <button
-            onClick={() => setCreando(true)}
-            className="mt-3 rounded-md px-4 py-1.5 text-xs font-semibold text-white"
-            style={{ background: '#171717' }}
-          >
+          <Button size="sm" className="mt-3" onClick={() => setCreando(true)}>
             Ver el catálogo
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
@@ -361,9 +361,12 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
               </div>
               <p className="mb-3 ml-[38px] text-[13px] leading-relaxed text-[#8a8a86]">{cat.para}</p>
               <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                {delGrupo.map(t => (
-                  <button
+                {delGrupo.map((t, i) => (
+                  <motion.button
                     key={t.slug}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.28, delay: i * 0.03, ease: 'easeOut' }}
                     onClick={() => onElegir(t)}
                     // El texto largo (uso, advertencia) vive acá: está a un segundo de
                     // distancia si hace falta, y no obliga a leer veinte párrafos para
@@ -404,7 +407,7 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
                     >
                       +
                     </span>
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </section>
@@ -439,19 +442,9 @@ function TarjetaWidget({
       style={{ borderLeft: `2px solid ${w.activo ? cat.color : '#d9d9d3'}` }}
     >
       <div className="flex items-start gap-3">
-        <button
-          onClick={onToggle}
-          className={`mt-0.5 h-6 w-11 shrink-0 rounded-full transition ${
-            w.activo ? 'bg-emerald-500' : 'bg-[#d4d4d0]'
-          }`}
-          title={w.activo ? 'Prendido — se está viendo en el sitio' : 'Apagado'}
-        >
-          <span
-            className={`block h-5 w-5 rounded-full bg-white shadow-sm transition ${
-              w.activo ? 'translate-x-5' : 'translate-x-0.5'
-            }`}
-          />
-        </button>
+        <div className="mt-0.5" title={w.activo ? 'Prendido — se está viendo en el sitio' : 'Apagado'}>
+          <Switch checked={w.activo} onCheckedChange={onToggle} />
+        </div>
 
         <span
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg leading-none"
@@ -466,9 +459,9 @@ function TarjetaWidget({
           <p className="mt-0.5 truncate text-[12px] text-[#8a8a86]">{tipo?.nombre ?? w.tipo}</p>
         </div>
 
-        <button onClick={onEditar} className={BTN}>
+        <Button variant="outline" size="sm" onClick={onEditar}>
           Editar
-        </button>
+        </Button>
       </div>
 
       {/* Rendimiento de 30 días. La barra compara contra el widget más visto del contexto:
@@ -533,9 +526,9 @@ function Editor({
   if (!tipo) {
     return (
       <div className={`${CARD} p-5`}>
-        <button onClick={onCerrar} className={`${BTN} mb-4`}>
+        <Button variant="outline" size="sm" onClick={onCerrar} className="mb-4">
           ← Volver
-        </button>
+        </Button>
         <p className={AVISO}>
           El tipo «{widget.tipo}» ya no existe en el código. El widget queda guardado pero no se
           muestra.
@@ -546,14 +539,20 @@ function Editor({
 
   const cat = catDe(tipo.categoria)
   const reglas = widget.reglas ?? {}
+  // Avisos de carga (no bloquean guardar). Se recalculan en cada tecla, como la vista previa.
+  const avisos = validarConfig(tipo, widget.config)
 
   return (
-    <div>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+    >
       {/* Barra del editor: siempre visible qué se está tocando y si está al aire. */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <button onClick={onCerrar} className={BTN}>
+        <Button variant="outline" size="sm" onClick={onCerrar}>
           ← Todos los widgets
-        </button>
+        </Button>
         <span
           className="flex h-8 w-8 items-center justify-center rounded-xl text-base leading-none"
           style={{ background: `${cat.color}22` }}
@@ -562,27 +561,45 @@ function Editor({
           {iconoDe(widget.tipo)}
         </span>
         <span className={SUBSECCION}>{tipo.nombre}</span>
-        <button
-          onClick={onToggle}
-          className="ml-auto flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all"
-          style={
-            activo
-              ? { background: 'rgba(16,185,129,0.10)', borderColor: 'rgba(16,185,129,0.35)', color: '#059669' }
-              : { background: '#f4f4f1', borderColor: '#e7e7e2', color: '#737373' }
-          }
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${activo ? 'bg-emerald-500' : 'bg-[#a3a3a0]'}`} />
-          {activo ? 'Al aire' : 'Apagado'}
-        </button>
-        <button
-          onClick={onGuardar}
-          disabled={guardando}
-          className="rounded-md px-4 py-1.5 text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
-          style={{ background: '#171717' }}
-        >
+        <div className="ml-auto flex items-center gap-2">
+          <Switch checked={activo} onCheckedChange={onToggle} />
+          <span className={`text-xs font-medium ${activo ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+            {activo ? 'Al aire' : 'Apagado'}
+          </span>
+        </div>
+        <Button size="sm" onClick={onGuardar} disabled={guardando}>
           {guardando ? 'Guardando…' : 'Guardar cambios'}
-        </button>
+        </Button>
       </div>
+
+      {/* Avisos de carga: lo que es válido pero casi seguro un error (un WhatsApp corto, una
+          fecha ya vencida, un envío gratis en $0). No traban guardar; son para no publicar un
+          widget que no se va a ver. Aparecen y se van con la edición. */}
+      <AnimatePresence initial={false}>
+        {avisos.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="mb-4 overflow-hidden"
+          >
+            <div className="space-y-1.5 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5">
+              {avisos.map((a, i) => (
+                <div key={i} className="flex items-start gap-2 text-[13px] leading-relaxed">
+                  <span
+                    className={`mt-px text-[10px] leading-4 ${a.nivel === 'error' ? 'text-red-500' : 'text-amber-600'}`}
+                    aria-hidden
+                  >
+                    {a.nivel === 'error' ? '●' : '▲'}
+                  </span>
+                  <span className="text-[#5b4a2f]">{a.mensaje}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-start">
         {/* ── Columna de configuración ───────────────────────────── */}
@@ -598,8 +615,7 @@ function Editor({
           <div className={`${CARD} space-y-5 p-4`}>
             <div>
               <label className={LABEL}>Nombre interno</label>
-              <input
-                className={INPUT}
+              <Input
                 value={widget.nombre}
                 onChange={e => onCambio({ ...widget, nombre: e.target.value })}
               />
@@ -665,17 +681,19 @@ function Editor({
 
               <div>
                 <label className={LABEL}>Dispositivo</label>
-                <select
-                  className={INPUT}
+                <Select
                   value={reglas.dispositivo ?? 'todos'}
-                  onChange={e =>
-                    onCambio({ ...widget, reglas: { ...reglas, dispositivo: e.target.value } })
-                  }
+                  onValueChange={v => onCambio({ ...widget, reglas: { ...reglas, dispositivo: String(v) } })}
                 >
-                  <option value="todos">Todos</option>
-                  <option value="movil">Solo celular</option>
-                  <option value="escritorio">Solo escritorio</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="movil">Solo celular</SelectItem>
+                    <SelectItem value="escritorio">Solo escritorio</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
@@ -687,18 +705,16 @@ function Editor({
                 <div className="flex gap-3">
                   <div>
                     <label className="mb-1 block text-[11px] text-[#737373]">Desde</label>
-                    <input
+                    <Input
                       type="date"
-                      className={INPUT}
                       value={(reglas.desde ?? '').slice(0, 10)}
                       onChange={e => onCambio({ ...widget, reglas: { ...reglas, desde: e.target.value } })}
                     />
                   </div>
                   <div>
                     <label className="mb-1 block text-[11px] text-[#737373]">Hasta</label>
-                    <input
+                    <Input
                       type="date"
-                      className={INPUT}
                       value={(reglas.hasta ?? '').slice(0, 10)}
                       onChange={e => onCambio({ ...widget, reglas: { ...reglas, hasta: e.target.value } })}
                     />
@@ -709,9 +725,10 @@ function Editor({
           </details>
 
           <div className="flex items-center gap-4 px-1">
-            <button onClick={onBorrar} className="text-xs text-red-500 hover:text-red-600">
+            <Button variant="ghost" size="sm" onClick={onBorrar} className="text-destructive hover:text-destructive">
+              <Trash2 />
               Borrar widget
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -721,6 +738,6 @@ function Editor({
           <VistaPrevia tipo={widget.tipo} config={widget.config} />
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

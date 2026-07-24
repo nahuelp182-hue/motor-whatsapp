@@ -112,6 +112,22 @@
     } catch (e) {}
   }
 
+  /* Envuelve un cambio de estado (rotar un mensaje, cruzar un umbral) para que el navegador
+     funda el antes con el después. Un `transition` de CSS no puede hacerlo: anima propiedades
+     de un mismo nodo, no sabe interpolar entre dos contenidos distintos. Donde no hay soporte
+     —o el visitante pidió menos movimiento— el cambio ocurre igual, sin animar: mejora
+     progresiva, riesgo cero. El nombre se limpia al terminar porque debe ser único en todo el
+     documento, aunque el widget viva en su propio Shadow DOM. */
+  function conTransicion(el, nombre, cambiar) {
+    try {
+      var menos = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!document.startViewTransition || menos) { cambiar(); return; }
+      el.style.viewTransitionName = nombre;
+      var vt = document.startViewTransition(cambiar);
+      vt.finished.finally(function () { try { el.style.viewTransitionName = ''; } catch (e) {} });
+    } catch (e) { cambiar(); }
+  }
+
   var esMovil = window.matchMedia('(max-width: 768px)').matches;
 
   /* ¿Corresponde mostrar este widget en esta página? Las fechas ya las filtró el servidor. */
@@ -239,7 +255,17 @@
 
   var BASE_CSS =
     ':host{all:initial}*{box-sizing:border-box;font-family:ui-sans-serif,system-ui,"Segoe UI",Helvetica,Arial,sans-serif}' +
-    'button{font:inherit;cursor:pointer;border:none}';
+    'button{font:inherit;cursor:pointer;border:none}' +
+    /* Entrada de los widgets de bloque: invisibles hasta que cruzan la pantalla (verUnaVez
+       les pone la clase mic-vis en ese momento, el mismo en que ya marcaba la impresión). El
+       gesto se elige desde el panel con data-anim; 'ninguna' no pone el atributo y no anima. */
+    ':host([data-anim]){opacity:0;will-change:opacity,transform}' +
+    ':host([data-anim].mic-vis){opacity:1;transform:none;transition:opacity .55s cubic-bezier(.22,.61,.36,1),transform .55s cubic-bezier(.22,.61,.36,1)}' +
+    ':host([data-anim="subir"]){transform:translateY(20px)}' +
+    ':host([data-anim="escala"]){transform:scale(.965)}' +
+    ':host([data-anim="lado"]){transform:translateX(-24px)}' +
+    /* Respeta a quien pidió menos movimiento: se ve completo, sin desplazamiento ni transición. */
+    '@media (prefers-reduced-motion:reduce){:host([data-anim]){opacity:1;transform:none}:host([data-anim].mic-vis){transition:none}}';
 
   function pintar(shadow, css, html) {
     shadow.innerHTML = '<style>' + BASE_CSS + css + '</style>' + html;
@@ -247,12 +273,17 @@
 
   /* Marca la impresión una sola vez, y recién cuando el widget entra en pantalla: una
      impresión que nadie vio no sirve para comparar widgets entre sí. */
-  function verUnaVez(shadow, id) {
+  function verUnaVez(shadow, id, anim) {
     var el = shadow.host;
-    if (!('IntersectionObserver' in window)) { evento(id, 'impresion'); return; }
+    // Estado inicial de la entrada. Sin dato, el gesto por defecto es 'subir'; 'ninguna' apaga
+    // la animación (el widget aparece de una). El CSS de :host([data-anim]) lo deja invisible.
+    if (anim == null) anim = 'subir';
+    if (anim !== 'ninguna') el.setAttribute('data-anim', anim);
+    function revelar() { el.classList.add('mic-vis'); }
+    if (!('IntersectionObserver' in window)) { revelar(); evento(id, 'impresion'); return; }
     var obs = new IntersectionObserver(function (entradas) {
       for (var i = 0; i < entradas.length; i++) {
-        if (entradas[i].isIntersecting) { evento(id, 'impresion'); obs.disconnect(); }
+        if (entradas[i].isIntersecting) { revelar(); evento(id, 'impresion'); obs.disconnect(); }
       }
     }, { threshold: 0.4 });
     obs.observe(el);
@@ -300,7 +331,7 @@
 
     var a = sh.querySelector('a');
     if (a) a.addEventListener('click', function () { evento(w.id, 'interaccion'); evento(w.id, 'conversion'); });
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.beneficios = function (w) {
@@ -315,7 +346,7 @@
       '.i{flex:0 0 auto;font-size:17px}' +
       'h3{margin:0 0 14px;font-size:18px;color:' + p.bg + '}',
       (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') + '<ul>' + items + '</ul>');
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.garantia = function (w) {
@@ -328,7 +359,7 @@
       'span.t{font-size:13.5px;line-height:1.55;color:#5a534a}',
       '<div class="g"><div class="e">' + esc(c.icono || '🛡️') + '</div><div>' +
       '<b>' + esc(c.titulo) + '</b><span class="t">' + esc(c.texto) + '</span></div></div>');
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.faq = function (w) {
@@ -350,7 +381,7 @@
     sh.querySelectorAll('summary').forEach(function (s) {
       s.addEventListener('click', function () { evento(w.id, 'interaccion'); }, { once: true });
     });
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   /* Fila de 5 estrellas para un rating dado (o para elegir uno). `n` es cuántas van llenas.
@@ -494,7 +525,7 @@
 
     if (verFotos) montarLightbox(sh);
     if (conForm) montarFormResena(sh, w, c);
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   /* Clic en una foto de reseña → se ve en grande. Un solo overlay reutilizado. */
@@ -717,7 +748,7 @@
         });
       }
     } else {
-      verUnaVez(sh, w.id);
+      verUnaVez(sh, w.id, c.animacion);
     }
   };
 
@@ -757,7 +788,7 @@
       'span{font-size:13px;color:#5a534a}',
       '<div class="c"><b>' + n + ' cuotas de ' + esc(pesos(total / n)) + '</b>' +
       '<span>' + esc(c.texto || '') + '</span></div>');
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.envio_estimado = function (w) {
@@ -858,7 +889,7 @@
       (c.nota ? '<p class="nota">' + esc(c.nota) + '</p>' : '') +
       '</div>');
 
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.pasos = function (w) {
@@ -877,7 +908,7 @@
       'b{display:block;font-size:15.5px;color:#2a2620;margin-bottom:2px}' +
       'span{font-size:14px;line-height:1.55;color:#5a534a}',
       (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') + '<ol>' + items + '</ol>');
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.barra_confianza = function (w) {
@@ -895,7 +926,7 @@
       'b{display:block;font-size:13.5px;color:#2a2620;margin-bottom:2px}' +
       '.t{font-size:12px;line-height:1.45;color:#6a6157}',
       '<div class="g">' + items + '</div>');
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.comparador = function (w) {
@@ -916,7 +947,7 @@
       (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
       '<div class="w"><table><thead><tr><th></th><th>' + esc(c.col_a) + '</th>' +
       '<th class="b">' + esc(c.col_b) + '</th></tr></thead><tbody>' + filas + '</tbody></table></div>');
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.especificaciones = function (w) {
@@ -933,7 +964,7 @@
       'dd{margin:0;font-size:14px;color:#2a2620;font-weight:500}' +
       'h3{color:' + p.bg + '}',
       (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') + '<dl>' + filas + '</dl>');
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.banner_anuncio = function (w) {
@@ -962,12 +993,10 @@
     var m = sh.querySelector('.m'), n = 0;
     if (items.length > 1) {
       setInterval(function () {
-        m.classList.remove('on');
-        setTimeout(function () {
+        conTransicion(m, 'mic-ban-' + w.id, function () {
           n = (n + 1) % items.length;
           m.textContent = items[n].texto;
-          m.classList.add('on');
-        }, 400);
+        });
       }, Math.max(2, Number(c.segundos) || 5) * 1000);
     }
     var x = sh.querySelector('.x');
@@ -1012,7 +1041,7 @@
     }
     tic();
     setInterval(tic, 1000);
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.video = function (w) {
@@ -1043,7 +1072,7 @@
         'src="https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1"></iframe>';
       evento(w.id, 'interaccion');
     }, { once: true });
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   /* ── Carrito de Tiendanube ──
@@ -1105,9 +1134,12 @@
       caja.style.display = '';
       var falta = objetivo - total;
       barra.style.width = Math.min(100, (total / objetivo) * 100) + '%';
-      txt.innerHTML = falta > 0
-        ? esc(c.texto_falta || 'Te falta') + ' <b>' + esc(pesos(falta)) + '</b>'
-        : '<b>' + esc(c.texto_logrado || '¡Envío gratis!') + '</b>';
+      // Al cruzar el umbral, el texto muta con un crossfade en vez de saltar de golpe.
+      conTransicion(txt, 'mic-prog-' + w.id, function () {
+        txt.innerHTML = falta > 0
+          ? esc(c.texto_falta || 'Te falta') + ' <b>' + esc(pesos(falta)) + '</b>'
+          : '<b>' + esc(c.texto_logrado || '¡Envío gratis!') + '</b>';
+      });
       if (!contado) { contado = true; evento(w.id, 'impresion'); }
     });
   };
@@ -1195,7 +1227,7 @@
       })();
     });
 
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   /* Gente viendo ahora.
@@ -1254,7 +1286,7 @@
           '@media (prefers-reduced-motion:reduce){.d{animation:none}}',
           '<div class="v"><span class="d"></span><span class="t"></span></div>');
         texto = sh.querySelector('.t');
-        verUnaVez(sh, w.id);
+        verUnaVez(sh, w.id, c.animacion);
       }
       texto.textContent = frase;
       if (!visible) { sh.host.style.display = ''; visible = true; }
@@ -1356,7 +1388,7 @@
         location.href = '/carrito/';
       });
     });
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.crosssell_carrito = function (w) {
@@ -1398,7 +1430,7 @@
           '.pr{font-size:14px;font-weight:600;white-space:nowrap;margin-right:8px}' +
           'button{padding:8px 14px;background:' + p.bg + ';color:' + p.texto + ';border-radius:8px;font-size:13px;font-weight:600;white-space:nowrap}',
           '<div class="c"><h3>' + esc(c.titulo) + '</h3><div class="lista"></div></div>');
-        verUnaVez(sh, w.id);
+        verUnaVez(sh, w.id, c.animacion);
       }
 
       sh.host.style.display = '';
@@ -1553,7 +1585,7 @@
       }, { threshold: 0.25 }).observe(v);
     }
 
-    verUnaVez(sh, w.id);
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   /* ══════════════ ARRANQUE ══════════════ */

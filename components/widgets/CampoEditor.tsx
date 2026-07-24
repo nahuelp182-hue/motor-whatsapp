@@ -2,14 +2,28 @@
 
 import { PALETA, UBICACIONES, DESTINOS, EMOJIS, PROPORCIONES, type Campo } from '@/lib/widgets/tipos'
 import { SubirMedia } from './SubirMedia'
-import { INPUT, LABEL, AYUDA, AVISO } from './ui'
+import { cn } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { ArrowUp, ArrowDown, Trash2, Plus } from 'lucide-react'
 
 // Formulario genérico: dibuja UN campo a partir de su declaración en lib/widgets/tipos.ts.
 // Ningún tipo de widget tiene formulario propio. Agregar un tipo nuevo no toca este archivo
 // mientras use los tipos de campo ya soportados — que es justo el punto del diseño.
 //
-// Estilos: sistema "Neutro premium + salvia" (ver ./ui). Fondo claro, hairline #e7e7e2,
-// selección con salvia. El acento activo se dibuja con la variable --ac que fija la página.
+// Construido sobre shadcn/ui (base-ui): Input, Textarea, Select, Switch, Button, Label. El
+// color primario de shadcn está teñido de salvia en app/globals.css, así que el foco y los
+// controles salen con la identidad de marca sin estilar cada uno a mano.
 
 export type Producto = { id: string; nombre: string; precio: number; imagen: string | null }
 
@@ -24,56 +38,75 @@ type Props = {
   onChange: (v: unknown) => void
 }
 
-const input = INPUT
+// Texto de ayuda debajo del campo, siempre en renglón aparte: es la diferencia entre poder
+// configurar un widget sin preguntarle a nadie y tener que adivinar qué hace cada casilla.
+const AYUDA = 'mt-1.5 text-[13px] leading-relaxed text-muted-foreground'
+const AVISO = 'text-xs leading-relaxed text-amber-600'
+const ETIQUETA = 'mb-1.5 text-[13px] font-medium text-foreground'
+
+// base-ui Select trata el string vacío como "sin selección". Varios campos usan '' como un
+// valor real ("Sin enlace"), así que se mapea a un centinela solo mientras vive en el Select.
+const NADA = '__nada__'
+
+function SelectCampo({
+  value,
+  onChange,
+  opciones,
+  placeholder,
+}: {
+  value: string
+  onChange: (v: string) => void
+  opciones: readonly { value: string; label: string }[]
+  placeholder?: string
+}) {
+  return (
+    <Select value={value === '' ? NADA : value} onValueChange={v => onChange(v === NADA ? '' : String(v))}>
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {opciones.map(o => (
+          <SelectItem key={o.value} value={o.value === '' ? NADA : o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
 
 export function CampoEditor({ campo, valor, productos = [], config, onChange }: Props) {
-  // La ayuda va SIEMPRE debajo del campo y en renglón aparte, no como texto gris al lado
-  // del rótulo. Es la diferencia entre poder configurar un widget sin preguntarle a nadie y
-  // tener que acordarse de qué hacía cada casilla.
   const ayuda = campo.ayuda ? <p className={AYUDA}>{campo.ayuda}</p> : null
 
+  // ── Booleano: switch de shadcn ────────────────────────────────────────────
   if (campo.tipo === 'booleano') {
     const prendido = valor === true
     return (
       <div className="py-1">
-        <label className="flex cursor-pointer items-center gap-3 text-sm text-[#3f3f3c]">
-          <button
-            type="button"
-            onClick={() => onChange(!prendido)}
-            className={`h-5 w-9 shrink-0 rounded-full transition ${
-              prendido ? 'bg-emerald-500' : 'bg-[#d4d4d0]'
-            }`}
-          >
-            <span
-              className={`block h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                prendido ? 'translate-x-[18px]' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
-          <span onClick={() => onChange(!prendido)}>{campo.label}</span>
-        </label>
-        {campo.ayuda && <p className={`ml-12 ${AYUDA}`}>{campo.ayuda}</p>}
+        <div className="flex items-center gap-3">
+          <Switch checked={prendido} onCheckedChange={v => onChange(v === true)} />
+          <Label className="cursor-pointer text-sm text-foreground" onClick={() => onChange(!prendido)}>
+            {campo.label}
+          </Label>
+        </div>
+        {campo.ayuda && <p className={`ml-[44px] ${AYUDA}`}>{campo.ayuda}</p>}
       </div>
     )
   }
 
-  const etiqueta = <label className={LABEL}>{campo.label}</label>
+  const etiqueta = <Label className={ETIQUETA}>{campo.label}</Label>
 
-  // Dónde se inserta el widget: se elige mirando un dibujo de la página, no escribiendo
-  // HTML. Antes esto era un <div data-mic-slot="..."> que había que pegar a mano en cada
-  // página; el dibujo dice exactamente lo mismo sin pedirle código a nadie.
+  // ── Ubicación: se elige mirando un dibujo de la página, no escribiendo HTML ─
   if (campo.tipo === 'ubicacion') {
     const actual = String(valor ?? 'final')
     const elegida = UBICACIONES.find(u => u.value === actual) ?? UBICACIONES[4]
+    const filas = ['inicio', 'tras_intro', 'medio', 'antes_final', 'final']
     return (
       <div>
         {etiqueta}
         <div className="flex flex-wrap gap-2">
           {UBICACIONES.map(u => {
             const activo = u.value === actual
-            // Miniatura de la página: renglones grises de texto y una banda de color donde
-            // caería el widget.
-            const filas = ['inicio', 'tras_intro', 'medio', 'antes_final', 'final']
             const posicion = filas.indexOf(u.value)
             return (
               <button
@@ -81,29 +114,23 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
                 type="button"
                 onClick={() => onChange(u.value)}
                 title={u.ayuda}
-                className="w-[104px] rounded-xl border p-2 text-left transition-all"
-                style={{
-                  borderColor: activo ? 'rgb(var(--ac) / 0.55)' : '#e7e7e2',
-                  background: activo ? '#eef1e9' : '#fff',
-                }}
+                className={cn(
+                  'w-[104px] rounded-xl border p-2 text-left transition-all',
+                  activo ? 'border-primary/55 bg-primary/8 ring-2 ring-primary/15' : 'border-border bg-card hover:border-foreground/20',
+                )}
               >
-                <div className="mb-1.5 space-y-[3px] rounded-md bg-[#f0f0ec] p-1.5">
+                <div className="mb-1.5 space-y-[3px] rounded-md bg-muted p-1.5">
                   {[0, 1, 2, 3, 4].map(i => (
                     <div
                       key={i}
-                      className={
-                        i === posicion
-                          ? 'h-2 rounded-sm'
-                          : `h-[3px] rounded-sm bg-[#cfcfc9] ${i % 2 ? 'w-3/4' : 'w-full'}`
-                      }
-                      style={i === posicion ? { background: 'rgb(var(--ac))' } : undefined}
+                      className={cn(
+                        i === posicion ? 'h-2 rounded-sm bg-primary' : 'h-[3px] rounded-sm bg-border',
+                        i !== posicion && (i % 2 ? 'w-3/4' : 'w-full'),
+                      )}
                     />
                   ))}
                 </div>
-                <span
-                  className="block text-[11px] leading-tight"
-                  style={{ color: activo ? '#171717' : '#737373' }}
-                >
+                <span className={cn('block text-[11px] leading-tight', activo ? 'text-foreground' : 'text-muted-foreground')}>
                   {u.label}
                 </span>
               </button>
@@ -116,30 +143,19 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
     )
   }
 
-  // Destino de un enlace: lista cerrada de páginas reales. Escribir la dirección a mano es
-  // la forma más fácil de mandar a los visitantes a una página que no existe.
+  // ── Enlace: lista cerrada de páginas reales ────────────────────────────────
   if (campo.tipo === 'enlace') {
     return (
       <div>
         {etiqueta}
-        <select className={input} value={String(valor ?? '')} onChange={e => onChange(e.target.value)}>
-          {DESTINOS.map(d => (
-            <option key={d.value} value={d.value}>
-              {d.label}
-            </option>
-          ))}
-        </select>
+        <SelectCampo value={String(valor ?? '')} onChange={onChange} opciones={DESTINOS} />
         {ayuda}
       </div>
     )
   }
 
-  // Producto del catálogo real. Nunca se escribe un id: un id mal tipeado no falla a la
-  // vista, deja el widget ofreciendo algo que no existe.
-  // Subida de archivo: la conversión y el tope de peso viven en SubirMedia.
+  // ── Media: la conversión y el tope de peso viven en SubirMedia ─────────────
   if (campo.tipo === 'media') {
-    // La medida sugerida sale de la proporción que el widget ya tenga elegida, así el
-    // número que se muestra es el que corresponde y no una tabla genérica.
     const prop = PROPORCIONES.find(x => x.value === String(config?.proporcion ?? '16:9'))
     return (
       <SubirMedia
@@ -152,72 +168,54 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
     )
   }
 
+  // ── Producto del catálogo real ─────────────────────────────────────────────
   if (campo.tipo === 'producto') {
     const elegido = productos.find(p => p.id === String(valor ?? ''))
+    const opciones = productos.map(p => ({
+      value: p.id,
+      label: p.precio ? `${p.nombre} — $${p.precio.toLocaleString('es-AR')}` : p.nombre,
+    }))
     return (
       <div>
         {etiqueta}
         <div className="flex items-center gap-2">
           {elegido?.imagen && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={elegido.imagen}
-              alt=""
-              className="h-11 w-11 shrink-0 rounded-lg border border-[#e7e7e2] object-cover"
-            />
+            <img src={elegido.imagen} alt="" className="h-11 w-11 shrink-0 rounded-lg border border-border object-cover" />
           )}
-          <select
-            className={input}
-            value={String(valor ?? '')}
-            onChange={e => onChange(e.target.value)}
-          >
-            <option value="">Elegí un producto…</option>
-            {productos.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-                {p.precio ? ` — $${p.precio.toLocaleString('es-AR')}` : ''}
-              </option>
-            ))}
-          </select>
+          <div className="flex-1">
+            <SelectCampo
+              value={String(valor ?? '')}
+              onChange={onChange}
+              opciones={opciones}
+              placeholder="Elegí un producto…"
+            />
+          </div>
         </div>
         {productos.length === 0 && (
-          <p className={`mt-1.5 ${AVISO}`}>
-            No se pudo leer el catálogo de Tiendanube. Recargá en un rato.
-          </p>
+          <p className={`mt-1.5 ${AVISO}`}>No se pudo leer el catálogo de Tiendanube. Recargá en un rato.</p>
         )}
         {ayuda}
       </div>
     )
   }
 
+  // ── Emoji: paleta corta de marca ───────────────────────────────────────────
   if (campo.tipo === 'emoji') {
+    const chip = (activo: boolean) =>
+      cn(
+        'flex h-9 w-9 items-center justify-center rounded-lg border leading-none transition-all',
+        activo ? 'border-primary/55 bg-primary/8 ring-2 ring-primary/15' : 'border-border bg-card hover:border-foreground/20',
+      )
     return (
       <div>
         {etiqueta}
         <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => onChange('')}
-            className="h-9 w-9 rounded-lg border text-xs text-[#737373] transition-all"
-            style={{
-              borderColor: !valor ? 'rgb(var(--ac) / 0.55)' : '#e7e7e2',
-              background: !valor ? '#eef1e9' : '#fff',
-            }}
-            title="Sin emoji"
-          >
+          <button type="button" onClick={() => onChange('')} className={cn(chip(!valor), 'text-xs text-muted-foreground')} title="Sin emoji">
             —
           </button>
           {EMOJIS.map(e => (
-            <button
-              key={e}
-              type="button"
-              onClick={() => onChange(e)}
-              className="h-9 w-9 rounded-lg border text-lg leading-none transition-all"
-              style={{
-                borderColor: valor === e ? 'rgb(var(--ac) / 0.55)' : '#e7e7e2',
-                background: valor === e ? '#eef1e9' : '#fff',
-              }}
-            >
+            <button key={e} type="button" onClick={() => onChange(e)} className={cn(chip(valor === e), 'text-lg')}>
               {e}
             </button>
           ))}
@@ -227,50 +225,58 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
     )
   }
 
+  // ── Lista: ítems repetibles con reordenar y borrar ─────────────────────────
   if (campo.tipo === 'lista') {
     const items = Array.isArray(valor) ? (valor as Record<string, unknown>[]) : []
     const tope = campo.maxItems ?? 20
     return (
-      <div className="rounded-xl border border-[#e7e7e2] bg-[#fafafa] p-3.5">
+      <div className="rounded-xl border border-border bg-muted/40 p-3.5">
         {etiqueta}
         {ayuda}
         <div className="mt-3 space-y-3">
           {items.map((item, i) => (
-            <div key={i} className="rounded-xl border border-[#e7e7e2] bg-white p-3">
+            <div key={i} className="rounded-xl border border-border bg-card p-3">
               <div className="mb-2.5 flex items-center justify-between">
-                <span className="font-mono text-[11px] text-[#a3a3a0]">#{i + 1}</span>
-                <div className="flex items-center gap-2 text-xs">
-                  <button
+                <span className="font-mono text-[11px] text-muted-foreground">#{i + 1}</span>
+                <div className="flex items-center gap-0.5">
+                  <Button
                     type="button"
-                    className="text-[#737373] hover:text-[#171717] disabled:opacity-25"
+                    variant="ghost"
+                    size="icon-xs"
                     disabled={i === 0}
+                    aria-label="Subir"
                     onClick={() => {
                       const c = [...items]
                       ;[c[i - 1], c[i]] = [c[i], c[i - 1]]
                       onChange(c)
                     }}
                   >
-                    ↑
-                  </button>
-                  <button
+                    <ArrowUp />
+                  </Button>
+                  <Button
                     type="button"
-                    className="text-[#737373] hover:text-[#171717] disabled:opacity-25"
+                    variant="ghost"
+                    size="icon-xs"
                     disabled={i === items.length - 1}
+                    aria-label="Bajar"
                     onClick={() => {
                       const c = [...items]
                       ;[c[i + 1], c[i]] = [c[i], c[i + 1]]
                       onChange(c)
                     }}
                   >
-                    ↓
-                  </button>
-                  <button
+                    <ArrowDown />
+                  </Button>
+                  <Button
                     type="button"
-                    className="text-red-500 hover:text-red-600"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-destructive hover:text-destructive"
+                    aria-label="Borrar"
                     onClick={() => onChange(items.filter((_, j) => j !== i))}
                   >
-                    Borrar
-                  </button>
+                    <Trash2 />
+                  </Button>
                 </div>
               </div>
               <div className="space-y-3">
@@ -291,42 +297,32 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
             </div>
           ))}
         </div>
-        <button
-          type="button"
-          className="mt-3 rounded-md border border-[#e7e7e2] bg-white px-3 py-1.5 text-xs text-[#3f3f3c] transition-all hover:border-[#171717]/25 hover:text-[#171717] disabled:opacity-30"
-          disabled={items.length >= tope}
-          onClick={() => onChange([...items, {}])}
-        >
-          + Agregar
-        </button>
+        <Button type="button" variant="outline" size="sm" className="mt-3" disabled={items.length >= tope} onClick={() => onChange([...items, {}])}>
+          <Plus />
+          Agregar
+        </Button>
       </div>
     )
   }
 
+  // ── Campos simples ─────────────────────────────────────────────────────────
   return (
     <div>
       {etiqueta}
       {campo.tipo === 'textarea' ? (
-        <textarea
-          className={input}
+        <Textarea
           rows={3}
           value={String(valor ?? '')}
           placeholder={campo.placeholder}
           onChange={e => onChange(e.target.value)}
         />
       ) : campo.tipo === 'select' ? (
-        <select className={input} value={String(valor ?? '')} onChange={e => onChange(e.target.value)}>
-          {(campo.opciones ?? []).map(o => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <SelectCampo value={String(valor ?? '')} onChange={onChange} opciones={campo.opciones ?? []} />
       ) : campo.tipo === 'color' ? (
-        // La paleta de marca primero, y un código propio para lo puntual (un evento, una
-        // fecha). El orden importa: lo de marca es el camino fácil, el color libre es el
-        // desvío deliberado.
         <div>
+          {/* La paleta de marca primero, y un código propio para lo puntual (un evento, una
+              fecha). El orden importa: lo de marca es el camino fácil, el color libre es el
+              desvío deliberado. */}
           <div className="flex flex-wrap items-center gap-2">
             {PALETA.map(p => (
               <button
@@ -337,17 +333,17 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
                 className="h-8 w-8 rounded-full border-2 transition-all"
                 style={{
                   background: p.hex,
-                  borderColor: valor === p.value ? '#171717' : '#e7e7e2',
-                  boxShadow: valor === p.value ? '0 0 0 3px rgba(23,23,23,0.10)' : undefined,
+                  borderColor: valor === p.value ? 'var(--foreground)' : 'var(--border)',
+                  boxShadow: valor === p.value ? '0 0 0 3px color-mix(in oklch, var(--foreground) 12%, transparent)' : undefined,
                 }}
               />
             ))}
-            <span className="mx-1 h-6 w-px bg-[#e7e7e2]" />
+            <span className="mx-1 h-6 w-px bg-border" />
             <label
-              className="flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-1"
-              style={{
-                borderColor: String(valor ?? '').startsWith('#') ? '#171717' : '#e7e7e2',
-              }}
+              className={cn(
+                'flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-1',
+                String(valor ?? '').startsWith('#') ? 'border-foreground' : 'border-border',
+              )}
               title="Elegir un color propio"
             >
               <input
@@ -356,47 +352,36 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
                 value={String(valor ?? '').startsWith('#') ? String(valor) : '#6f8a5f'}
                 onChange={e => onChange(e.target.value)}
               />
-              <span className="text-xs text-[#3f3f3c]">Otro color</span>
+              <span className="text-xs text-foreground">Otro color</span>
             </label>
-            <input
+            <Input
               type="text"
               placeholder="#a1b2c3"
               maxLength={7}
-              className="w-24 rounded-lg border border-[#e7e7e2] bg-white px-2 py-1 font-mono text-xs uppercase text-[#171717] placeholder:text-[#a3a3a0] focus:border-[#6f8a5f] focus:outline-none"
+              className="w-24 font-mono text-xs uppercase"
               value={String(valor ?? '').startsWith('#') ? String(valor) : ''}
               onChange={e => {
                 const v = e.target.value.trim()
-                // Se avisa recién con el código completo: marcar en rojo mientras todavía
-                // lo está escribiendo es ruido, no ayuda.
                 onChange(v === '' ? 'sage' : v.startsWith('#') ? v : '#' + v)
               }}
             />
           </div>
-          {String(valor ?? '').startsWith('#') &&
-            !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(String(valor)) && (
-              <p className={`mt-1.5 ${AVISO}`}>
-                Código incompleto. Va con almohadilla y seis dígitos, por ejemplo #b0341d. Si se
-                guarda así, vuelve al color de marca.
-              </p>
-            )}
+          {String(valor ?? '').startsWith('#') && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(String(valor)) && (
+            <p className={`mt-1.5 ${AVISO}`}>
+              Código incompleto. Va con almohadilla y seis dígitos, por ejemplo #b0341d. Si se guarda así, vuelve al color de marca.
+            </p>
+          )}
         </div>
       ) : campo.tipo === 'numero' ? (
-        <input
+        <Input
           type="number"
-          className={input}
           value={Number(valor ?? 0)}
           min={campo.min}
           max={campo.max}
           onChange={e => onChange(Number(e.target.value))}
         />
       ) : (
-        <input
-          type="text"
-          className={input}
-          value={String(valor ?? '')}
-          placeholder={campo.placeholder}
-          onChange={e => onChange(e.target.value)}
-        />
+        <Input type="text" value={String(valor ?? '')} placeholder={campo.placeholder} onChange={e => onChange(e.target.value)} />
       )}
       {ayuda}
     </div>
