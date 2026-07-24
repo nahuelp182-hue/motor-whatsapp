@@ -6,8 +6,10 @@ import { uploadClickConversion } from './GoogleAdsConversionService'
 type TNProduct = { product_id: number; name: string }
 type TNOrder = {
   id: number
+  number?: number
   contact_name: string
   contact_phone: string
+  contact_email?: string
   total: string
   checkout_url?: string
   products: TNProduct[]
@@ -19,6 +21,36 @@ type TNOrder = {
   shipping_status?: string | null
   shipped_at?: string | null
   updated_at?: string | null
+  // Método de pago (para detectar transferencia/depósito):
+  gateway?: string | null
+  gateway_name?: string | null
+  payment_details?: { method?: string | null } | null
+  payment_method_name?: string | null
+  payment_provider_name?: string | null
+  customer?: { name?: string; phone?: string | null } | null
+}
+
+// Plantillas de Meta (aprobadas) para el flujo de transferencia. Editables por env.
+const TEMPLATE_TRANSFER = process.env.WA_TPL_TRANSFER ?? 'datos_transferencia'
+const TEMPLATE_TRANSFER_REMINDER = process.env.WA_TPL_TRANSFER_REMINDER ?? 'recordatorio_transferencia'
+const TEMPLATE_LANG = process.env.WA_TPL_LANG ?? 'es_AR'
+
+// ¿El pedido se paga por transferencia/depósito bancario? Chequea varios campos
+// posibles del pedido (REST v1 usa gateway/gateway_name/payment_details; el nombre
+// del método aparece como "Transferencia o depósito bancario").
+function esTransferencia(o: TNOrder): boolean {
+  const txt = [
+    o.gateway, o.gateway_name, o.payment_details?.method,
+    o.payment_method_name, o.payment_provider_name,
+  ].filter(Boolean).join(' ').toLowerCase()
+  return /transfer|dep[oó]sito|wire_transfer/.test(txt)
+}
+
+// Formatea un total de Tiendanube ("250559.13") como moneda AR: "$ 250.559,13".
+function fmtARS(total: string | number): string {
+  const n = typeof total === 'number' ? total : parseFloat(total)
+  if (!isFinite(n)) return String(total)
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 }).format(n)
 }
 
 // ── WhatsApp Cloud API ────────────────────────────────────────────────────────
@@ -97,6 +129,146 @@ async function sendWhatsAppTemplate(
 // ── Servicio ──────────────────────────────────────────────────────────────────
 export class CampaignService {
   constructor(private store: Store) {}
+
+  /**
+   * TRANSFERENCIA — order/created
+   * Apenas se crea un pedido que se paga por TRANSFERENCIA/DEPÓSITO (y aún no está
+   * pago), le mandamos por WhatsApp los datos bancarios + cómo enviar el comprobante.
+   * Objetivo: que no tenga que volver a buscar el alias/CVU (antes se perdían y caían
+   * al flujo de "carrito abandonado"). Idempotente por pedido.
+   */
+  async handleOrderCreated(data: TNOrder) {
+    // El webhook order/created de TN suele traer solo { store_id, event, id }: si faltan
+    // datos del pedido, lo traemos completo por API.
+    const order = data.contact_phone && data.total ? data : (await this.fetchOrderById(data.id) ?? data)
+
+    if (!esTransferencia(order)) return          // solo transferencia/depósito
+    if (order.payment_status === 'paid') return  // ya pagó, no hace falta
+    if (order.status === 'cancelled') return
+
+    const phone = order.contact_phone || order.customer?.phone || ''
+    if (!phone) return
+
+    const campaign = await this.getActiveCampaign(CampaignType.RECOVERY)
+    if (!campaign) return // reutilizamos la campaña RECOVERY como ancla (trae el phone_number_id)
+
+    const norm: TNOrder = {
+      ...order,
+      contact_name: order.contact_name || order.customer?.name || 'Cliente',
+      contact_phone: phone,
+    }
+    const customer = await this.upsertCustomer(norm)
+    await this.enviarInstruccionesTransferencia(norm, customer, campaign)
+  }
+
+  private async fetchOrderById(id: string | number): Promise<TNOrder | null> {
+    try {
+      const res = await fetch(
+        `https://api.tiendanube.com/v1/${this.store.tiendanube_store_id}/orders/${id}`,
+        {
+          headers: {
+            Authentication: `bearer ${this.store.tiendanube_access_token}`,
+            'User-Agent': 'MotorWhatsApp (nahuelp182@gmail.com)',
+          },
+        }
+      )
+      if (!res.ok) return null
+      return (await res.json()) as TNOrder
+    } catch {
+      return null
+    }
+  }
+
+  // Envía la plantilla con los datos bancarios. Idempotente: no reenvía si ya se mandó
+  // para ESTE pedido (marca 'order:<id>' en error_details). Devuelve true si salió.
+  private async enviarInstruccionesTransferencia(
+    order: TNOrder,
+    customer: { id: string; nombre: string; telefono: string },
+    campaign: { id: string; configuracion: unknown }
+  ): Promise<boolean> {
+    const marca = `order:${order.id}`
+    const previos = await prisma.messageLog.findMany({
+      where: {
+        store_id: this.store.id, customer_id: customer.id, campaign_id: campaign.id,
+        tipo_evento: 'transfer_instructions', error_details: { contains: marca },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (previos.some((l) => l.estado === 'SENT')) return false // ya se envió OK
+    // Reintento de un envío fallido (ej. plantilla aún no aprobada): no antes de 6 h.
+    if (previos[0] && (Date.now() - previos[0].createdAt.getTime()) / 3_600_000 < 6) return false
+
+    const config = campaign.configuracion as { wa_phone_number_id: string }
+    const firstName = (customer.nombre || 'Hola').split(' ')[0]
+
+    const log = await prisma.messageLog.create({
+      data: {
+        store_id: this.store.id, customer_id: customer.id, campaign_id: campaign.id,
+        estado: 'PENDING', tipo_evento: 'transfer_instructions', error_details: marca,
+      },
+    })
+    const result = await sendWhatsAppTemplate(
+      config.wa_phone_number_id,
+      this.store.whatsapp_api_token,
+      customer.telefono,
+      TEMPLATE_TRANSFER,
+      TEMPLATE_LANG,
+      [firstName, String(order.number ?? order.id), fmtARS(order.total)]
+    )
+    await prisma.messageLog.update({
+      where: { id: log.id },
+      data: {
+        estado: result.ok ? 'SENT' : 'FAILED',
+        error_details: result.ok ? marca : `${marca} ${result.error}`,
+      },
+    })
+    return result.ok
+  }
+
+  // Recordatorio único de pago pendiente (reemplaza el "carrito abandonado" para las
+  // compras por transferencia). Idempotente por pedido.
+  private async enviarRecordatorioTransferencia(
+    order: TNOrder,
+    customer: { id: string; nombre: string; telefono: string },
+    campaign: { id: string; configuracion: unknown }
+  ): Promise<boolean> {
+    const marca = `order:${order.id}`
+    const previos = await prisma.messageLog.findMany({
+      where: {
+        store_id: this.store.id, customer_id: customer.id, campaign_id: campaign.id,
+        tipo_evento: 'transfer_reminder', error_details: { contains: marca },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (previos.some((l) => l.estado === 'SENT')) return false
+    if (previos[0] && (Date.now() - previos[0].createdAt.getTime()) / 3_600_000 < 6) return false
+
+    const config = campaign.configuracion as { wa_phone_number_id: string }
+    const firstName = (customer.nombre || 'Hola').split(' ')[0]
+
+    const log = await prisma.messageLog.create({
+      data: {
+        store_id: this.store.id, customer_id: customer.id, campaign_id: campaign.id,
+        estado: 'PENDING', tipo_evento: 'transfer_reminder', error_details: marca,
+      },
+    })
+    const result = await sendWhatsAppTemplate(
+      config.wa_phone_number_id,
+      this.store.whatsapp_api_token,
+      customer.telefono,
+      TEMPLATE_TRANSFER_REMINDER,
+      TEMPLATE_LANG,
+      [firstName, String(order.number ?? order.id), fmtARS(order.total)]
+    )
+    await prisma.messageLog.update({
+      where: { id: log.id },
+      data: {
+        estado: result.ok ? 'SENT' : 'FAILED',
+        error_details: result.ok ? marca : `${marca} ${result.error}`,
+      },
+    })
+    return result.ok
+  }
 
   /**
    * RECOVERY — checkout/abandoned
@@ -181,6 +353,32 @@ export class CampaignService {
       if (!o.contact_phone || !o.created_at) continue
       const ageH = (Date.now() - new Date(o.created_at).getTime()) / 3_600_000
       const customer = await this.upsertCustomer(o)
+
+      // ── Compras por TRANSFERENCIA: no son carritos abandonados (la persona compró y
+      // eligió transferencia). Tienen su propio flujo: datos bancarios (fallback si el
+      // webhook order/created no llegó) + un único recordatorio de pago. Nunca el
+      // "carrito abandonado" genérico (sería contradictorio: "volvé a tu carrito").
+      if (esTransferencia(o)) {
+        const logsT = await prisma.messageLog.findMany({
+          where: {
+            store_id: this.store.id, customer_id: customer.id, campaign_id: campaign.id,
+            tipo_evento: { in: ['transfer_instructions', 'transfer_reminder'] },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+        const marca = `order:${o.id}`
+        const instrOk = logsT.find((l) => l.tipo_evento === 'transfer_instructions' && l.estado === 'SENT' && (l.error_details ?? '').includes(marca))
+        const reminOk = logsT.find((l) => l.tipo_evento === 'transfer_reminder' && l.estado === 'SENT' && (l.error_details ?? '').includes(marca))
+        if (!instrOk) {
+          await this.enviarInstruccionesTransferencia(o, customer, campaign) // fallback (webhook perdido o reintento)
+        } else if (!reminOk) {
+          const hSinceInstr = (Date.now() - instrOk.createdAt.getTime()) / 3_600_000
+          if (hSinceInstr >= 20 && ageH <= 72) {
+            await this.enviarRecordatorioTransferencia(o, customer, campaign)
+          }
+        }
+        continue
+      }
 
       const logs = await prisma.messageLog.findMany({
         where: {

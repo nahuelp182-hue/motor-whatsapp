@@ -40,6 +40,10 @@ export async function POST(req: NextRequest) {
     case 'checkout/abandoned':
       await service.handleAbandonedCart(body)
       break
+    case 'order/created':
+      // Pedidos por transferencia/depósito → datos bancarios al instante por WhatsApp.
+      await service.handleOrderCreated(body)
+      break
     case 'order/paid':
       await service.handleOrderPaid(body)
       break
