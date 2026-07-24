@@ -20,6 +20,7 @@
   function setDone() { try { localStorage.setItem(DONE_KEY, '1'); } catch (e) {} }
 
   var CSS =
+    "@import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500&display=swap');"+
     '.lm-ov{position:fixed;inset:0;background:rgba(20,18,15,.72);z-index:99999;display:flex;'+
     'align-items:center;justify-content:center;padding:16px;opacity:0;transition:opacity .25s}'+
     '.lm-ov.on{opacity:1}'+
@@ -29,8 +30,10 @@
     '.lm-ov.on .lm-card{transform:none}'+
     '.lm-x{position:absolute;top:12px;right:16px;color:#fff;font-size:24px;cursor:pointer;opacity:.8;line-height:1;z-index:2}'+
     '.lm-top{background:#1c1a17;color:#fff;padding:24px 28px 20px;text-align:center;position:relative}'+
-    '.lm-logo{font-weight:800;letter-spacing:3px;font-size:12px;color:#d8cfc6}'+
-    '.lm-acc{width:44px;height:3px;background:#b0341d;margin:9px auto}'+
+    '.lm-logo{font-family:"Jost","Century Gothic","Segoe UI",sans-serif;font-weight:500;'+
+    'letter-spacing:.22em;font-size:14px;text-transform:uppercase;color:#efe7dc;'+
+    'text-indent:.22em;line-height:1}'+
+    '.lm-acc{width:40px;height:2px;background:#b0341d;margin:11px auto 0}'+
     '.lm-top h2{font-size:21px;line-height:1.22;margin:6px 0 0;font-weight:800}'+
     '.lm-g{color:#e8a08a}'+
     '.lm-body{padding:22px 28px 26px;text-align:center}'+
