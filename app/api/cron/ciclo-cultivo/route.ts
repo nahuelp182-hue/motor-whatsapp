@@ -13,7 +13,7 @@
 // molestia a callarnos el aviso.
 import { NextRequest, NextResponse } from 'next/server'
 import { chequearCron } from '@/lib/cron-auth'
-import { comprasParaSeguimiento, tieneHardware, type CompraSeguimiento } from '@/lib/pedidos'
+import { comprasParaSeguimiento, type CompraSeguimiento } from '@/lib/pedidos'
 import { crearTokenEntrada } from '@/lib/session'
 import {
   BASE_URL,
@@ -37,23 +37,22 @@ type Hito = {
   reloj: 'pago' | 'entrega'
   desde: number
   hasta: number
-  soloHardware: boolean
   arma: (nombre: string, url: string, soloDigital: boolean) => { subject: string; html: string }
 }
 
 const HITOS: Hito[] = [
-  // La bienvenida la reciben todos, incluido quien compró solo material digital: para él,
-  // este mail ES la entrega del producto.
-  { id: 'bienvenida', reloj: 'pago', desde: 0, hasta: 2, soloHardware: false, arma: mailBienvenida },
-  { id: 'entrega', reloj: 'entrega', desde: 1, hasta: 4, soloHardware: true, arma: mailEntrega },
-  { id: 'shock', reloj: 'entrega', desde: 21, hasta: 25, soloHardware: true, arma: mailShock },
-  { id: 'cosecha', reloj: 'entrega', desde: 35, hasta: 40, soloHardware: true, arma: mailCosecha },
+  { id: 'bienvenida', reloj: 'pago', desde: 0, hasta: 2, arma: mailBienvenida },
+  { id: 'entrega', reloj: 'entrega', desde: 1, hasta: 4, arma: mailEntrega },
+  { id: 'shock', reloj: 'entrega', desde: 21, hasta: 25, arma: mailShock },
+  { id: 'cosecha', reloj: 'entrega', desde: 35, hasta: 40, arma: mailCosecha },
 ]
 
 function hitoDe(c: CompraSeguimiento): Hito | null {
-  const hardware = tieneHardware(c.equipos)
+  // SOLO compradores de la incubadora INC101. Los mails hablan de la sonda, del shock
+  // térmico y de la cosecha: asumen ese equipo. Mantas calefactoras (pc400), material
+  // digital (ebook) y compras sin clasificar (otro) quedan afuera a propósito.
+  if (!c.equipos.includes('inc101')) return null
   for (const h of HITOS) {
-    if (h.soloHardware && !hardware) continue
     // Sin entrega confirmada no corre el reloj del cultivo: el equipo todavía no llegó.
     const base = h.reloj === 'pago' ? c.pagado : c.entrega
     if (!base) continue
@@ -92,7 +91,8 @@ export async function GET(req: NextRequest) {
     )
     const ok = await enviarMail(
       c.email,
-      hito.arma(c.nombre, `${BASE_URL}/e/${token}`, !tieneHardware(c.equipos)),
+      // Siempre INC101 (hardware), nunca material digital: soloDigital = false.
+      hito.arma(c.nombre, `${BASE_URL}/e/${token}`, false),
     )
     if (ok) enviados.push({ pedido: c.numero, hito: hito.id })
     else fallidos++
