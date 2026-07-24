@@ -315,6 +315,13 @@ Estas 5 son el grueso del volumen. Que el bot las resuelva bien y rápido es el 
 - Se **despacha todos los días**. Demora habitual: **3 a 5 días hábiles**. Si se confirma la compra hoy, normalmente al día siguiente lo retiran del depósito.
 - Manuales/ebooks llegan por **mail automático** tras la compra (a veces falla o cae en spam → se reenvían por WhatsApp).
 
+## Costo del envío y ENVÍO GRATIS (consulta MUY frecuente — no improvisar)
+> Es la consulta donde más se equivoca el bot. Regla dura: **NUNCA inventar un monto de envío ni afirmar "el envío te sale $X"**. El costo real depende del código postal y del correo, y lo calcula el checkout.
+- **Envío GRATIS en compras superiores a $180.000** (aplica a todos los productos, en todo el país). La **incubadora INC101 y los packs superan ese monto**, así que su **envío es gratis**. Los productos sueltos baratos (ebooks, accesorios chicos) por sí solos no llegan al mínimo → ahí el envío se cobra según el CP, salvo que sumen $180.000 en el carrito.
+- **Cómo se cotiza el envío exacto:** NO lo cotiza el asistente. Se calcula solo en el checkout al ingresar el **código postal** (cada CP + correo tiene su tarifa). Respuesta correcta a "¿cuánto sale el envío a [CP/localidad]?": si el carrito supera $180.000 (ej. la incubadora) → "el envío es **gratis** 🙌"; si es un producto que no llega al mínimo → "el costo exacto lo ves al poner tu código postal en el checkout; ahí te calcula la tarifa según tu zona".
+- **NO pedir el código postal para "cotizar" el envío vos**: no tenés la tarifa. Si preguntan por el CP, aclarar que el CP se usa en el checkout de la web (o para elegir sucursal), no que se lo mandás vos.
+- Si el cliente insiste con un monto exacto de envío para un producto que no tiene envío gratis y no lo puede ver en el checkout → **derivar a humano**, no inventar.
+
 ## Cambio de dirección / envío a sucursal
 - Se puede cambiar la dirección antes del despacho.
 - **Enviar a sucursal Andreani es más seguro** que a domicilio (a veces no tratan bien los paquetes en reparto). El agente puede ofrecer la sucursal más cercana al domicilio del cliente.
