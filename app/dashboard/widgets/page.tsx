@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CampoEditor } from '@/components/widgets/CampoEditor'
 import { VistaPrevia } from '@/components/widgets/VistaPrevia'
 import { Metricas } from '@/components/widgets/Metricas'
-import { CARD, INPUT, LABEL, AYUDA, AVISO, BTN, ACENTO, TITULO, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
+import { CARD, INPUT, LABEL, AYUDA, AVISO, BTN, ACENTO, TITULO, SECCION, SECCION_SUB, SUBSECCION, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
 
 // Panel de widgets. Todo lo que se ve acá sale del registro de tipos: la lista de widgets
@@ -132,15 +132,15 @@ export default function WidgetsPage() {
       <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p
-            className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]"
+            className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em]"
             style={{ color: ACENTO }}
           >
             Motor de widgets
           </p>
-          <h1 className="text-2xl font-medium tracking-tight text-[#171717]" style={{ fontFamily: TITULO }}>
+          <h1 className="text-[32px] font-semibold leading-none tracking-tight text-[#171717] md:text-[36px]" style={{ fontFamily: TITULO }}>
             Panel de widgets
           </h1>
-          <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-[#737373]">
+          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-[#525250]">
             Prendés, apagás y editás desde acá. Los cambios salen al sitio en menos de un minuto,
             sin desplegar nada.
           </p>
@@ -205,14 +205,14 @@ export default function WidgetsPage() {
                   setCreando(false)
                 }}
                 title={c.donde}
-                className="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-medium transition-all"
+                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-[14px] transition-all ${activo ? 'font-semibold' : 'font-medium'}`}
                 style={
                   activo
                     ? { background: '#eef1e9', color: ACENTO }
                     : { color: '#737373' }
                 }
               >
-                <span className="text-sm leading-none">{c.icono}</span>
+                <span className="text-base leading-none">{c.icono}</span>
                 {c.label}
                 <span
                   className="rounded-md px-1.5 py-0.5 font-mono text-[10px]"
@@ -225,7 +225,7 @@ export default function WidgetsPage() {
           })}
         </div>
       </div>
-      <p className="-mt-4 mb-6 text-[11px] text-[#a3a3a0]">{ctxActual.donde}.</p>
+      <p className="-mt-4 mb-6 text-[13px] text-[#8a8a86]">{ctxActual.donde}.</p>
 
       {/* ── Catálogo por categoría ─────────────────────────────────── */}
       {creando && <Catalogo tipos={disponibles} onElegir={t => void crear(t)} />}
@@ -319,17 +319,17 @@ function Kpi({
             }
       }
     >
-      <p className="text-[10px] font-semibold uppercase leading-none tracking-[0.15em] text-[#737373]">
+      <p className="text-[11px] font-semibold uppercase leading-none tracking-[0.15em] text-[#8a8a86]">
         {label}
       </p>
       <div>
         <p
-          className="font-mono text-2xl font-bold leading-none tracking-tight"
+          className="font-mono text-[32px] font-bold leading-none tracking-tight"
           style={{ color: destacado ? ACENTO : '#171717' }}
         >
           {valor}
         </p>
-        {sub && <p className="mt-1.5 text-[10px] leading-snug text-[#a3a3a0]">{sub}</p>}
+        {sub && <p className="mt-2 text-[12px] leading-snug text-[#8a8a86]">{sub}</p>}
       </div>
     </div>
   )
@@ -342,31 +342,34 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
   const orden = Object.keys(CATEGORIAS) as (keyof typeof CATEGORIAS)[]
   return (
     <div className={`${CARD} mb-6 p-5`}>
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#737373]">
-        Catálogo
-      </p>
-      <p className="mb-5 text-xs leading-relaxed text-[#737373]">
+      <h2 className={SECCION}>Catálogo</h2>
+      <p className={`mb-6 mt-1 ${SECCION_SUB}`}>
         Nace apagado: podés configurarlo tranquilo antes de que lo vea nadie.
       </p>
 
-      <div className="space-y-7">
+      <div className="space-y-8">
         {orden.map(k => {
           const cat = CATEGORIAS[k]
           const delGrupo = tipos.filter(t => t.categoria === k)
           if (delGrupo.length === 0) return null
           return (
             <section key={k}>
-              <div className="mb-3 flex items-center gap-2.5">
-                <span className="text-base leading-none">{cat.icono}</span>
+              <div className="mb-1 flex items-center gap-2.5">
                 <span
-                  className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-sm leading-none"
+                  style={{ background: `${cat.color}22` }}
+                >
+                  {cat.icono}
+                </span>
+                <span
+                  className="text-[15px] font-semibold tracking-tight"
                   style={{ color: cat.color }}
                 >
                   {cat.label}
                 </span>
                 <span className="h-px flex-1" style={{ background: `${cat.color}33` }} />
-                <p className="text-[11px] leading-relaxed text-[#a3a3a0]">{cat.para}</p>
               </div>
+              <p className="mb-3 ml-[38px] text-[13px] leading-relaxed text-[#8a8a86]">{cat.para}</p>
               <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                 {delGrupo.map(t => (
                   <button
@@ -389,7 +392,7 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5">
-                        <span className="truncate text-sm font-semibold text-[#171717]">{t.nombre}</span>
+                        <span className="truncate text-[15px] font-semibold text-[#171717]">{t.nombre}</span>
                         {t.cuidado && (
                           <span className="text-[11px] text-amber-600" title={t.cuidado}>
                             ⚠
@@ -401,7 +404,7 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
                           </span>
                         )}
                       </span>
-                      <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-[#737373]">
+                      <span className="mt-1 line-clamp-2 block text-[13px] leading-relaxed text-[#6b6b68]">
                         {t.descripcion}
                       </span>
                     </span>
@@ -469,8 +472,8 @@ function TarjetaWidget({
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-[#171717]">{w.nombre}</p>
-          <p className="mt-0.5 truncate text-[11px] text-[#a3a3a0]">{tipo?.nombre ?? w.tipo}</p>
+          <p className="truncate text-[15px] font-semibold text-[#171717]">{w.nombre}</p>
+          <p className="mt-0.5 truncate text-[12px] text-[#8a8a86]">{tipo?.nombre ?? w.tipo}</p>
         </div>
 
         <button onClick={onEditar} className={BTN}>
@@ -503,10 +506,10 @@ function TarjetaWidget({
 function Dato({ valor, label, acento }: { valor: string; label: string; acento?: string }) {
   return (
     <div>
-      <p className="font-mono text-base font-bold leading-none" style={{ color: acento ?? '#171717' }}>
+      <p className="font-mono text-lg font-bold leading-none" style={{ color: acento ?? '#171717' }}>
         {valor}
       </p>
-      <p className="mt-1 text-[10px] uppercase tracking-[0.1em] text-[#a3a3a0]">{label}</p>
+      <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[#8a8a86]">{label}</p>
     </div>
   )
 }
@@ -568,7 +571,7 @@ function Editor({
         >
           {iconoDe(widget.tipo)}
         </span>
-        <span className="text-sm font-semibold text-[#171717]">{tipo.nombre}</span>
+        <span className={SUBSECCION}>{tipo.nombre}</span>
         <button
           onClick={onToggle}
           className="ml-auto flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all"
@@ -597,8 +600,8 @@ function Editor({
           {/* Qué hace y qué necesita, arriba de todo: configurar un widget no debería
               requerir acordarse de nada ni preguntar. */}
           <div className={`${CARD} p-4`} style={{ borderLeft: `2px solid ${cat.color}88` }}>
-            <p className="text-xs leading-relaxed text-[#3f3f3c]">{tipo.descripcion}</p>
-            <p className="mt-2 text-xs leading-relaxed text-[#737373]">{tipo.uso}</p>
+            <p className="text-[14px] leading-relaxed text-[#3f3f3c]">{tipo.descripcion}</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-[#6b6b68]">{tipo.uso}</p>
             {tipo.cuidado && <p className={`mt-2 ${AVISO}`}>⚠ {tipo.cuidado}</p>}
           </div>
 
@@ -626,13 +629,13 @@ function Editor({
           </div>
 
           <details className={`${CARD} p-4`}>
-            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.12em] text-[#737373]">
+            <summary className="cursor-pointer text-[14px] font-semibold tracking-tight text-[#171717]">
               Dónde y cuándo aparece
             </summary>
             <div className="mt-4 space-y-5">
               <div>
                 <label className={LABEL}>En qué páginas</label>
-                <p className="mb-2 text-xs leading-relaxed text-[#737373]">
+                <p className="mb-2 text-[13px] leading-relaxed text-[#6b6b68]">
                   Sin marcar ninguna, aparece en todas. Marcá solo si querés acotarlo.
                 </p>
                 {/* Casillas con las páginas que existen de verdad. Antes había que escribir la
@@ -687,7 +690,7 @@ function Editor({
 
               <div>
                 <label className={LABEL}>Ventana de fechas</label>
-                <p className="mb-2 text-xs leading-relaxed text-[#737373]">
+                <p className="mb-2 text-[13px] leading-relaxed text-[#6b6b68]">
                   Opcional. Fuera de la ventana el widget ni siquiera se envía a la página, así que
                   una promoción vencida no queda escondida en el código a la vista de nadie.
                 </p>

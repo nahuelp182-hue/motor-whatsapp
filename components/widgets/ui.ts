@@ -27,8 +27,30 @@ export const INPUT =
 /** Rótulo de campo — eyebrow Manrope. */
 export const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#737373]'
 
+// ── Escala de encabezados ────────────────────────────────────────────────────
+// La regla para que la vista descanse: cada nivel tiene que verse claramente más
+// grande y más oscuro que el de abajo. No repetir el mismo eyebrow chico para el
+// título de una sección y para un rótulo menor — ahí es donde todo se aplana.
+//
+//   H1  Fraunces 30px ink        →  el nombre de la pantalla
+//   SECCION  18px semibold ink   →  qué es este bloque (Catálogo, Rendimiento…)
+//   SUBSECCION  15px semibold    →  título de una tarjeta o grupo
+//   EYEBROW  11px mayúsc muted   →  rótulos y unidades, el piso de la escala
+
+/** Título de sección: el nivel que ordena la página. Grande y oscuro, se lee de un vistazo. */
+export const SECCION = 'text-lg font-semibold tracking-tight text-[#171717]'
+
+/** Bajada de sección: una línea de contexto debajo del título, en cuerpo legible. */
+export const SECCION_SUB = 'text-[13px] leading-relaxed text-[#6b6b68]'
+
+/** Título de una tarjeta o grupo dentro de una sección. */
+export const SUBSECCION = 'text-[15px] font-semibold tracking-tight text-[#171717]'
+
+/** Micro-rótulo (unidades, contadores, "apagado"). El piso de la escala. */
+export const EYEBROW = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8a8a86]'
+
 /** Texto de ayuda debajo del campo. */
-export const AYUDA = 'mt-1.5 text-xs leading-relaxed text-[#737373]'
+export const AYUDA = 'mt-1.5 text-[13px] leading-relaxed text-[#6b6b68]'
 
 /** Advertencia: ámbar legible sobre fondo claro. */
 export const AVISO = 'text-xs leading-relaxed text-amber-700'

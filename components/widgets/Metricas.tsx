@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { CARD, ACENTO, iconoDe } from './ui'
+import { CARD, ACENTO, SECCION, iconoDe } from './ui'
 
 // Tablero del motor de widgets: qué se vio, qué se tocó y cuánta plata movió cada uno.
 //
@@ -49,15 +49,13 @@ export function Metricas() {
   return (
     <div className={`${CARD} mb-5 p-4`}>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#737373]">
-          Rendimiento
-        </span>
+        <h2 className={SECCION}>Rendimiento</h2>
         <div className="ml-auto flex gap-1 rounded-lg bg-[#f4f4f1] p-0.5">
           {PERIODOS.map(p => (
             <button
               key={p.dias}
               onClick={() => setDias(p.dias)}
-              className="rounded-md px-2.5 py-1 text-[11px] font-medium transition-all"
+              className="rounded-md px-3 py-1.5 text-[12px] font-medium transition-all"
               style={
                 dias === p.dias
                   ? { background: '#eef1e9', color: ACENTO }
@@ -81,10 +79,10 @@ export function Metricas() {
               { k: 'Al carrito', v: num(t.conversion), s: 'sumados desde un widget' },
               { k: 'Movido', v: t.monto > 0 ? pesos(t.monto) : '—', s: 'valor de lo agregado' },
             ].map(m => (
-              <div key={m.k} className="rounded-xl bg-[#f4f4f1] p-3">
-                <div className="text-[10px] uppercase tracking-[0.12em] text-[#737373]">{m.k}</div>
-                <div className="mt-1 font-mono text-xl font-semibold text-[#171717]">{m.v}</div>
-                <div className="mt-0.5 text-[11px] text-[#a3a3a0]">{m.s}</div>
+              <div key={m.k} className="rounded-xl bg-[#f4f4f1] p-3.5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8a86]">{m.k}</div>
+                <div className="mt-1.5 font-mono text-[26px] font-semibold leading-none text-[#171717]">{m.v}</div>
+                <div className="mt-1.5 text-[12px] text-[#8a8a86]">{m.s}</div>
               </div>
             ))}
           </div>
@@ -115,13 +113,13 @@ export function Metricas() {
             {d.porWidget.filter(w => w.impresion > 0 || w.activo).map(w => (
               <div key={w.id} className="rounded-lg bg-[#f4f4f1] px-3 py-2">
                 <div className="flex items-center gap-2">
-                  <span>{iconoDe(w.tipo)}</span>
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-[#3f3f3c]">{w.nombre}</span>
+                  <span className="text-base leading-none">{iconoDe(w.tipo)}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[#171717]">{w.nombre}</span>
                   {!w.activo && (
-                    <span className="text-[10px] uppercase tracking-wider text-[#a3a3a0]">apagado</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[#a3a3a0]">apagado</span>
                   )}
-                  <span className="text-[12px] text-[#737373]">{num(w.impresion)} vistas</span>
-                  <span className="w-20 text-right text-[12px] text-[#3f3f3c]">
+                  <span className="font-mono text-[13px] text-[#525250]">{num(w.impresion)} vistas</span>
+                  <span className="w-20 text-right font-mono text-[13px] font-medium text-[#171717]">
                     {w.interaccion > 0 ? `${num(w.interaccion)} clics` : '—'}
                   </span>
                 </div>
