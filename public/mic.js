@@ -770,6 +770,22 @@
     return 0;
   }
 
+  /* El precio tachado (el "antes"). Vive aparte de precioPagina() porque puede no existir:
+     un producto sin promoción no tiene precio de lista, y ahí no hay ahorro que mostrar. */
+  function precioListaPagina() {
+    var sel = ['#compare_price_display', '.js-compare-price-display', '[data-store="product-compare-price"]'];
+    for (var i = 0; i < sel.length; i++) {
+      var el = document.querySelector(sel[i]);
+      if (!el) continue;
+      // Un compare vacío o escondido es "sin promoción", no cero.
+      if (el.offsetParent === null && (el.style.display === 'none' || !el.textContent.trim())) continue;
+      var limpio = (el.textContent || '').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');
+      var n = parseFloat(limpio);
+      if (n > 0) return n;
+    }
+    return 0;
+  }
+
   function pesos(n) {
     try { return '$' + n.toLocaleString('es-AR', { maximumFractionDigits: 0 }); }
     catch (e) { return '$' + Math.round(n); }
@@ -947,6 +963,87 @@
       (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
       '<div class="w"><table><thead><tr><th></th><th>' + esc(c.col_a) + '</th>' +
       '<th class="b">' + esc(c.col_b) + '</th></tr></thead><tbody>' + filas + '</tbody></table></div>');
+    verUnaVez(sh, w.id, c.animacion);
+  };
+
+  /* Desglose del pack.
+     El widget no guarda ni un solo importe: reparte el precio de lista que la página ya
+     muestra según el peso de cada pieza. Así el desglose no puede quedar desfasado del
+     precio real — que es exactamente lo que pasaba cuando la tabla estaba escrita a mano
+     dentro de la descripción del producto. */
+  R.desglose_pack = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var items = (c.items || []).filter(function (i) { return i.nombre; });
+    if (!items.length) return;
+
+    var pagando = precioPagina();
+    var lista = precioListaPagina();
+    // Sin promoción vigente no hay dos números que enfrentar: el desglose se reparte
+    // sobre lo que se paga y no se habla de ahorro.
+    var base = lista > pagando ? lista : pagando;
+    var hayAhorro = lista > pagando && pagando > 0;
+
+    var sumaPesos = items.reduce(function (a, i) { return a + (Number(i.peso) > 0 ? Number(i.peso) : 1); }, 0);
+    var valores = [];
+    if (base > 0 && sumaPesos > 0) {
+      var acum = 0, mayor = 0;
+      for (var k = 0; k < items.length; k++) {
+        var peso = Number(items[k].peso) > 0 ? Number(items[k].peso) : 1;
+        // A la centena: un desglose con centavos parece una cuenta forzada.
+        var v = Math.round((base * peso / sumaPesos) / 100) * 100;
+        valores.push(v); acum += v;
+        if (peso > (Number(items[mayor].peso) || 1)) mayor = k;
+      }
+      // El redondeo desajusta la suma. Se corrige en la pieza más grande: si las filas no
+      // suman el total que está abajo, el cliente lo nota y deja de creer toda la tabla.
+      valores[mayor] += base - acum;
+    }
+
+    var sh = montar(w, false); if (!sh) return;
+
+    var filas = items.map(function (i, n) {
+      return '<tr>' +
+        '<td><b>' + esc(i.nombre) + '</b>' + (i.detalle ? '<small>' + esc(i.detalle) + '</small>' : '') + '</td>' +
+        (valores.length ? '<td class="n">' + esc(pesos(valores[n])) + '</td>' : '') +
+        '</tr>';
+    }).join('');
+
+    var pie = '';
+    if (valores.length && hayAhorro) {
+      pie =
+        '<tr class="t"><td>' + esc(c.etiqueta_total || 'Valor por separado') + '</td>' +
+        '<td class="n tach">' + esc(pesos(base)) + '</td></tr>' +
+        '<tr class="pk"><td><b>' + esc(c.etiqueta_pack || 'Precio del pack') + '</b></td>' +
+        '<td class="n"><b>' + esc(pesos(pagando)) + '</b></td></tr>';
+    }
+
+    var ahorroTxt = '';
+    if (hayAhorro && c.mostrar_ahorro !== false) {
+      var a = base - pagando;
+      ahorroTxt = '<p class="ah">Ahorrás <b>' + esc(pesos(a)) + '</b> — un <b>' +
+        Math.round(a / base * 100) + '&nbsp;%</b> respecto del valor por separado.</p>';
+    }
+
+    pintar(sh,
+      'h3{margin:0 0 6px;font-size:20px;color:' + p.bg + '}' +
+      '.in{margin:0 0 14px;font-size:13px;color:#6a6157}' +
+      '.w{overflow-x:auto;margin:20px 0 0}' +
+      'table{width:100%;border-collapse:collapse;font-size:14px}' +
+      'td{padding:12px 10px;border-top:1px solid #e6e2da;vertical-align:top}' +
+      'td b{color:#2a2620;font-weight:600}' +
+      'td small{display:block;margin-top:3px;font-size:12px;color:#6a6157;line-height:1.45}' +
+      '.n{text-align:right;white-space:nowrap;color:#5a534a}' +
+      '.tach{text-decoration:line-through;color:#8c8c82}' +
+      '.t td{color:#6a6157}' +
+      '.pk td{background:' + p.suave + ';border-top:1px solid ' + p.bg + ';padding:14px 10px}' +
+      '.pk b{color:' + p.bg + ';font-size:18px}' +
+      '.ah{text-align:center;margin:14px 0 2px;font-size:14px;color:' + p.bg + '}' +
+      '.nt{text-align:center;margin:0;font-size:12px;color:#6a6157}',
+      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
+      (c.intro ? '<p class="in">' + esc(c.intro) + '</p>' : '') +
+      '<div class="w"><table><tbody>' + filas + pie + '</tbody></table></div>' +
+      ahorroTxt +
+      (c.nota ? '<p class="nt">' + esc(c.nota) + '</p>' : ''));
     verUnaVez(sh, w.id, c.animacion);
   };
 

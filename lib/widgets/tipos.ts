@@ -966,6 +966,85 @@ const TIPOS_BASE: TipoWidget[] = [
     ],
   },
   {
+    slug: 'desglose_pack',
+    nombre: 'Qué incluye el pack',
+    descripcion:
+      'Desarma el precio en las piezas que vienen adentro y las enfrenta con lo que se paga. Justifica el número en vez de solo mostrarlo.',
+    categoria: 'conversion',
+    contextos: ['producto', 'tienda'],
+    bloque: true,
+    uso:
+      'No se carga ningún precio acá: el valor de cada pieza sale del precio de lista que la página ya muestra, repartido según el peso que le des a cada una. Si cambiás el precio en Tiendanube, el desglose se acomoda solo. Sin precio tachado en la página, muestra las piezas sin importes.',
+    cuidado:
+      'Los pesos tienen que reflejar lo que cada pieza vale de verdad. Inflar una para agrandar el ahorro se nota, y en un producto caro la desconfianza es el freno que ya tenés.',
+    campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'medio',
+        ayuda: 'Va bien después de la comparativa: primero por qué conviene, después cuánto vale.',
+      },
+      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: 'Lo que incluye este pack', ayuda: 'Vacío = sin encabezado.' },
+      {
+        key: 'intro',
+        label: 'Bajada',
+        tipo: 'texto',
+        porDefecto: 'Tres piezas que se venden juntas y trabajan como un solo equipo.',
+        ayuda: 'Una línea abajo del título. Vacío = no se muestra.',
+      },
+      {
+        key: 'items',
+        label: 'Piezas del pack',
+        tipo: 'lista',
+        maxItems: 6,
+        ayuda: 'Se muestran en este orden. La pieza principal va primero.',
+        campos: [
+          { key: 'nombre', label: 'Pieza', tipo: 'texto', ayuda: 'Cómo se llama en la caja.' },
+          { key: 'detalle', label: 'Qué hace', tipo: 'texto', ayuda: 'Media línea. Es lo que convierte una lista de nombres en una razón para pagar.' },
+          {
+            key: 'peso',
+            label: 'Cuánto pesa en el precio',
+            tipo: 'numero',
+            porDefecto: 1,
+            min: 0,
+            max: 100,
+            ayuda: 'Proporción, no pesos. Si ponés 70 / 22 / 8, la primera pieza se lleva el 70 % del precio de lista. Los números se reparten solos, así que no hace falta que sumen 100.',
+          },
+        ],
+      },
+      {
+        key: 'etiqueta_total',
+        label: 'Cómo llamar a la suma',
+        tipo: 'texto',
+        porDefecto: 'Valor de las 3 piezas',
+        ayuda: 'La fila tachada. Es el precio de lista de la página, no un número aparte.',
+      },
+      {
+        key: 'etiqueta_pack',
+        label: 'Cómo llamar al precio final',
+        tipo: 'texto',
+        porDefecto: 'Precio del pack completo',
+        ayuda: 'La fila destacada, con el precio que realmente se paga hoy.',
+      },
+      {
+        key: 'mostrar_ahorro',
+        label: 'Mostrar cuánto ahorra',
+        tipo: 'booleano',
+        porDefecto: true,
+        ayuda: 'El monto en pesos además del porcentaje. El monto pega más fuerte que el %.',
+      },
+      {
+        key: 'nota',
+        label: 'Nota al pie',
+        tipo: 'texto',
+        porDefecto: 'Las tres se despachan juntas en el mismo envío. No se venden por separado.',
+        ayuda: 'Si las piezas no están publicadas sueltas, conviene decirlo: alguien que las busca y no las encuentra desconfía del precio.',
+      },
+      CAMPO_COLOR,
+    ],
+  },
+  {
     slug: 'especificaciones',
     nombre: 'Ficha técnica',
     descripcion:
