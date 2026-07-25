@@ -173,14 +173,22 @@ function manualesDeProductos(prods: Array<{ name?: unknown }>): ManualId[] {
 }
 
 type OrdenTN = {
-  number: number; status?: string; payment_status?: string
+  number: number; status?: string; payment_status?: string; created_at?: string
   contact_name?: string; contact_phone?: string; contact_identification?: string; products?: Array<{ name?: unknown }>
   shipping_tracking_number?: string; shipping_option?: string; shipping_pickup_type?: string; shipping_status?: string
 }
 
 const CAMPOS_ORDEN =
-  'number,status,payment_status,contact_name,contact_phone,contact_identification,products,' +
+  'number,status,payment_status,created_at,contact_name,contact_phone,contact_identification,products,' +
   'shipping_tracking_number,shipping_option,shipping_pickup_type,shipping_status'
+
+// Días tras los cuales un pedido PENDIENTE DE PAGO se considera zombi. Tiendanube deja
+// abiertas para siempre las transferencias que nunca se concretaron (hay pedidos de 2025
+// todavía en open+pending). Si el bot los matchea, a alguien que pregunta cualquier cosa
+// le contesta "encontré tu pedido #1197, está impago, mandame el comprobante" — un pedido
+// de hace nueve meses que la persona no recuerda haber hecho. Pasó el 25/07/26. Los
+// pedidos PAGOS no caducan: alguien puede pedir el manual de un equipo que compró en 2025.
+const DIAS_PENDIENTE_ZOMBIE = 45
 
 // Normaliza para comparar nombres: sin tildes, sin puntuación, en minúsculas.
 function normalizar(s: string): string {
@@ -215,8 +223,16 @@ function matcheaNombre(orden: OrdenTN, candidatos: string[]): boolean {
   })
 }
 
+// Pedido pendiente de pago abierto hace meses: no es un pedido vivo, es residuo.
+function esPendienteZombie(o: OrdenTN): boolean {
+  if (o.payment_status === 'paid' || !o.created_at) return false
+  const dias = (Date.now() - new Date(o.created_at).getTime()) / 86_400_000
+  return dias > DIAS_PENDIENTE_ZOMBIE
+}
+
 function esDeEsteCliente(o: OrdenTN, tel8: string, tokens: string[], nombres: string[]): boolean {
   if (o.status === 'cancelled') return false // orden cancelada = no es un pedido válido
+  if (esPendienteZombie(o)) return false     // pending de hace meses: no lo traemos a la charla
   const oPhone8 = soloDigitos(o.contact_phone ?? '').slice(-8)
   if (tel8.length >= 8 && oPhone8 === tel8) return true
   if (tokens.some((t) => String(o.number) === t || soloDigitos(o.contact_identification ?? '') === t)) return true
@@ -354,6 +370,11 @@ SEGUIMIENTO DE ENVÍO: si el cliente pregunta dónde está su pedido / cuándo l
 IMPORTANTE: si el cliente te da un NÚMERO DE ORDEN o un DNI para que ubiques su compra, pago o envío (ej. "mi pedido es el 1594", "DNI 35185724", "compré a nombre de X"), marcá SIEMPRE [SEGUIMIENTO] (el sistema resuelve: si el pago está pendiente, si está en camino, etc.). No respondas vos "ya tengo tus datos" sin marcar [SEGUIMIENTO] — sin la etiqueta el sistema no verifica nada.
 PAGO PENDIENTE / COMPROBANTE: si el cliente dice que ya compró/pagó, que va a mandar o mandó el comprobante, o pregunta por qué su pedido figura sin pagar, marcá [SEGUIMIENTO] (el sistema detecta si la orden está pendiente de pago y le pide el comprobante). No afirmes vos que el pago está confirmado ni que no lo está.
 
+COMPRA QUE EL CLIENTE NO RECONOCE (esta regla gana sobre TODAS las demás): si dice que NO hizo esa compra, que no reconoce un pedido/cargo/cobro, que "no fui yo", que le llegó un aviso por algo que no compró, o que sospecha una estafa o un uso indebido de su tarjeta → marcá [NO_RECONOCE] y NO marqués [SEGUIMIENTO].
+- NO le pidas DNI, ni número de pedido, ni comprobante, ni ningún dato personal. Pedirle datos justo ahí es exactamente lo que hace una estafa: lo confirma en su sospecha y nos deja como los estafadores.
+- NO le digas que tiene una compra, ni le pases el número, el monto ni ningún dato de un pedido.
+- Respondé UNA o DOS líneas que lo tranquilicen: desde nuestro lado no hay ningún cobro hecho, no tiene que pagar ni mandar nada, y el equipo lo revisa ahora. El sistema deriva y avisa al equipo solo.
+
 FEEDBACK / QUEJA SOBRE EL PRODUCTO: si el cliente comenta una falla, defecto, crítica o problema de calidad del equipo (algo que llegó torcido/roto/mal, o una observación de mejora), marcá [FEEDBACK]. Respondé breve, agradecido y empático, pero NO des instrucciones de reparación ni le pidas que lo arregle/desarme él mismo (nada de "despegá y volvé a pegar", "ajustá", "cambiá vos"). Para cualquier arreglo o reposición lo ve el equipo. El sistema le avisa a Nahuel.
 REGLA DURA ANTI-DIY (aplica en CUALQUIER turno, no solo el primero): NUNCA le confirmes, apruebes ni le sugieras al cliente desarmar, despegar, pegar, forzar, ajustar tornillos ni intervenir físicamente el equipo — AUNQUE sea ÉL quien lo proponga ("voy a despegarla y pegarla de nuevo"). En ese caso NO respondas "perfecto, hacelo": pedile que NO lo manipule, que lo dejamos que lo vea el equipo para no arriesgar el equipo ni su garantía, y marcá [FEEDBACK].
 
@@ -369,6 +390,7 @@ FORMATO DE SALIDA OBLIGATORIO (respetá estas etiquetas EXACTAS, en este orden):
 [MANUAL] <inc101|pc400|? — SOLO si el cliente pide el manual de su compra; si no aplica, omití esta línea>
 [SEGUIMIENTO] si — SOLO si el cliente pregunta por el estado/llegada de su envío; si no aplica, omití esta línea
 [FEEDBACK] si — SOLO si el cliente reporta una falla/crítica/defecto del producto; si no aplica, omití esta línea
+[NO_RECONOCE] si — SOLO si el cliente dice que no hizo / no reconoce esa compra, o sospecha fraude; si no aplica, omití esta línea
 
 === BASE DE CONOCIMIENTO ===
 ${KB_MICELIUM}
@@ -377,21 +399,43 @@ ${KB_MICELIUM}
 // ─────────── Parseo de salida del cerebro ───────────
 type Salida = {
   respuesta: string; derivar: boolean; motivo: string
-  manual: ManualId | '?' | null; seguimiento: boolean; feedback: boolean
+  manual: ManualId | '?' | null; seguimiento: boolean; feedback: boolean; noReconoce: boolean
 }
 
-function parseSalida(raw: string): Salida {
-  const mResp = raw.match(/\[RESPUESTA\]\s*([\s\S]*?)\s*(?:\[DERIVAR\]|\[MANUAL\]|\[SEGUIMIENTO\]|\[FEEDBACK\]|$)/i)
+// Red de seguridad por texto: si el cliente niega la compra, no dependemos de que el
+// modelo haya puesto la etiqueta. Es el caso donde equivocarse sale más caro (pedirle
+// datos a alguien que sospecha un fraude), así que se detecta también acá.
+// Ojo con lo que NO va acá: un "no compré todavía" o un "¿no será una estafa?" son un
+// interesado, no una denuncia. Si entraran, cada consulta de precio terminaría derivada.
+const RE_NO_RECONOCE = new RegExp(
+  [
+    'no\\s+(?:hice|realic[eé]|ped[ií])\\s+(?:esa|esta|ninguna|ning[uú]n)',
+    'no\\s+reconozco',
+    'no\\s+fui\\s+yo',
+    'no\\s+(?:compr[eé]|ped[ií])\\s+nada',
+    'nunca\\s+(?:compr[eé]|ped[ií])\\s+nada',
+    '(?:esa|esta)\\s+compra\\s+no\\s+(?:es|fue)\\s+m[ií]a',
+    'no\\s+(?:autoric[eé]|orden[eé])\\s+(?:ese|este|ning)',
+    'me\\s+(?:estafaron|hackearon|robaron\\s+la\\s+tarjeta)',
+    'usaron\\s+mi\\s+tarjeta',
+  ].join('|'),
+  'i',
+)
+
+function parseSalida(raw: string, mensajeCliente = ''): Salida {
+  const mResp = raw.match(/\[RESPUESTA\]\s*([\s\S]*?)\s*(?:\[DERIVAR\]|\[MANUAL\]|\[SEGUIMIENTO\]|\[FEEDBACK\]|\[NO_RECONOCE\]|$)/i)
   const mDer  = raw.match(/\[DERIVAR\]\s*(si|sí|no)/i)
-  const mMot  = raw.match(/\[MOTIVO\]\s*([\s\S]*?)\s*(?:\[MANUAL\]|\[SEGUIMIENTO\]|\[FEEDBACK\]|$)/i)
+  const mMot  = raw.match(/\[MOTIVO\]\s*([\s\S]*?)\s*(?:\[MANUAL\]|\[SEGUIMIENTO\]|\[FEEDBACK\]|\[NO_RECONOCE\]|$)/i)
   const mMan  = raw.match(/\[MANUAL\]\s*(inc101|pc400|\?)/i)
   const mSeg  = raw.match(/\[SEGUIMIENTO\]\s*(si|sí)/i)
   const mFb   = raw.match(/\[FEEDBACK\]\s*(si|sí)/i)
+  const mNr   = raw.match(/\[NO_RECONOCE\]\s*(si|sí)/i)
   const respuesta = (mResp ? mResp[1] : raw).trim()
   const derivar = mDer ? /s[ií]/i.test(mDer[1]) : false
   const motivo = mMot ? mMot[1].trim() : ''
   const manual = mMan ? (mMan[1].toLowerCase() as ManualId | '?') : null
-  return { respuesta, derivar, motivo, manual, seguimiento: !!mSeg, feedback: !!mFb }
+  const noReconoce = !!mNr || RE_NO_RECONOCE.test(mensajeCliente)
+  return { respuesta, derivar, motivo, manual, seguimiento: !!mSeg, feedback: !!mFb, noReconoce }
 }
 
 // ─────────── Cerebro de Ariel ───────────
@@ -413,7 +457,7 @@ async function pensar(mensaje: string, catalogo: string, historial: Turno[]): Pr
   await logClaudeUsage('whatsapp', MODELO, response.usage)
   const block = response.content[0]
   const raw = block && block.type === 'text' ? block.text : ''
-  return parseSalida(raw)
+  return parseSalida(raw, mensaje)
 }
 
 // ─────────── WA Cloud API send ───────────
@@ -727,14 +771,26 @@ export async function POST(req: NextRequest) {
           const mensajeUsuario = rafaga.length > 1 ? rafaga.join('\n') : texto
 
           const [catalogo, historial] = await Promise.all([bloqueCatalogo(), getHistorial(from)])
-          const { respuesta, derivar, motivo, manual, seguimiento, feedback } = await pensar(mensajeUsuario, catalogo, historial)
+          const { respuesta, derivar, motivo, manual, seguimiento, feedback, noReconoce } =
+            await pensar(mensajeUsuario, catalogo, historial)
 
           // Estado final que se envía + se loguea (un solo 'pensado' por mensaje).
           let outText = respuesta
           let didDerivar = derivar
           let accion: string | undefined
 
-          if (seguimiento) {
+          if (noReconoce) {
+            // El cliente niega la compra. Va PRIMERO, antes de cualquier búsqueda de pedido:
+            // acá no se busca nada, no se pide ningún dato y no se nombra ningún pedido. Si
+            // le pedimos DNI o comprobante a alguien que cree que le cobraron algo que no
+            // compró, le confirmamos la sospecha de estafa. Lo atiende una persona.
+            outText = respuesta ||
+              'Quedate tranquilo: desde nuestro lado no hay ningún cobro hecho, y no tenés que pagar ni mandar nada 🙌 ' +
+              'Se lo paso al equipo ahora para que lo revise y te confirme 👇'
+            didDerivar = true
+            accion = 'no_reconoce_compra'
+            await derivarAlEquipo(from, outText)
+          } else if (seguimiento) {
             // Estado REAL del envío (Tiendanube + Andreani). Nunca inventa: si no hay dato
             // certero, deriva al equipo.
             const pedido = await buscarPedido(from, mensajeUsuario, nombre)
@@ -848,8 +904,16 @@ export async function POST(req: NextRequest) {
           }
 
           if (didDerivar) {
+            const esNiega = accion === 'no_reconoce_compra'
             await notifyNahuel(
-              '🔔 WhatsApp: lead derivado al equipo',
+              esNiega
+                ? '🚨 WhatsApp: un cliente NO reconoce una compra — atender ya'
+                : '🔔 WhatsApp: lead derivado al equipo',
+              (esNiega
+                ? `Un cliente dice que NO hizo la compra por la que le escribimos (o no reconoce un cargo).\n` +
+                  `El bot NO le pidió datos ni le nombró ningún pedido: solo lo tranquilizó y derivó.\n` +
+                  `Revisá si le llegó un mensaje automático nuestro por un pedido viejo.\n\n`
+                : '') +
               `Un mensaje de WhatsApp fue derivado al equipo.\n\n` +
               `Número: ${from}\n` +
               (nombre ? `Nombre: ${nombre}\n` : '') +

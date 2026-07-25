@@ -35,6 +35,11 @@ const TEMPLATE_TRANSFER = process.env.WA_TPL_TRANSFER ?? 'datos_transferencia'
 const TEMPLATE_TRANSFER_REMINDER = process.env.WA_TPL_TRANSFER_REMINDER ?? 'recordatorio_transferencia'
 const TEMPLATE_LANG = process.env.WA_TPL_LANG ?? 'es_AR'
 
+// Antigüedad máxima de un pedido para que una automatización le escriba. Más allá de
+// esto el pedido es "zombi" (pending abierto hace meses) y cualquier mensaje nuestro le
+// llega al cliente como un cobro que no reconoce. Ver la nota en pollAbandonedCarts().
+const VENTANA_ZOMBIE_H = 72
+
 // ¿El pedido se paga por transferencia/depósito bancario? Chequea varios campos
 // posibles del pedido (REST v1 usa gateway/gateway_name/payment_details; el nombre
 // del método aparece como "Transferencia o depósito bancario").
@@ -200,6 +205,12 @@ export class CampaignService {
     campaign: { id: string; configuracion: unknown }
   ): Promise<boolean> {
     const marca = `order:${order.id}`
+    // Tope de antigüedad también acá, no solo en el poll: este método se reintenta cada
+    // 6 h hasta que un envío sale bien, y sin el tope ese reintento no caducaba nunca.
+    if (order.created_at &&
+        (Date.now() - new Date(order.created_at).getTime()) / 3_600_000 > VENTANA_ZOMBIE_H) {
+      return false
+    }
     const previos = await prisma.messageLog.findMany({
       where: {
         store_id: this.store.id, customer_id: customer.id, campaign_id: campaign.id,
@@ -365,6 +376,19 @@ export class CampaignService {
     for (const o of orders) {
       if (!o.contact_phone || !o.created_at) continue
       const ageH = (Date.now() - new Date(o.created_at).getTime()) / 3_600_000
+
+      // ── Pedidos ZOMBI ──
+      // Tiendanube deja las transferencias que nunca se concretaron como open+pending
+      // para siempre: hoy hay pedidos de abril, julio y noviembre de 2025 en ese estado.
+      // fetchPendingOrders() los trae a todos, y el reintento de las instrucciones de
+      // transferencia no tenía tope de antigüedad: bastaba que un envío fallara (plantilla
+      // sin aprobar, token vencido) para que se reintentara cada 6 h hasta que un día
+      // saliera. El 25/07/26 le llegó así a una clienta el aviso de pago del pedido #1197,
+      // de nov-2025: contestó "No hice esa compra" — para ella fue un cargo desconocido,
+      // que es la forma exacta de una estafa. Pasada la ventana, el pedido no se toca más:
+      // si hay que recuperarlo, lo hace una persona.
+      if (ageH > VENTANA_ZOMBIE_H) continue
+
       const customer = await this.upsertCustomer(o)
 
       // ── Compras por TRANSFERENCIA: no son carritos abandonados (la persona compró y
