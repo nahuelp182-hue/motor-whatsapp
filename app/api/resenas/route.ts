@@ -15,10 +15,77 @@ async function storeId(): Promise<string | null> {
   return s?.id ?? null
 }
 
+const MES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+/** Resumen de TODAS las reseñas de la tienda, no solo de las que se están viendo. Es lo que
+    permite leer el panel de un vistazo: cuántas hay publicadas, con qué puntaje promedio, de
+    dónde vienen y si el flujo viene creciendo o se secó. El filtro de la lista no lo toca. */
+type FilaResumen = {
+  rating: number | null
+  source: string
+  approved: boolean
+  foto_url: string | null
+  fecha: Date | null
+  createdAt: Date
+}
+
+function armarResumen(filas: FilaResumen[]) {
+  const cuando = (f: FilaResumen) => f.fecha ?? f.createdAt
+  const conPuntaje = filas.filter(f => typeof f.rating === 'number')
+  const suma = conPuntaje.reduce((a, f) => a + (f.rating ?? 0), 0)
+
+  const distribucion = [5, 4, 3, 2, 1].map(estrellas => ({
+    estrellas,
+    n: conPuntaje.filter(f => f.rating === estrellas).length,
+  }))
+
+  const fuentes = ['whatsapp', 'google', 'form'].map(source => ({
+    source,
+    n: filas.filter(f => f.source === source).length,
+  }))
+
+  // Últimos 6 meses, incluido el actual aunque esté vacío: un mes en cero es información.
+  const hoy = new Date()
+  const meses = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - (5 - i), 1)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const delMes = filas.filter(f => {
+      const c = cuando(f)
+      return c.getFullYear() === d.getFullYear() && c.getMonth() === d.getMonth()
+    })
+    const p = delMes.filter(f => typeof f.rating === 'number')
+    return {
+      key,
+      label: MES_CORTO[d.getMonth()],
+      n: delMes.length,
+      promedio: p.length ? Number((p.reduce((a, f) => a + (f.rating ?? 0), 0) / p.length).toFixed(2)) : null,
+    }
+  })
+
+  const hace30 = new Date(Date.now() - 30 * 864e5)
+  const hace60 = new Date(Date.now() - 60 * 864e5)
+
+  return {
+    total: filas.length,
+    aprobadas: filas.filter(f => f.approved).length,
+    pendientes: filas.filter(f => !f.approved).length,
+    sinPuntaje: filas.length - conPuntaje.length,
+    // Un puntaje bajo publicado es lo primero que hay que ver al entrar.
+    negativas: filas.filter(f => typeof f.rating === 'number' && (f.rating ?? 5) <= 3).length,
+    conFoto: filas.filter(f => !!f.foto_url).length,
+    promedio: conPuntaje.length ? Number((suma / conPuntaje.length).toFixed(2)) : null,
+    distribucion,
+    fuentes,
+    meses,
+    ultimos30: filas.filter(f => cuando(f) >= hace30).length,
+    previos30: filas.filter(f => cuando(f) >= hace60 && cuando(f) < hace30).length,
+  }
+}
+
 /** Lista reseñas. ?estado=pendientes | aprobadas | todas (default: pendientes primero). */
 export async function GET(req: NextRequest) {
   const sid = await storeId()
-  if (!sid) return NextResponse.json({ resenas: [], pendientes: 0 })
+  if (!sid) return NextResponse.json({ resenas: [], pendientes: 0, resumen: null })
 
   const estado = req.nextUrl.searchParams.get('estado') ?? 'todas'
   const where: { store_id: string; approved?: boolean } = { store_id: sid }
@@ -34,6 +101,13 @@ export async function GET(req: NextRequest) {
 
   const pendientes = await prisma.review.count({ where: { store_id: sid, approved: false } })
 
+  // Para el resumen se leen todas (campos mínimos): las cuentas tienen que hablar del total
+  // de la tienda, no de la pestaña abierta.
+  const todas = await prisma.review.findMany({
+    where: { store_id: sid },
+    select: { rating: true, source: true, approved: true, foto_url: true, fecha: true, createdAt: true },
+  })
+
   const resenas = filas.map(r => ({
     id: r.id,
     autor: r.customer?.nombre ?? r.autor ?? 'Cliente',
@@ -46,7 +120,7 @@ export async function GET(req: NextRequest) {
     fecha: (r.fecha ?? r.createdAt).toISOString().slice(0, 10),
   }))
 
-  return NextResponse.json({ resenas, pendientes })
+  return NextResponse.json({ resenas, pendientes, resumen: armarResumen(todas) })
 }
 
 /** Aprueba/oculta una reseña y/o le fija el puntaje (útil para las de WhatsApp, que llegan
