@@ -14,6 +14,7 @@ const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD ?? ''
 const REMITENTE = process.env.MAIL_REMITENTE ?? `Micelium <${GMAIL_USER}>`
 
 export const BASE_URL = process.env.PUBLIC_BASE_URL ?? 'https://guias.infomicelium.com.ar'
+const TIENDA_URL = process.env.TIENDA_URL ?? 'https://infomicelium.com.ar'
 
 const VERDE = '#3f4f38'
 const SAGE = '#6f8a5f'
@@ -58,6 +59,21 @@ function plantilla(titulo: string, cuerpo: string, cta?: { texto: string; url: s
 
 const p = (texto: string): string =>
   `<p style="margin:0 0 14px;font-size:15px;line-height:1.7;color:${TINTA_SUAVE};">${texto}</p>`
+
+/**
+ * Bloque secundario, separado del cuerpo por una línea. Es para lo que NO es el motivo del
+ * mail: se lee después del consejo y nunca antes, así el mail sigue siendo útil aunque no
+ * se mire. Va apagado por defecto en todos los hitos menos donde tiene sentido.
+ */
+const aparte = (titulo: string, texto: string, cta: { texto: string; url: string }): string =>
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:30px 0 0;">
+     <tr><td style="border-top:1px solid #e2ded2;padding-top:20px;">
+       <div style="font-size:11px;letter-spacing:1.6px;color:${SAGE};font-weight:700;margin-bottom:8px;">TAMBI&Eacute;N DE MICELIUM</div>
+       <p style="margin:0 0 10px;font-family:Georgia,serif;font-size:17px;line-height:1.35;color:${TINTA};">${titulo}</p>
+       <p style="margin:0 0 14px;font-size:14px;line-height:1.65;color:${TINTA_SUAVE};">${texto}</p>
+       <a href="${cta.url}" style="font-size:14px;color:${VERDE};text-decoration:underline;">${cta.texto}</a>
+     </td></tr>
+   </table>`
 
 async function enviar(to: string, subject: string, html: string): Promise<boolean> {
   if (!GMAIL_PASS) {
@@ -181,6 +197,14 @@ export function mailCosecha(nombre: string, url: string) {
         ) +
         p(
           'Después de cosechar, rehidratás el sustrato y repetís el shock térmico. El procedimiento completo está en tu cuenta.',
+        ) +
+        // Único lugar del ciclo donde ofrecer el siguiente equipo no interrumpe: ya cosechó,
+        // o sea que el método le funcionó, y la pregunta que sigue sola es cómo hacer más.
+        // En los hitos anteriores el cultivo todavía no dio resultado y sería ruido.
+        aparte(
+          'Cuando el cultivo ya no entra en un equipo',
+          'La incubadora sostiene la temperatura adentro. Para escalar a un placard, un gabinete o una estantería entera, HALO sostiene de 25 a 35&nbsp;°C parejos en todo el mueble — y el invierno deja de definir el calendario.',
+          { texto: 'Ver HALO', url: `${TIENDA_URL}/productos/halo-calentador-de-cultivos-qz5e8/` },
         ),
       { texto: 'Ver cómo seguir', url },
     ),
