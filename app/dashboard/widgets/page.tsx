@@ -260,7 +260,7 @@ export default function WidgetsPage() {
                 <span className="relative z-10">{c.label}</span>
                 <span
                   className="relative z-10 rounded-md px-1.5 py-0.5 font-mono text-[10px]"
-                  style={{ background: activo ? 'rgb(var(--ac) / 0.22)' : 'rgba(255,255,255,0.06)', color: activo ? ACENTO : 'rgba(255,255,255,0.5)' }}
+                  style={{ background: activo ? 'rgb(var(--ac) / 0.22)' : '#191922', color: activo ? ACENTO : 'rgba(255,255,255,0.5)' }}
                 >
                   {n}
                 </span>
@@ -307,7 +307,7 @@ export default function WidgetsPage() {
           onBorrar={() => void borrar(editando)}
         />
       ) : delCtx.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-12 text-center">
+        <div className="rounded-2xl border border-dashed border-white/15 bg-[#0e0e16] p-12 text-center">
           <p className="text-sm text-white/50">Todavía no hay widgets en {ctxActual.label.toLowerCase()}.</p>
           <Button size="sm" className="mt-3" onClick={() => setCreando(true)}>
             Ver el catálogo
@@ -430,7 +430,7 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
                     title={[t.descripcion, t.uso, t.cuidado && `⚠ ${t.cuidado}`]
                       .filter(Boolean)
                       .join('\n\n')}
-                    className="group flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3.5 text-left transition-all hover:border-white/20 hover:bg-white/[0.06]"
+                    className="group flex items-start gap-3 rounded-xl border border-white/10 bg-[#111119] p-3.5 text-left transition-all hover:border-white/20 hover:bg-[#191922]"
                     style={{ borderLeft: `2px solid ${cat.color}88` }}
                   >
                     <span
@@ -706,7 +706,7 @@ function Editor({
                 {/* Casillas con las páginas que existen de verdad. Antes había que escribir la
                     dirección a mano, que es la forma más fácil de equivocarse en una letra y no
                     enterarse nunca. */}
-                <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-white/[0.02] p-2.5">
+                <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-[#0e0e16] p-2.5">
                   {/* Las páginas del contexto del widget van arriba: en un widget de ficha de
                       producto, las fichas son lo único que se va a marcar, y buscarlas abajo de
                       veinte guías es la parte del panel que más cuesta. */}
@@ -721,7 +721,7 @@ function Editor({
                     return (
                       <label
                         key={p.ruta}
-                        className="flex cursor-pointer items-start gap-2 rounded-lg px-1.5 py-1 text-xs text-white/70 hover:bg-white/[0.06]"
+                        className="flex cursor-pointer items-start gap-2 rounded-lg px-1.5 py-1 text-xs text-white/70 hover:bg-[#191922]"
                       >
                         <input
                           type="checkbox"

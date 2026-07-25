@@ -242,7 +242,7 @@ export default function DashboardPage() {
   const isLight     = theme.light     ?? false
   const isGrayscale = theme.grayscale ?? false
 
-  const inputCls  = 'rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70 focus:outline-none focus:border-white/20 transition-colors'
+  const inputCls  = 'rounded-xl border border-white/10 bg-[#14141c] px-3 py-1.5 text-xs text-white/70 focus:outline-none focus:border-white/20 transition-colors'
   const btnBase   = 'px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all border'
   const btnSty    = (active: boolean): React.CSSProperties => active
     ? { background: 'rgb(var(--ac) / 0.15)', color: 'rgb(var(--ac) / 0.9)', borderColor: 'rgb(var(--ac) / 0.3)' }
@@ -266,7 +266,7 @@ export default function DashboardPage() {
         '--t-muted':  isLight ? 'rgba(15,23,42,0.60)'   : 'rgba(255,255,255,0.60)',
         '--t-dim':    isLight ? 'rgba(15,23,42,0.38)'   : 'rgba(255,255,255,0.38)',
         '--t-border': isLight ? 'rgba(15,23,42,0.10)'   : 'rgba(255,255,255,0.08)',
-        '--t-card-bg':isLight ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.03)',
+        '--t-card-bg':isLight ? 'rgba(255,255,255,0.7)' : '#111119',
         color: isLight ? '#0f172a' : 'white',
         background: isLight
           ? theme.bg
@@ -465,7 +465,7 @@ export default function DashboardPage() {
           </div>
 
           {/* ══ EMBUDO DE CONVERSIÓN ═════════════════════════════════ */}
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-5">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 mb-5">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 flex items-center">
                 Embudo de conversión
@@ -501,7 +501,7 @@ export default function DashboardPage() {
           </div>
 
           {/* ── Main chart ──────────────────────────────────────────── */}
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-5">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 mb-5">
             <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
               <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/60">
                 Evolución del período
@@ -543,7 +543,7 @@ export default function DashboardPage() {
 
           {/* ── Revenue vs Spend ─────────────────────────────────────── */}
           <div className="mb-5">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
               <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/60 mb-5">Ingresos TN vs Gasto Meta · {since} → {until}</h3>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barGap={2}>
@@ -576,7 +576,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
 
             {/* Clicks por día */}
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55">Tráfico Meta Ads / día</h3>
                 <span className="text-xs font-bold text-emerald-400">{NUM(s.clicks)} clicks</span>
@@ -602,7 +602,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Fuentes de tráfico — revenue real por canal, ver AttributionSection abajo */}
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
               <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4">Fuentes de tráfico (órdenes)</h3>
               <div className="space-y-3">
                 {(data?.channels ?? []).filter(c => c.orders > 0).map(c => {
@@ -624,7 +624,7 @@ export default function DashboardPage() {
                   )
                 })}
               </div>
-              <div className="mt-4 pt-4 border-t border-white/5 rounded-xl bg-white/[0.02] p-3">
+              <div className="mt-4 pt-4 border-t border-white/5 rounded-xl bg-[#0e0e16] p-3">
                 <p className="text-[10px] text-white/55 leading-relaxed">
                   Clasificación por utm/fbclid capturado por Tiendanube al momento del click. Detalle y ROAS real abajo.
                 </p>
@@ -651,7 +651,7 @@ export default function DashboardPage() {
 
           {/* ── Bottom: LTV ──────────────────────────────────────────── */}
           <div className="grid grid-cols-1 gap-4 mb-5">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 md:max-w-md">
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5 md:max-w-md">
               {/* Título con tooltip */}
               <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 mb-4 flex items-center">
                 LTV / CAC ratio
@@ -723,7 +723,7 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
               {/* Categorías con acordeón */}
-              <div className="lg:col-span-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <div className="lg:col-span-1 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-white/55">
                     Por categoría
@@ -748,7 +748,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Timeline filtrada por producto */}
-              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5">
                 <div className="flex items-baseline justify-between mb-4">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-white/50">
                     {selectedProduct ? `Ingresos — ${selectedProduct.slice(0,30)}…` : 'Ingresos totales por día'}
@@ -800,7 +800,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
               {/* Donut */}
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5">
                 <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 mb-4">
                   {selectedProduct ? `Filtrado: ${selectedProduct.slice(0,20)}…` : 'Distribución general'}
                 </p>
@@ -811,7 +811,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Tabla detalle */}
-              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5">
                 <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 mb-4">Detalle por método</p>
                 {ordersLoading
                   ? <div className="text-white/50 text-xs py-8 text-center">Cargando...</div>
@@ -824,7 +824,7 @@ export default function DashboardPage() {
                       </div>
                       {(ordersData?.payments ?? []).map(p => (
                         <div key={p.label}
-                          className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 hover:bg-white/[0.03] transition-colors group">
+                          className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 hover:bg-[#111119] transition-colors group">
                           <div className="col-span-2 flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
                             <span className="text-[11px] text-white/70 truncate">{p.label}</span>
@@ -867,7 +867,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3 mb-5">
               <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/50">Gasto de los bots (Claude API)</h2>
             </div>
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
               <div className="flex items-baseline justify-between mb-5 flex-wrap gap-2">
                 <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 flex items-center">
                   Costo diario por canal · últimos 30 días
@@ -898,7 +898,7 @@ export default function DashboardPage() {
             </div>
 
             {/* ── Gráfico 12 meses Revenue / Spend / Neto ── */}
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 mb-4">
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 mb-4">
               <div className="flex items-baseline justify-between mb-5">
                 <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55">Ingresos · Gasto Meta · Neto mensual</h3>
                 {monthly && (
@@ -916,7 +916,7 @@ export default function DashboardPage() {
             {/* ── ROAS + CAC trend | Ticket + Órdenes ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+              <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
                 <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-5 flex items-center">ROAS y CAC mensual<HelpTip text="ROAS mide el retorno de la inversión publicitaria. CAC es cuánto cuesta adquirir cada cliente nuevo. Si el ROAS baja o el CAC sube mes a mes, los anuncios están perdiendo eficiencia." /></h3>
                 {monthly
                   ? <RoasCacChart data={monthly.series} />
@@ -925,7 +925,7 @@ export default function DashboardPage() {
                 <p className="text-[9px] text-white/25 mt-2">ROAS baja = Meta se encarece · CAC sube = cuesta más adquirir cada cliente</p>
               </div>
 
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+              <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
                 <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-5 flex items-center">Ticket y volumen<HelpTip text="Ticket promedio = valor promedio por orden. Órdenes = cantidad de ventas. Si el ticket sube sin más órdenes, estás vendiendo productos más caros. Si suben las órdenes, hay más demanda." /></h3>
                 {monthly
                   ? <AvgTicketChart data={monthly.series} />
@@ -939,7 +939,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
               {/* Repeat rate card */}
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+              <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
                 <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4 flex items-center">Tasa de recompra<HelpTip text="% de clientes únicos que compraron en dos o más meses distintos. Un número alto indica fidelidad y reduce la dependencia de publicidad para generar ventas. Saludable: ≥20%." /></h3>
                 {monthly ? (
                   <>
@@ -977,7 +977,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Tabla mensual resumen */}
-              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 overflow-x-auto">
+              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 overflow-x-auto">
                 <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4">Resumen por mes</h3>
                 {monthly ? (
                   <table className="w-full text-[11px]">

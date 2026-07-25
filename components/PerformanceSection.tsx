@@ -117,7 +117,7 @@ export function PerformanceSection({
       .catch(() => { setError('Error al cargar datos de rendimiento'); setLoading(false) })
   }, [since, until])
 
-  const cardCls = 'rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5'
+  const cardCls = 'rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5'
   const titleCls = 'text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4'
 
   if (loading) return (
@@ -185,7 +185,7 @@ export function PerformanceSection({
               ) : (
                 <div className="space-y-2">
                   {gads.campaigns.map(c => (
-                    <div key={c.id} className="rounded-xl bg-white/[0.03] border border-white/[0.05] p-3">
+                    <div key={c.id} className="rounded-xl bg-[#111119] border border-white/[0.05] p-3">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div>
                           <p className="text-[11px] text-white/80 font-medium leading-tight">{c.name}</p>
@@ -216,12 +216,12 @@ export function PerformanceSection({
             </div>
           </div>
         ) : (
-          <div className="rounded-xl bg-white/[0.02] border border-white/[0.04] p-4 text-center space-y-2">
+          <div className="rounded-xl bg-[#0e0e16] border border-white/[0.04] p-4 text-center space-y-2">
             <p className="text-[11px] text-white/50">Google Ads API solo funciona via gRPC (Python)</p>
             <p className="text-[10px] text-white/30 leading-relaxed">
               Ejecutá el script de sincronización para cargar datos en la DB:
             </p>
-            <p className="text-[10px] font-mono text-white/25 bg-white/[0.03] rounded px-3 py-1.5">
+            <p className="text-[10px] font-mono text-white/25 bg-[#111119] rounded px-3 py-1.5">
               python ~/.claude/gads_sync_db.py
             </p>
           </div>

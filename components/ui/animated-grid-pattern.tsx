@@ -127,7 +127,9 @@ export function AnimatedGridPattern({
       ref={containerRef}
       aria-hidden="true"
       className={cn(
-        "pointer-events-none absolute inset-0 h-full w-full fill-gray-400/30 stroke-gray-400/30",
+        // La retícula es ambiente, no información: al 5% se intuye y no compite con los datos.
+        // A 30% (el default de la librería) hacía ruido visual en todas las pantallas.
+        "pointer-events-none absolute inset-0 h-full w-full fill-gray-400/[0.05] stroke-gray-400/[0.05]",
         className
       )}
       {...props}

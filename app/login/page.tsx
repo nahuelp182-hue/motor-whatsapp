@@ -70,7 +70,7 @@ function LoginForm() {
 
         {/* Card */}
         <div className="rounded-2xl border border-white/[0.08] p-6"
-          style={{ background: 'rgba(255,255,255,0.03)' }}>
+          style={{ background: '#111119' }}>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-[10px] uppercase tracking-[0.15em] text-white/40 mb-2">
@@ -82,7 +82,7 @@ function LoginForm() {
                 value={password}
                 onChange={e => { setPassword(e.target.value); setError('') }}
                 placeholder="••••••••"
-                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-orange-500/40 focus:bg-white/[0.06] transition-all"
+                className="w-full rounded-xl border border-white/10 bg-[#14141c] px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-orange-500/40 focus:bg-[#191922] transition-all"
                 autoComplete="current-password"
                 disabled={loading}
               />

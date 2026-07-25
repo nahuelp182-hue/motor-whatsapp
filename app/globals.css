@@ -81,6 +81,24 @@ main[data-light] .rounded-xl:not([data-isolated]) {
   border-color: rgba(15, 23, 42, 0.08) !important;
 }
 
+/* ── Superficies opacas del modo oscuro ──────────────────────── */
+/* Las tarjetas dejaron de ser traslúcidas (bg-white/[0.0x] → grises opacos) para que no se
+   les vea la retícula del fondo. En tema claro esos rellenos oscuros no van: las tarjetas ya
+   reciben su blanco de las reglas de arriba, y lo que no es tarjeta (botones, chips, celdas)
+   vuelve a transparente, que es como se veía antes. */
+main[data-light]
+  :is(
+    [class*="bg-[#0a0a12]"],
+    [class*="bg-[#0e0e16]"],
+    [class*="bg-[#111119]"],
+    [class*="bg-[#14141c]"],
+    [class*="bg-[#16161f]"],
+    [class*="bg-[#191922]"],
+    [class*="bg-[#1e1e28]"]
+  ):not(.rounded-xl):not(.rounded-2xl):not([data-isolated]) {
+  background-color: transparent !important;
+}
+
 /* ── Inputs ──────────────────────────────────────────────────── */
 main[data-light] input[type="date"] {
   background: rgba(255, 255, 255, 0.9) !important;

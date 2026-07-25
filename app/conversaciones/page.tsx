@@ -99,7 +99,7 @@ export default function ConversacionesPage() {
             <a href="/dashboard" className="text-xs text-white/40 hover:text-white/70">← Volver al dashboard</a>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
+            <div className="flex rounded-xl border border-white/[0.08] bg-[#0e0e16] p-1">
               {RANGOS.map((r) => (
                 <button
                   key={r.days}
@@ -112,7 +112,7 @@ export default function ConversacionesPage() {
             </div>
             <button
               onClick={cargar}
-              className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs text-white/60 hover:text-white"
+              className="rounded-xl border border-white/[0.08] bg-[#0e0e16] px-3 py-1.5 text-xs text-white/60 hover:text-white"
             >
               ↻ Actualizar
             </button>
@@ -131,12 +131,12 @@ export default function ConversacionesPage() {
                     key={f.id}
                     onClick={() => { setFiltro(f.id); setSel(null) }}
                     className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition ${
-                      activo ? 'border-white/[0.2] bg-white/[0.08] text-white' : 'border-white/[0.06] bg-white/[0.02] text-white/55 hover:text-white/90'
+                      activo ? 'border-white/[0.2] bg-[#1e1e28] text-white' : 'border-white/[0.06] bg-[#0e0e16] text-white/55 hover:text-white/90'
                     }`}
                   >
                     {f.color && <span className="inline-block h-2 w-2 rounded-full" style={{ background: f.color }} />}
                     <span>{f.label}</span>
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activo ? 'bg-white/[0.15]' : 'bg-white/[0.06] text-white/50'}`}>{n}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activo ? 'bg-white/[0.15]' : 'bg-[#191922] text-white/50'}`}>{n}</span>
                   </button>
                 )
               })}
@@ -145,14 +145,14 @@ export default function ConversacionesPage() {
               value={q}
               onChange={(e) => { setQ(e.target.value); setSel(null) }}
               placeholder="Buscar por nombre, número o texto del mensaje…"
-              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-white/[0.2] focus:outline-none sm:max-w-md"
+              className="w-full rounded-xl border border-white/[0.08] bg-[#0e0e16] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-white/[0.2] focus:outline-none sm:max-w-md"
             />
           </div>
         )}
 
         {loading && <p className="text-sm text-white/40">Cargando…</p>}
         {!loading && convs.length === 0 && (
-          <p className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/40">
+          <p className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 text-sm text-white/40">
             No hay conversaciones en este período.
           </p>
         )}
@@ -167,8 +167,8 @@ export default function ConversacionesPage() {
                   onClick={() => setSel(c.sender)}
                   className={`w-full rounded-xl border p-3 text-left transition ${
                     sel === c.sender
-                      ? 'border-white/[0.15] bg-white/[0.06]'
-                      : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]'
+                      ? 'border-white/[0.15] bg-[#191922]'
+                      : 'border-white/[0.06] bg-[#0e0e16] hover:bg-[#14141c]'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -190,7 +190,7 @@ export default function ConversacionesPage() {
             </div>
 
             {/* Hilo */}
-            <div className={`rounded-2xl border border-white/[0.06] bg-white/[0.02] ${actual ? '' : 'hidden lg:block'}`}>
+            <div className={`rounded-2xl border border-white/[0.06] bg-[#0e0e16] ${actual ? '' : 'hidden lg:block'}`}>
               {actual ? (
                 <div className="flex h-full flex-col">
                   <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] p-4">
@@ -214,7 +214,7 @@ export default function ConversacionesPage() {
                         <div
                           className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${
                             m.role === 'user'
-                              ? 'bg-white/[0.06] text-white/90'
+                              ? 'bg-[#191922] text-white/90'
                               : m.derivar
                                 ? 'bg-amber-500/15 text-amber-100'
                                 : 'bg-emerald-500/15 text-emerald-50'
@@ -300,7 +300,7 @@ function Responder({ sender, onEnviado }: { sender: string; onEnviado: () => voi
           }}
           rows={2}
           placeholder="Responder como Micelium…"
-          className="flex-1 resize-none rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/25 focus:border-white/20 focus:outline-none"
+          className="flex-1 resize-none rounded-xl border border-white/[0.08] bg-[#111119] px-3 py-2 text-sm text-white/90 placeholder:text-white/25 focus:border-white/20 focus:outline-none"
         />
         <button
           onClick={() => void enviar()}

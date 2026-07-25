@@ -18,7 +18,7 @@ export function GlobalRoasGauge({
   const data = [{ name: 'roas', value: clamped, fill: color }]
 
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 flex flex-col sm:flex-row items-center gap-4">
+    <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5 flex flex-col sm:flex-row items-center gap-4">
       <div className="relative w-[180px] h-[110px] flex-shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <RadialBarChart

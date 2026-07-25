@@ -19,7 +19,7 @@ export function AttributionSection({
   channels: Channel[]; timeline: TimelineDay[]; summary: Summary
   since: string; until: string; acHex: string
 }) {
-  const cardCls  = 'rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5'
+  const cardCls  = 'rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5'
   const titleCls = 'text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4'
 
   const totalRevenue = channels.reduce((s, c) => s + c.revenue, 0)
@@ -51,24 +51,24 @@ export function AttributionSection({
         </p>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] p-3 text-center">
+          <div className="rounded-xl bg-[#111119] border border-white/[0.05] p-3 text-center">
             <p className="text-[9px] uppercase tracking-widest text-white/30 mb-1">ROAS Meta real</p>
             <p className={`text-lg font-bold font-mono ${summary.roasMetaReal >= 3 ? 'text-emerald-400' : 'text-orange-400'}`}>
               {summary.roasMetaReal > 0 ? `${summary.roasMetaReal.toFixed(2)}x` : '—'}
             </p>
             <p className="text-[9px] text-white/25 mt-0.5">solo revenue confirmado Meta</p>
           </div>
-          <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] p-3 text-center">
+          <div className="rounded-xl bg-[#111119] border border-white/[0.05] p-3 text-center">
             <p className="text-[9px] uppercase tracking-widest text-white/30 mb-1">Revenue Meta</p>
             <p className="text-lg font-bold font-mono text-white/80">{metaCh ? ARS(metaCh.revenue) : '—'}</p>
             <p className="text-[9px] text-white/25 mt-0.5">{metaCh?.orders ?? 0} órdenes</p>
           </div>
-          <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] p-3 text-center">
+          <div className="rounded-xl bg-[#111119] border border-white/[0.05] p-3 text-center">
             <p className="text-[9px] uppercase tracking-widest text-white/30 mb-1">Revenue Orgánico/Directo</p>
             <p className="text-lg font-bold font-mono text-white/80">{orgCh ? ARS(orgCh.revenue) : '—'}</p>
             <p className="text-[9px] text-white/25 mt-0.5">{orgCh?.orders ?? 0} órdenes · costo $0</p>
           </div>
-          <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] p-3 text-center">
+          <div className="rounded-xl bg-[#111119] border border-white/[0.05] p-3 text-center">
             <p className="text-[9px] uppercase tracking-widest text-white/30 mb-1">Sin dato (ciego)</p>
             <p className="text-lg font-bold font-mono text-white/50">{ciegoCh ? ARS(ciegoCh.revenue) : '—'}</p>
             <p className="text-[9px] text-white/25 mt-0.5">{ciegoCh?.orders ?? 0} órdenes · no es orgánico confirmado</p>

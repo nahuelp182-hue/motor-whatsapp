@@ -10,22 +10,27 @@
 //          acento salvia #6f8a5f · texto-acento #57704a · wash #eef1e9
 
 // ── Modo premium oscuro (24/07/26) ────────────────────────────────────────────
-// El panel dejó de ser una isla clara: ahora comparte el tema oscuro glass del resto del
-// dashboard (fondo #07070f, tarjetas white/[0.02], acento salvia vía --ac). Los componentes
-// shadcn se dan vuelta con la clase `dark` en el <main>; estos tokens cubren lo hardcodeado.
+// El panel dejó de ser una isla clara: ahora comparte el tema oscuro del resto del dashboard
+// (fondo #07070f, acento salvia vía --ac). Los componentes shadcn se dan vuelta con la clase
+// `dark` en el <main>; estos tokens cubren lo hardcodeado.
+//
+// Superficies opacas (25/07/26): las tarjetas eran white/[0.0x] traslúcido y dejaban ver la
+// retícula y las auroras del fondo por debajo — el contenido flotaba sobre ruido. Ahora cada
+// nivel es un gris azulado opaco, ya mezclado sobre el fondo de página:
+//   #0a0a12 · #0e0e16 (tarjeta) · #111119 · #14141c (campo) · #16161f · #191922 · #1e1e28
 
 /** Acento holográfico (violeta-índigo) legible sobre oscuro, a tono con el dashboard. */
 export const ACENTO = '#a5b4fc'
 /** Fuente de títulos — Fraunces, servida por el layout como variable. */
 export const TITULO = 'var(--font-fraunces), Georgia, serif'
 
-/** Tarjeta base: glass sutil, igual que las del dashboard. */
+/** Tarjeta base: superficie opaca, igual que las del dashboard. */
 export const CARD =
-  'rounded-2xl border border-white/[0.06] bg-white/[0.02]'
+  'rounded-2xl border border-white/[0.06] bg-[#0e0e16]'
 
-/** Campo de formulario glass sobre oscuro. */
+/** Campo de formulario sobre oscuro. */
 export const INPUT =
-  'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/80 ' +
+  'w-full rounded-xl border border-white/10 bg-[#14141c] px-3 py-2 text-sm text-white/80 ' +
   'placeholder:text-white/30 focus:border-white/25 focus:ring-2 focus:ring-white/10 ' +
   'focus:outline-none transition-colors'
 
@@ -55,14 +60,18 @@ export const SUBSECCION = 'text-[15px] font-semibold tracking-tight text-white'
 export const EYEBROW = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45'
 
 // ── Tonos de panel ───────────────────────────────────────────────────────────
-// Tarjetas de indicador glass, tintadas con el color de su categoría (menta / celeste /
-// durazno / violeta) sobre el fondo oscuro. Tintes muy bajos: el color titula, el número —en
-// blanco— manda la lectura. Mismos colores de categoría de más abajo.
+// Tarjetas de indicador tintadas con el color de su categoría (menta / celeste / durazno /
+// violeta). Tintes muy bajos: el color titula, el número —en blanco— manda la lectura.
+// Mismos colores de categoría de más abajo.
+//
+// Los fondos son OPACOS (el tinte ya viene mezclado sobre el #07070f de la página, no es un
+// rgba): las tarjetas son superficie, no vidrio. Con relleno traslúcido se les veía la
+// retícula y las auroras del fondo por debajo y el panel entero hacía ruido.
 export const TONOS = {
-  salvia:  { fondo: 'rgb(111 138 95 / 0.13)', borde: 'rgb(111 138 95 / 0.22)' },
-  celeste: { fondo: 'rgb(95 168 211 / 0.11)', borde: 'rgb(95 168 211 / 0.20)' },
-  durazno: { fondo: 'rgb(240 160 60 / 0.11)', borde: 'rgb(240 160 60 / 0.20)' },
-  violeta: { fondo: 'rgb(155 140 240 / 0.11)', borde: 'rgb(155 140 240 / 0.20)' },
+  salvia:  { fondo: '#151819', borde: 'rgb(111 138 95 / 0.22)' },
+  celeste: { fondo: '#111925', borde: 'rgb(95 168 211 / 0.20)' },
+  durazno: { fondo: '#211814', borde: 'rgb(240 160 60 / 0.20)' },
+  violeta: { fondo: '#171628', borde: 'rgb(155 140 240 / 0.20)' },
 } as const
 
 export type TonoKey = keyof typeof TONOS
@@ -76,9 +85,9 @@ export const AYUDA = 'mt-1.5 text-[13px] leading-relaxed text-white/50'
 /** Advertencia: ámbar legible sobre oscuro. */
 export const AVISO = 'text-xs leading-relaxed text-amber-400'
 
-/** Botón secundario glass. */
+/** Botón secundario. */
 export const BTN =
-  'rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/70 ' +
+  'rounded-md border border-white/10 bg-[#14141c] px-3 py-1.5 text-xs font-medium text-white/70 ' +
   'hover:border-white/25 hover:text-white transition-all disabled:opacity-30'
 
 // ── Categorías ───────────────────────────────────────────────────────────────
@@ -140,6 +149,7 @@ const ICONOS: Record<string, string> = {
   especificaciones: '📋',
   banner_anuncio: '📣',
   cuenta_regresiva: '⏳',
+  corte_despacho: '🕒',
   video: '▶️',
   progreso_envio: '📦',
   pack_complementarios: '🎁',

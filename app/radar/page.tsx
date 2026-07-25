@@ -45,7 +45,7 @@ function fmtViews(n: number): string {
 
 function TarjetaYouTube({ videos }: { videos: YTVideo[] }) {
   return (
-    <section className="rounded-2xl border bg-white/[0.02] p-5" style={{ borderColor: '#ef444455' }}>
+    <section className="rounded-2xl border bg-[#0e0e16] p-5" style={{ borderColor: '#ef444455' }}>
       <h2 className="text-sm font-semibold" style={{ color: '#f87171' }}>📺 Qué performa en YouTube</h2>
       <p className="mb-3 text-[11px] text-white/40">Videos de tu nicho por vistas — formatos/ángulos que funcionan</p>
       {videos.length === 0 ? (
@@ -60,7 +60,7 @@ function TarjetaYouTube({ videos }: { videos: YTVideo[] }) {
               rel="noopener"
               className="flex items-start gap-2 border-t border-white/[0.05] py-1.5 text-sm text-white/85 first:border-t-0 hover:text-red-300"
             >
-              <span className="mt-0.5 shrink-0 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/60">
+              <span className="mt-0.5 shrink-0 rounded bg-[#191922] px-1.5 py-0.5 text-[10px] text-white/60">
                 {fmtViews(v.views)}
               </span>
               <span className="flex-1">
@@ -114,7 +114,7 @@ function Card({ titulo, sub, filas, max, acento }: {
 }) {
   return (
     <section
-      className="rounded-2xl border bg-white/[0.02] p-5"
+      className="rounded-2xl border bg-[#0e0e16] p-5"
       style={{ borderColor: acento ? acento + '55' : 'rgba(255,255,255,0.06)' }}
     >
       <h2 className="text-sm font-semibold" style={{ color: acento ?? '#e8eaed' }}>{titulo}</h2>
@@ -152,7 +152,7 @@ export default async function RadarPage() {
         </p>
 
         {total === 0 ? (
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/60">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 text-sm text-white/60">
             Todavía no hay snapshot. El radar corre cada mañana (cron diario). Volvé mañana
             o disparalo manualmente desde <code className="text-white/80">/api/cron/radar</code>.
           </div>

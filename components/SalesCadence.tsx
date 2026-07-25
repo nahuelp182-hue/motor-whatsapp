@@ -67,7 +67,7 @@ export function SalesCadence({ since, until, acHex = '#f97316' }: Props) {
   const maxOrders = data ? Math.max(...data.daily.map(d => d.orders), 1) : 1
 
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">

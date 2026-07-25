@@ -35,8 +35,8 @@ export function ProductsChart({
               isSelected
                 ? 'border-orange-500/40 bg-orange-500/10'
                 : isOther
-                ? 'border-white/[0.04] bg-white/[0.01] opacity-40'
-                : 'border-white/[0.06] bg-white/[0.02] hover:border-white/10 hover:bg-white/[0.04]'
+                ? 'border-white/[0.04] bg-[#0a0a12] opacity-40'
+                : 'border-white/[0.06] bg-[#0e0e16] hover:border-white/10 hover:bg-[#14141c]'
             }`}
           >
             <div className="flex items-center justify-between mb-2">

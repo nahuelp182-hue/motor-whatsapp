@@ -310,7 +310,7 @@ export default function ResenasPage() {
               }`}
               style={{
                 borderColor: on ? a.color : 'rgba(255,255,255,0.08)',
-                background: on ? `${a.color}1f` : 'rgba(255,255,255,0.02)',
+                background: on ? `${a.color}1f` : '#0e0e16',
               }}
             >
               <Icon className="size-4 shrink-0" style={{ color: a.color }} />
@@ -367,7 +367,7 @@ export default function ResenasPage() {
                 title={`${d.n} reseña${d.n === 1 ? '' : 's'} de ${d.estrellas} estrellas`}
               >
                 <span className="w-9 shrink-0 text-right font-mono text-[12px] text-white/45">{d.estrellas}★</span>
-                <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-[#191922]">
                   <motion.span
                     className="block h-full rounded-full"
                     style={{ background: d.estrellas <= 3 ? '#f87171' : DORADO }}
@@ -436,7 +436,7 @@ export default function ResenasPage() {
           value={busca}
           onChange={e => setBusca(e.target.value)}
           placeholder="Buscar por nombre, texto o producto…"
-          className="min-w-[220px] flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/80 transition-colors placeholder:text-white/30 focus:border-white/25 focus:outline-none focus:ring-2 focus:ring-white/10"
+          className="min-w-[220px] flex-1 rounded-xl border border-white/10 bg-[#14141c] px-3 py-2 text-sm text-white/80 transition-colors placeholder:text-white/30 focus:border-white/25 focus:outline-none focus:ring-2 focus:ring-white/10"
         />
 
         {(chip || fuente || busca) && (

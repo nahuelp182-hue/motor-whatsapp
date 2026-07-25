@@ -35,7 +35,7 @@ export function Trend7d({ trend }: { trend: Trend }) {
           </div>
         </div>
 
-        <div className="w-px h-8 bg-white/[0.06] flex-shrink-0 hidden md:block" />
+        <div className="w-px h-8 bg-[#191922] flex-shrink-0 hidden md:block" />
 
         {/* Barras comparativas */}
         <div className="flex-1 min-w-0 space-y-1.5">
@@ -59,7 +59,7 @@ export function Trend7d({ trend }: { trend: Trend }) {
           </div>
         </div>
 
-        <div className="w-px h-8 bg-white/[0.06] flex-shrink-0 hidden md:block" />
+        <div className="w-px h-8 bg-[#191922] flex-shrink-0 hidden md:block" />
 
         {/* Diferencia */}
         <div className="flex-shrink-0 text-right">

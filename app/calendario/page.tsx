@@ -44,7 +44,7 @@ function Tarjeta({ it }: { it: ItemCalendario }) {
   const urgente = it.faltan >= 0 && it.faltan <= 10
   return (
     <article
-      className="rounded-2xl border bg-white/[0.02] p-4 flex flex-col"
+      className="rounded-2xl border bg-[#0e0e16] p-4 flex flex-col"
       style={{ borderColor: urgente ? col + '66' : 'rgba(255,255,255,0.06)', borderLeft: `4px solid ${col}` }}
     >
       <header className="flex items-start justify-between gap-2">
@@ -73,7 +73,7 @@ function Tarjeta({ it }: { it: ItemCalendario }) {
         {it.promo}
       </div>
 
-      <div className="mb-3 rounded-xl bg-white/[0.03] p-2.5 text-sm italic text-white/75">
+      <div className="mb-3 rounded-xl bg-[#111119] p-2.5 text-sm italic text-white/75">
         <span className="mr-1.5 rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold not-italic text-white/70">
           JUSTIFICATIVO
         </span>
@@ -133,7 +133,7 @@ export default async function CalendarioPage({
             <h1 className="text-xl font-semibold">📅 Calendario Comercial Vivo</h1>
             <a href="/dashboard" className="text-xs text-white/40 hover:text-white/70">← Volver al dashboard</a>
           </div>
-          <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
+          <div className="flex rounded-xl border border-white/[0.08] bg-[#0e0e16] p-1">
             {RANGOS.map((d) => (
               <a
                 key={d}
@@ -150,15 +150,15 @@ export default async function CalendarioPage({
 
         {/* Stats */}
         <div className="mb-5 grid grid-cols-3 gap-2 sm:max-w-md">
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-3">
             <div className="text-lg font-semibold">{items.length}</div>
             <div className="text-[11px] text-white/45">fechas en juego</div>
           </div>
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-3">
             <div className="text-lg font-semibold" style={{ color: urgentes ? '#fb923c' : undefined }}>{urgentes}</div>
             <div className="text-[11px] text-white/45">acción en ≤10 días</div>
           </div>
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-3">
             <div className="text-lg font-semibold text-emerald-400">+20%</div>
             <div className="text-[11px] text-white/45">meta anual</div>
           </div>

@@ -86,7 +86,7 @@ export default function MarketingAutomaticoPage() {
             <a href="/dashboard" className="text-xs text-white/40 hover:text-white/70">← Volver al dashboard</a>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
+            <div className="flex rounded-xl border border-white/[0.08] bg-[#0e0e16] p-1">
               {RANGOS.map((r) => (
                 <button
                   key={r.days}
@@ -99,7 +99,7 @@ export default function MarketingAutomaticoPage() {
             </div>
             <button
               onClick={cargar}
-              className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs text-white/60 hover:text-white"
+              className="rounded-xl border border-white/[0.08] bg-[#0e0e16] px-3 py-1.5 text-xs text-white/60 hover:text-white"
             >
               ↻ Actualizar
             </button>
@@ -123,7 +123,7 @@ export default function MarketingAutomaticoPage() {
             </div>
 
             {/* Estado de plantillas */}
-            <div className="mb-5 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="mb-5 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-4">
               <h2 className="mb-3 text-sm font-semibold text-white/80">Estado de plantillas (Meta)</h2>
               <div className="grid gap-2 sm:grid-cols-2">
                 {data.templates.map((t) => {
@@ -145,7 +145,7 @@ export default function MarketingAutomaticoPage() {
               {Object.entries(NOMBRE_EVENTO).map(([key, label]) => {
                 const c = data.porEvento[key] ?? { enviados: 0, fallidos: 0, pendientes: 0 }
                 return (
-                  <div key={key} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+                  <div key={key} className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-4">
                     <div className="mb-2 text-sm font-medium text-white/80">{label}</div>
                     <div className="flex gap-4 text-xs text-white/50">
                       <span><span className="text-base font-semibold text-emerald-400">{c.enviados}</span> enviados</span>
@@ -158,7 +158,7 @@ export default function MarketingAutomaticoPage() {
             </div>
 
             {/* Reseñas recibidas */}
-            <div className="mb-5 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="mb-5 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-4">
               <h2 className="mb-3 text-sm font-semibold text-white/80">⭐ Reseñas recibidas ({data.resenas.length})</h2>
               {data.resenas.length === 0 && (
                 <p className="text-sm text-white/40">Todavía no llegó ninguna respuesta al pedido de reseña.</p>
@@ -177,7 +177,7 @@ export default function MarketingAutomaticoPage() {
             </div>
 
             {/* Actividad reciente */}
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-4">
               <h2 className="mb-3 text-sm font-semibold text-white/80">Actividad reciente</h2>
               {data.recientes.length === 0 && (
                 <p className="text-sm text-white/40">Sin envíos en este período todavía.</p>
@@ -215,7 +215,7 @@ export default function MarketingAutomaticoPage() {
 
 function Kpi({ label, value, accent }: { label: string; value: number; accent?: string }) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+    <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-3">
       <div className="text-lg font-semibold" style={accent ? { color: accent } : undefined}>{value}</div>
       <div className="text-[11px] text-white/45">{label}</div>
     </div>

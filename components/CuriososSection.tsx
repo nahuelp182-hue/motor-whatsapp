@@ -54,7 +54,7 @@ export function CuriososSection({ acHex }: { acHex: string }) {
       .catch((e: Error) => { setErr(e.message); setLoading(false) })
   }, [])
 
-  const cardCls = 'rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5'
+  const cardCls = 'rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5'
   const titleCls = 'text-[10px] uppercase tracking-[0.18em] text-white/55 flex items-center gap-1.5'
 
   const cohortes = (data?.cohortes ?? []).filter((c) => c.visitantes > 0)
@@ -103,7 +103,7 @@ export function CuriososSection({ acHex }: { acHex: string }) {
             {cohortes.map((c) => {
               const m = meta(c.canal)
               return (
-                <div key={c.canal} className="rounded-xl bg-white/[0.03] border border-white/[0.05] p-3">
+                <div key={c.canal} className="rounded-xl bg-[#111119] border border-white/[0.05] p-3">
                   <div className="flex items-center gap-1.5 mb-2">
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: m.color }} />
                     <span className="text-[11px] text-white/70 truncate">{m.label}</span>

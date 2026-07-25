@@ -169,7 +169,7 @@ export function SubirMedia({ valor, label, ayuda, recomendado, onChange }: Props
 
       {valor ? (
         <div className="flex items-start gap-3">
-          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.05]">
+          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#16161f]">
             {esVideo ? (
               <video src={valor} className="h-full w-full object-cover" autoPlay loop muted playsInline />
             ) : (

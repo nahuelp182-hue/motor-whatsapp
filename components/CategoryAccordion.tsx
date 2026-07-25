@@ -36,7 +36,7 @@ export function CategoryAccordion({
             {/* ── Cabecera de categoría ── */}
             <button
               onClick={() => setOpen(isOpen ? null : cat.name)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#111119] transition-colors"
             >
               {/* Color dot */}
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: cat.color }} />
@@ -64,7 +64,7 @@ export function CategoryAccordion({
 
             {/* ── Productos desplegables ── */}
             {isOpen && (
-              <div className="px-4 pb-3 pt-2 space-y-1 bg-white/[0.01]">
+              <div className="px-4 pb-3 pt-2 space-y-1 bg-[#0a0a12]">
                 {cat.products.map(prod => {
                   const isSelected = selectedProduct === prod.name
                   return (
@@ -74,7 +74,7 @@ export function CategoryAccordion({
                       className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left transition-all border ${
                         isSelected
                           ? 'border-orange-500/30 bg-orange-500/10'
-                          : 'border-transparent hover:bg-white/[0.04] hover:border-white/[0.06]'
+                          : 'border-transparent hover:bg-[#14141c] hover:border-white/[0.06]'
                       }`}
                     >
                       {/* Barra mini de revenue */}
@@ -105,7 +105,7 @@ export function CategoryAccordion({
       })}
 
       {/* ── Total ── */}
-      <div className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02]">
+      <div className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-white/[0.06] bg-[#0e0e16]">
         <span className="text-[11px] text-white/50">Total período</span>
         <div className="flex items-center gap-4">
           <span className="text-[10px] text-white/35">
