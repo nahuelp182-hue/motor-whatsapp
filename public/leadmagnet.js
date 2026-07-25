@@ -51,13 +51,13 @@
     '.lm-err{color:#b0341d}.lm-ok{color:#3f8f3f}'+
     '.lm-success{padding:8px 0}.lm-success .big{font-size:40px}'+
     '.lm-success h3{font-size:19px;color:#1c1a17;margin:8px 0 6px}'+
-    '.lm-blogcta{margin:34px 0;border:1.5px solid #e6ded4;border-radius:14px;background:#faf5ef;padding:22px 24px}'+
+    '.lm-blogcta{margin:34px 0;border:1px solid #dfe3d8;border-radius:14px;background:#f4f2eb;padding:22px 24px}'+
     '.lm-cta-in{display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:space-between}'+
     '.lm-cta-tx{flex:1;min-width:220px}'+
-    '.lm-cta-tx b{display:block;font-size:16px;color:#1c1a17;margin-bottom:4px}'+
+    '.lm-cta-tx b{display:block;font-size:16px;color:#3f4f38;margin-bottom:4px}'+
     '.lm-cta-tx span{font-size:13.5px;color:#5a5148;line-height:1.45}'+
-    '.lm-blogcta button{background:#b0341d;color:#fff;border:none;border-radius:9px;padding:13px 22px;'+
-    'font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap}';
+    '.lm-blogcta button{background:#3f4f38;color:#fff;border:none;border-radius:999px;padding:13px 22px;'+
+    'font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}';
 
   var HTML =
     '<div class="lm-card">'+
@@ -138,7 +138,12 @@
     }
     window.__lmOpen = function(){ form.style.display=''; okBox.style.display='none'; btn.disabled=false; msg.textContent=''; open(); };
 
-    // CTA automatico al final de cada nota del blog (no depende de editar los posts)
+    // CTA automatico dentro de cada nota del blog (no depende de editar los posts).
+    //
+    // Antes se insertaba DESPUES de .post-content, o sea al pie de la nota: ahi llega una
+    // fraccion de quien empieza a leer. Ahora entra INTERCALADO, despues del cuarto
+    // parrafo, que es donde el lector ya entendio de que se trata y todavia esta leyendo.
+    // Si la nota es corta y no llega a cinco parrafos, cae al pie como antes.
     var pc = document.querySelector('.post-content');
     if (pc && !document.querySelector('.lm-blogcta')) {
       var cta = document.createElement('div');
@@ -151,7 +156,10 @@
           '</div>'+
           '<button type="button" data-leadmagnet>DESCARGAR GU&Iacute;A GRATIS</button>'+
         '</div>';
-      pc.parentNode.insertBefore(cta, pc.nextSibling);
+
+      var parrafos = pc.querySelectorAll(':scope > p');
+      if (parrafos.length >= 5) pc.insertBefore(cta, parrafos[4]);
+      else pc.parentNode.insertBefore(cta, pc.nextSibling);
     }
   }
 
