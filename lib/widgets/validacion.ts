@@ -61,6 +61,58 @@ const REGLAS: Record<string, Regla> = {
     return []
   },
 
+  corte_despacho(c) {
+    const avisos: Aviso[] = []
+    const claves = ['dia_lun', 'dia_mar', 'dia_mie', 'dia_jue', 'dia_vie', 'dia_sab', 'dia_dom']
+    const cuantos = claves.filter(k => c[k]).length
+    if (!cuantos)
+      return [{ nivel: 'error', mensaje: 'No marcaste ningún día de despacho: sin días el widget no se muestra.' }]
+
+    // Con pocos días de despacho, la mayor parte de la semana el mensaje pasa a ser "sale
+    // el martes" — o sea, el widget le anuncia una demora a quien estaba por comprar.
+    if (cuantos <= 2)
+      avisos.push({
+        nivel: 'aviso',
+        mensaje: `Con ${cuantos} día${cuantos > 1 ? 's' : ''} de despacho, buena parte de la semana el cartel va a decir «sale el …» en vez de «sale hoy». Sobre el historial de INC101, dos días por semana dejan al 50 % de las compras leyendo una espera de 3 o 4 días.`,
+      })
+
+    const h = num(c.hora_corte)
+    if (h < 8 || h > 20)
+      avisos.push({
+        key: 'hora_corte',
+        nivel: 'aviso',
+        mensaje: 'La hora de corte está fuera del horario de trabajo. Es hora de Argentina y en punto: 14 son las dos de la tarde.',
+      })
+
+    // Un corte muy temprano manda a "sale mañana" casi todas las visitas del día.
+    if (h > 0 && h <= 10)
+      avisos.push({
+        key: 'hora_corte',
+        nivel: 'aviso',
+        mensaje: 'Un corte tan temprano deja casi todas las visitas del día leyendo «sale mañana». Cuanto más tarde sea el corte, más gente ve «sale hoy» — mientras puedas cumplirlo.',
+      })
+
+    // El widget promete una fecha; en feriado no hay despacho y la promesa se rompe.
+    const feriados = txt(c.feriados)
+      .split(/[\n,;]+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+    if (!feriados.length)
+      avisos.push({
+        key: 'feriados',
+        nivel: 'aviso',
+        mensaje: 'No hay feriados cargados. En un feriado el widget va a decir «sale hoy» con el depósito cerrado, y eso el cliente lo ve en el seguimiento de Andreani.',
+      })
+    else if (feriados.some(f => !/^\d{4}-\d{2}-\d{2}$/.test(f)))
+      avisos.push({
+        key: 'feriados',
+        nivel: 'error',
+        mensaje: 'Hay líneas que no son fechas válidas y se van a ignorar. Va una por línea, como año-mes-día: 2026-08-17.',
+      })
+
+    return avisos
+  },
+
   progreso_envio(c) {
     if (num(c.objetivo) <= 0)
       return [{ key: 'objetivo', nivel: 'error', mensaje: 'El monto para envío gratis está en $0: con eso el widget no se muestra. Poné el mismo monto que tenés configurado en Tiendanube.' }]

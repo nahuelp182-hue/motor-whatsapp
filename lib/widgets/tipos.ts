@@ -74,15 +74,39 @@ export const PALETA = [
 
 // ── Ubicaciones ──────────────────────────────────────────────────────────────
 // Reemplazo del viejo `data-mic-slot`. El lugar se elige de esta lista y lo resuelve
-// mic.js midiendo el contenido de la página. Así mover un widget es un clic, y no editar
-// el HTML de diez guías.
-export const UBICACIONES = [
+// mic.js. Así mover un widget es un clic, y no editar el HTML de diez guías.
+//
+// Hay dos listas porque son dos páginas distintas. En una guía el contenido es texto
+// corrido y lo único que se puede pedir es "más arriba" o "más abajo". En la ficha de
+// producto, en cambio, los bloques tienen nombre —precio, cuotas, formulario de compra,
+// descripción— y ahí la ubicación se elige contra ESE bloque. Pedir "en el medio" en una
+// ficha no quiere decir nada: por eso antes los widgets caían al fondo de la columna.
+
+/** Guías, blog y páginas de tienda: texto corrido, se mide por párrafos. */
+export const UBICACIONES_TEXTO = [
   { value: 'inicio', label: 'Arriba de todo', ayuda: 'Antes del primer párrafo.' },
   { value: 'tras_intro', label: 'Después de la introducción', ayuda: 'Tras el primer párrafo, cuando ya enganchó pero todavía no se fue.' },
   { value: 'medio', label: 'En el medio', ayuda: 'A mitad del texto, entre dos párrafos.' },
   { value: 'antes_final', label: 'Antes del cierre', ayuda: 'Justo antes del último párrafo.' },
   { value: 'final', label: 'Al final', ayuda: 'Después de todo el contenido. Es el lugar más seguro: nunca interrumpe.' },
 ] as const
+
+/** Ficha de producto: cada opción es una ranura ENTRE dos bloques reales de la columna de
+ *  compra, en el orden en que se ven. Los `value` los resuelve el mapa ANCLAS de mic.js.
+ *  La lista es corta a propósito: dos opciones que caen en el mismo lugar físico —"debajo
+ *  del envío" y "arriba del formulario" son la misma ranura— solo hacen dudar al elegir. */
+export const UBICACIONES_FICHA = [
+  { value: 'prod_titulo', label: 'Debajo del título', ayuda: 'Entre el nombre del producto y el precio.', bloque: 'Título del producto' },
+  { value: 'prod_precio', label: 'Debajo del precio', ayuda: 'Pegado al precio, antes de las cuotas. Es la franja más leída de la ficha.', bloque: 'Precio' },
+  { value: 'prod_pagos', label: 'Debajo de las cuotas', ayuda: 'Después del bloque de medios de pago, cuotas y aviso de envío gratis.', bloque: 'Cuotas y medios de pago' },
+  { value: 'prod_form_arriba', label: 'Arriba del formulario de compra', ayuda: 'Justo antes de la cantidad, las variantes y el botón. Último argumento antes de decidir.', bloque: 'Envío' },
+  { value: 'prod_boton', label: 'Debajo del botón de compra', ayuda: 'Después de todo el formulario, incluido "Agregar al carrito".', bloque: 'Cantidad + Agregar al carrito' },
+  { value: 'prod_desc', label: 'Debajo de la descripción', ayuda: 'Después del texto largo del producto, para quien leyó todo.', bloque: 'Descripción' },
+  { value: 'prod_final', label: 'Al final de la columna', ayuda: 'Al fondo de todo. Es el lugar más seguro: nunca interrumpe.', bloque: '' },
+] as const
+
+/** Unión de las dos: la usa la validación, que no sabe de contextos. */
+export const UBICACIONES = [...UBICACIONES_TEXTO, ...UBICACIONES_FICHA] as const
 
 // ── Destinos de enlace ───────────────────────────────────────────────────────
 // Lista cerrada de destinos reales. Evita tener que escribir direcciones a mano (y que
@@ -1122,6 +1146,102 @@ const TIPOS_BASE: TipoWidget[] = [
     ],
   },
   {
+    slug: 'corte_despacho',
+    nombre: 'Corte de despacho',
+    descripcion:
+      'Muestra si la compra entra en el despacho de hoy, con el reloj corriendo hasta la hora de cierre. Pasado el corte cambia solo y dice cuándo sale. La urgencia sale de la operación real, así que no hay nada que actualizar nunca.',
+    categoria: 'conversion',
+    contextos: ['tienda', 'producto'],
+    bloque: true,
+    uso:
+      'Se inserta donde elijas, idealmente arriba del botón de comprar. Calcula el próximo despacho con la hora de Argentina, no con el reloj del visitante: alguien que entra desde España ve lo mismo que alguien de Córdoba.',
+    cuidado:
+      'Los días y la hora de corte tienen que ser los que cumplís de verdad. Si dice «sale hoy» y sale al otro día, el cliente lo detecta en el seguimiento de Andreani y es peor que no poner nada. Cargá los feriados: en un feriado el widget diría «sale hoy» con el depósito cerrado.',
+    campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'medio',
+        ayuda: 'Arriba del botón de comprar es donde más rinde: se lee justo antes de decidir.',
+      },
+      // Un booleano por día en vez de una lista de opciones: así se ve de un golpe qué
+      // días se despacha, y cambiar la cadencia en temporada baja es un clic.
+      { key: 'dia_lun', label: 'Despacho los lunes', tipo: 'booleano', porDefecto: true },
+      { key: 'dia_mar', label: 'Despacho los martes', tipo: 'booleano', porDefecto: true },
+      { key: 'dia_mie', label: 'Despacho los miércoles', tipo: 'booleano', porDefecto: true },
+      { key: 'dia_jue', label: 'Despacho los jueves', tipo: 'booleano', porDefecto: true },
+      { key: 'dia_vie', label: 'Despacho los viernes', tipo: 'booleano', porDefecto: true },
+      {
+        key: 'dia_sab',
+        label: 'Despacho los sábados',
+        tipo: 'booleano',
+        porDefecto: true,
+        ayuda: 'Solo si Andreani retira ese día. El sábado es el 11 % de las compras y sin despacho sabatino esas visitas leen «sale el lunes».',
+      },
+      { key: 'dia_dom', label: 'Despacho los domingos', tipo: 'booleano', porDefecto: false },
+      {
+        key: 'hora_corte',
+        label: 'Hora de cierre del despacho',
+        tipo: 'numero',
+        porDefecto: 14,
+        min: 0,
+        max: 23,
+        ayuda:
+          'Hora de Argentina, en punto. Es el último momento en que una compra entra en el despacho de ese día. Más tarde el corte, más visitas ven «sale hoy» — pero tiene que ser una hora que llegues a cumplir.',
+      },
+      {
+        key: 'horas_reloj',
+        label: 'Mostrar el reloj cuando falten menos de (horas)',
+        tipo: 'numero',
+        porDefecto: 8,
+        min: 1,
+        max: 24,
+        ayuda:
+          'Con muchas horas por delante un reloj corriendo no apura a nadie y queda a truco de vendedor. Arriba de este número se muestra el mismo mensaje sin el reloj.',
+      },
+      {
+        key: 'titulo_abierto',
+        label: 'Título — entra en el despacho de hoy',
+        tipo: 'texto',
+        porDefecto: 'Sale hoy',
+        ayuda: 'Corto. Es lo único que se lee seguro.',
+      },
+      {
+        key: 'nota_abierta',
+        label: 'Nota — entra en el despacho de hoy',
+        tipo: 'texto',
+        porDefecto: 'Cierre del despacho a las {hora}. Después entra en el del {proximo}.',
+        ayuda:
+          'Podés usar {hora} (la hora de corte), {proximo} (el día del despacho siguiente, sin artículo) y {dia} (hoy). Se reemplazan solos.',
+      },
+      {
+        key: 'titulo_cerrado',
+        label: 'Título — ya cerró el de hoy',
+        tipo: 'texto',
+        porDefecto: 'Sale {dia}',
+        ayuda:
+          '{dia} ya trae el artículo puesto y se resuelve como «mañana» o «el martes» según corresponda, así que escribilo sin «el» delante. Acá no hay urgencia real que mostrar: lo que convence es la fecha concreta.',
+      },
+      {
+        key: 'nota_cerrada',
+        label: 'Nota — ya cerró el de hoy',
+        tipo: 'texto',
+        porDefecto: 'Lo despachamos {dia} y Andreani lo retira ese mismo día.',
+        ayuda: 'Mismos reemplazos: {dia} es el próximo despacho, {hora} la hora de corte.',
+      },
+      {
+        key: 'feriados',
+        label: 'Feriados y días sin despacho',
+        tipo: 'textarea',
+        placeholder: '2026-08-17\n2026-10-12\n2026-11-23',
+        ayuda:
+          'Una fecha por línea, como año-mes-día. Esos días se saltean: el widget pasa al siguiente día de despacho en vez de prometer uno que no va a existir. Conviene cargar el año entero de una vez.',
+      },
+      CAMPO_COLOR,
+    ],
+  },
+  {
     slug: 'cuenta_regresiva',
     nombre: 'Cuenta regresiva',
     descripcion: 'Reloj hacia una fecha real: cierre de una preventa, fin de una promoción, corte de despacho.',
@@ -1702,7 +1822,7 @@ export function sanearConfig(tipo: TipoWidget, entrada: unknown): Record<string,
         // Solo el id numérico de Tiendanube; el nombre y el precio se leen en vivo.
         return /^\d{1,12}$/.test(String(v ?? '')) ? String(v) : ''
       case 'ubicacion':
-        return UBICACIONES.some(u => u.value === v) ? v : 'final'
+        return UBICACIONES.some(u => u.value === v) ? v : (c.porDefecto ?? 'final')
       case 'emoji':
         return EMOJIS.includes(v as (typeof EMOJIS)[number]) ? v : (c.porDefecto ?? '')
       case 'enlace':

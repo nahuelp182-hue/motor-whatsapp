@@ -1,6 +1,14 @@
 'use client'
 
-import { PALETA, UBICACIONES, DESTINOS, EMOJIS, PROPORCIONES, type Campo } from '@/lib/widgets/tipos'
+import {
+  PALETA,
+  UBICACIONES_TEXTO,
+  UBICACIONES_FICHA,
+  DESTINOS,
+  EMOJIS,
+  PROPORCIONES,
+  type Campo,
+} from '@/lib/widgets/tipos'
 import { SubirMedia } from './SubirMedia'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -35,7 +43,20 @@ type Props = {
   /** Config completa del widget: algún campo necesita mirar a otro (la medida sugerida
    *  del archivo depende de la proporción elegida). */
   config?: Record<string, unknown>
+  /** Dónde vive el widget ('producto' | 'tienda' | 'guias'). El campo de ubicación ofrece
+   *  las ranuras de la ficha de producto o las del texto según esto. */
+  contexto?: string
   onChange: (v: unknown) => void
+}
+
+// Traducción de las ubicaciones viejas (genéricas) a la ranura concreta de la ficha. Es la
+// misma tabla que aplica public/mic.js al dibujar: si se separan, el panel miente.
+const HEREDADAS: Record<string, string> = {
+  inicio: 'prod_titulo',
+  tras_intro: 'prod_precio',
+  medio: 'prod_form_arriba',
+  antes_final: 'prod_boton',
+  final: 'prod_final',
 }
 
 // Texto de ayuda debajo del campo, siempre en renglón aparte: es la diferencia entre poder
@@ -75,7 +96,7 @@ function SelectCampo({
   )
 }
 
-export function CampoEditor({ campo, valor, productos = [], config, onChange }: Props) {
+export function CampoEditor({ campo, valor, productos = [], config, contexto, onChange }: Props) {
   const ayuda = campo.ayuda ? <p className={AYUDA}>{campo.ayuda}</p> : null
 
   // ── Booleano: switch de shadcn ────────────────────────────────────────────
@@ -97,15 +118,65 @@ export function CampoEditor({ campo, valor, productos = [], config, onChange }: 
   const etiqueta = <Label className={ETIQUETA}>{campo.label}</Label>
 
   // ── Ubicación: se elige mirando un dibujo de la página, no escribiendo HTML ─
+  //
+  // En la ficha de producto se dibuja la columna de compra completa —título, precio,
+  // cuotas, formulario, descripción— y se elige la RANURA entre dos bloques. Es la única
+  // forma de que lo elegido y lo que pasa en el sitio sean lo mismo: pedir "en el medio"
+  // en una ficha no significa nada, y por eso antes todo terminaba al fondo.
   if (campo.tipo === 'ubicacion') {
-    const actual = String(valor ?? 'final')
-    const elegida = UBICACIONES.find(u => u.value === actual) ?? UBICACIONES[4]
-    const filas = ['inicio', 'tras_intro', 'medio', 'antes_final', 'final']
+    const ficha = contexto === 'producto'
+    const lista = ficha ? UBICACIONES_FICHA : UBICACIONES_TEXTO
+    const crudo = String(valor ?? campo.porDefecto ?? 'final')
+    // Un widget de ficha guardado con la lista vieja: se muestra la ranura equivalente, la
+    // misma a la que lo manda mic.js. Si no, el panel mostraría un lugar y el sitio otro.
+    const actual = ficha ? (HEREDADAS[crudo] ?? crudo) : crudo
+    const elegida = lista.find(u => u.value === actual) ?? lista[lista.length - 1]
+
+    if (ficha) {
+      return (
+        <div>
+          {etiqueta}
+          <div className="overflow-hidden rounded-xl border border-border bg-card p-3">
+            {UBICACIONES_FICHA.map(u => (
+              <div key={u.value}>
+                {u.bloque && (
+                  <div className="rounded-md bg-muted px-2.5 py-1.5 text-[12px] text-muted-foreground">
+                    {u.bloque}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onChange(u.value)}
+                  className={cn(
+                    'my-1 flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-[12px] transition-all',
+                    u.value === actual
+                      ? 'border-primary/55 bg-primary/10 text-foreground ring-2 ring-primary/15'
+                      : 'border-dashed border-border text-muted-foreground hover:border-foreground/25 hover:text-foreground',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'h-1.5 w-1.5 shrink-0 rounded-full',
+                      u.value === actual ? 'bg-primary' : 'bg-border',
+                    )}
+                  />
+                  {u.label}
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className={AYUDA}>{elegida.ayuda}</p>
+          {ayuda}
+        </div>
+      )
+    }
+
+    const filas = UBICACIONES_TEXTO.map(u => u.value) as string[]
     return (
       <div>
         {etiqueta}
         <div className="flex flex-wrap gap-2">
-          {UBICACIONES.map(u => {
+          {UBICACIONES_TEXTO.map(u => {
             const activo = u.value === actual
             const posicion = filas.indexOf(u.value)
             return (

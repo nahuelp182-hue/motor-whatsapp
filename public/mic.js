@@ -177,37 +177,97 @@
     return null;
   }
 
+  /* ── Ficha de producto: anclas reales ──────────────────────────────────────
+     La columna de la derecha de la ficha (`.product-detail-container`) es una pila de
+     bloques con un orden fijo y conocido: título, precio, medios de pago, aviso de envío,
+     formulario de compra (cantidad + "Agregar al carrito"), descripción. Cada ubicación
+     apunta a UNO de esos bloques por su selector propio, en vez de contar hijos: contar
+     no sirve acá, porque el bloque de la ficha es un solo hijo gigante y todo termina
+     pegado arriba o al fondo. Es la diferencia entre "más o menos por el medio" y
+     "debajo del precio". */
+  var ANCLAS = {
+    // clave              selector del bloque                                         después
+    prod_titulo:         ['.page-header, .js-product-name, h1',                        true],
+    prod_precio_arriba:  ['.js-price-container, .js-price-display',                    false],
+    prod_precio:         ['.js-price-container, .js-price-display',                    true],
+    prod_pagos:          ['.js-product-payments-container, .js-max-installments-container', true],
+    prod_envio:          ['.js-free-shipping-minimum-message, #product-shipping-container', true],
+    prod_form_arriba:    ['form.js-product-form, .js-product-form',                    false],
+    prod_boton:          ['form.js-product-form, .js-product-form',                    true],
+    prod_desc_arriba:    ['.js-product-description, .product-description',             false],
+    prod_desc:           ['.js-product-description, .product-description',             true],
+    prod_final:          [null,                                                        true]
+  };
+
+  // Las ubicaciones viejas quedaron guardadas en la base. Se traducen a la equivalente
+  // concreta para que ningún widget ya configurado se mueva de lugar al actualizar.
+  var HEREDADAS = {
+    inicio: 'prod_titulo',
+    tras_intro: 'prod_precio',
+    medio: 'prod_form_arriba',
+    antes_final: 'prod_boton',
+    final: 'prod_final'
+  };
+
+  /* La columna de la ficha. No sirve `.js-product-detail`: ese envuelve TAMBIÉN la galería
+     de fotos, y sus hijos directos son un único <div> contenedor. */
+  function columnaFicha() {
+    return document.querySelector('.js-product-detail .product-detail-container') ||
+           document.querySelector('.product-detail-container');
+  }
+
+  /* Sube desde el ancla hasta el hijo directo de la columna. Sin esto, "debajo del precio"
+     inserta dentro del <span> del precio (queda en línea, roto) y "debajo del botón" cae
+     adentro del <form>, entre la cantidad y el botón. El widget tiene que ser hermano de
+     los bloques de la columna, no colarse dentro de uno. */
+  function bloqueDe(el, cont) {
+    var n = el;
+    while (n && n.parentNode && n.parentNode !== cont) n = n.parentNode;
+    return n && n.parentNode === cont ? n : null;
+  }
+
+  /* Primer ancla del selector que esté DENTRO de la columna. El filtro importa: la ficha
+     trae al pie una grilla de productos relacionados con su propio `.js-addtocart` y su
+     propio precio, y sin acotar la búsqueda el widget se iría a esa grilla. */
+  function anclaEn(cont, sel) {
+    var lista = cont.querySelectorAll(sel);
+    for (var i = 0; i < lista.length; i++) {
+      var b = bloqueDe(lista[i], cont);
+      if (b) return b;
+    }
+    return null;
+  }
+
+  function insertarEnFicha(host, ubicacion) {
+    var cont = columnaFicha();
+    if (!cont) return false;
+
+    var clave = ANCLAS[ubicacion] ? ubicacion : (HEREDADAS[ubicacion] || 'prod_final');
+    var def = ANCLAS[clave];
+
+    // El host ocupa su propio renglón completo aunque el vecino sea un flex o un grid.
+    host.style.cssText = 'display:block;width:100%;flex:0 0 100%;margin:0';
+
+    var ref = def[0] ? anclaEn(cont, def[0]) : null;
+    if (!ref) {
+      // Sin el ancla pedida (tema distinto, producto sin cuotas, sin descripción) va al
+      // final de la columna: un lugar previsible es mejor que uno inventado.
+      cont.appendChild(host);
+      return true;
+    }
+    cont.insertBefore(host, def[1] ? ref.nextSibling : ref);
+    return true;
+  }
+
   /* Inserta el host en el lugar elegido desde el panel. Reemplaza al viejo data-mic-slot:
      antes había que pegar un <div> a mano en cada página para mover un widget. */
   function insertar(host, ubicacion) {
+    // En la ficha de producto manda el mapa de anclas; el conteo de párrafos es para el
+    // texto de las guías y el blog, donde no hay bloques con nombre.
+    if (columnaFicha() && insertarEnFicha(host, ubicacion)) return true;
+
     var cont = contenido();
     if (!cont) return false;
-
-    // Ficha de producto de Tiendanube: la columna se arma en el cliente y termina con solo
-    // 2-3 hijos directos enormes (todo el precio, las variantes y el botón viven anidados
-    // dentro de UNO). Contar índices sobre esos hijos deja cualquier ubicación pegada arriba
-    // o al fondo —nunca "en el medio"— porque no hay hermanos intermedios a los que apuntar.
-    // Cuando existen anclas reales se inserta contra ellas y ahí sí hay posiciones distintas.
-    var precio = cont.querySelector('.js-price-display');
-    var boton  = cont.querySelector('.js-addtocart');
-    if (precio || boton) {
-      // El host ocupa su propia línea completa aunque el ancla esté dentro de un flex/grid.
-      host.style.cssText = 'display:block;width:100%;flex:0 0 100%;margin:0';
-      var ref, antes;
-      switch (ubicacion) {
-        case 'inicio':      ref = precio || boton; antes = true;  break; // arriba del precio
-        case 'tras_intro':  ref = precio || boton; antes = false; break; // pegado bajo el precio
-        case 'medio':       ref = boton  || precio; antes = true;  break; // justo arriba del botón
-        case 'antes_final': ref = boton  || precio; antes = false; break; // debajo del botón
-        default:            ref = null; // 'final' → al fondo de la columna
-      }
-      if (ref && ref.parentNode) {
-        ref.parentNode.insertBefore(host, antes ? ref : ref.nextSibling);
-      } else {
-        cont.appendChild(host);
-      }
-      return true;
-    }
 
     // Los hijos "de texto" son la referencia para medir la página. Se excluye lo que ya
     // puso este mismo motor, si no cada widget correría de lugar al siguiente.
@@ -1125,6 +1185,152 @@
       try { sessionStorage.setItem(clave, '1'); } catch (e) {}
     });
     evento(w.id, 'impresion');
+  };
+
+  /* ── Corte de despacho ──────────────────────────────────────────────────────
+   * Dos estados que se resuelven solos con la hora de Argentina:
+   *   abierto → hoy hay despacho y todavía no cerró: "Sale hoy" + reloj al corte.
+   *   cerrado → ya cerró, o hoy no se despacha: "Sale el martes", sin reloj.
+   *
+   * Todo el cálculo va en hora de Argentina (UTC-3 fijo, el país no mueve el reloj en
+   * verano) y NO en la del visitante: si no, alguien mirando desde España a las 20:00 de
+   * allá vería "sale hoy" cuando en el depósito ya son las 15:00 y el corte pasó.
+   *
+   * El truco del desfasaje: `Date.now() - 3h` da un instante cuyos getUTC* devuelven los
+   * valores de pared de Argentina. Se hacen todas las cuentas en ese espacio corrido y
+   * al final se suman las 3 h para volver a un timestamp real y poder restar contra
+   * Date.now(). Sumar/restar días con getUTC* es seguro; con getHours() locales no,
+   * porque en un huso con horario de verano un día puede tener 23 o 25 horas.
+   */
+  var DIAS_ES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  var CLAVES_DIA = ['dia_dom', 'dia_lun', 'dia_mar', 'dia_mie', 'dia_jue', 'dia_vie', 'dia_sab'];
+
+  R.corte_despacho = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var H = 3600000, D = 86400000;
+
+    // Días con despacho, como números de getUTCDay(): 0 domingo … 6 sábado.
+    var dias = [];
+    for (var i = 0; i < 7; i++) if (c[CLAVES_DIA[i]]) dias.push(i);
+    if (!dias.length) return; // sin ningún día no hay nada verdadero que decir
+
+    var hora = Math.min(23, Math.max(0, Number(c.hora_corte)));
+    if (!isFinite(hora)) hora = 14;
+    var umbral = Number(c.horas_reloj) > 0 ? Number(c.horas_reloj) : 8;
+
+    // Feriados como YYYY-MM-DD, para comparar contra la fecha de pared argentina.
+    var feriados = {};
+    String(c.feriados || '').split(/[\n,;]+/).forEach(function (s) {
+      s = s.trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(s)) feriados[s] = 1;
+    });
+
+    function ymd(d) {
+      var m = d.getUTCMonth() + 1, x = d.getUTCDate();
+      return d.getUTCFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (x < 10 ? '0' : '') + x;
+    }
+
+    /* Próximo corte que todavía no pasó. Devuelve el timestamp REAL y si cae hoy.
+       Mira 14 días para no quedarse sin salida con una cadencia de un solo día que
+       encima cae feriado. */
+    function proximo() {
+      var ahora = Date.now() - 3 * H; // espacio corrido: getUTC* = hora argentina
+      var a = new Date(ahora);
+      var medianoche = Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate());
+      for (var k = 0; k < 14; k++) {
+        var dia = new Date(medianoche + k * D);
+        if (dias.indexOf(dia.getUTCDay()) < 0) continue;
+        if (feriados[ymd(dia)]) continue;
+        var corte = medianoche + k * D + hora * H;
+        if (corte > ahora) return { ms: corte + 3 * H, dow: dia.getUTCDay(), hoy: k === 0 };
+      }
+      return null;
+    }
+
+    var pr = proximo();
+    if (!pr) return;
+
+    // El despacho siguiente al que se está por cerrar: es el "después" del mensaje
+    // abierto ("si no llegás, entra en el del martes").
+    function despuesDe(pr) {
+      var base = pr.ms - 3 * H; // volver al espacio corrido
+      var b = new Date(base);
+      var medianoche = Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate());
+      for (var k = 1; k < 15; k++) {
+        var dia = new Date(medianoche + k * D);
+        if (dias.indexOf(dia.getUTCDay()) < 0) continue;
+        if (feriados[ymd(dia)]) continue;
+        return dia.getUTCDay();
+      }
+      return null;
+    }
+
+    var sigDow = despuesDe(pr);
+    var hh = (hora < 10 ? '0' : '') + hora + ':00';
+
+    /* Pasado el corte, el próximo despacho es casi siempre el día siguiente. «Sale el
+       martes» un lunes a las 18:00 se lee mucho más lejos de lo que es; «Sale mañana»
+       dice exactamente lo mismo y no suena a demora. Por eso {dia} viene con artículo
+       incluido («el martes») o resuelto como «mañana»/«hoy»: así una sola plantilla
+       —«Sale {dia}»— funciona en los tres casos sin quedar mal escrita. */
+    function comoDia(ms) {
+      var hoyART = new Date(Date.now() - 3 * H);
+      var hoy0 = Date.UTC(hoyART.getUTCFullYear(), hoyART.getUTCMonth(), hoyART.getUTCDate());
+      var d = new Date(ms - 3 * H);
+      var d0 = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      var faltanDias = Math.round((d0 - hoy0) / D);
+      if (faltanDias === 0) return 'hoy';
+      if (faltanDias === 1) return 'mañana';
+      return 'el ' + DIAS_ES[d.getUTCDay()];
+    }
+
+    function llenar(txt, diaNombre) {
+      return String(txt || '')
+        .replace(/\{hora\}/g, hh)
+        .replace(/\{dia\}/g, diaNombre)
+        // Sin artículo: la plantilla lo pone («en el del {proximo}» → «en el del martes»).
+        .replace(/\{proximo\}/g, sigDow == null ? 'próximo' : DIAS_ES[sigDow]);
+    }
+
+    var abierto = pr.hoy;
+    var nombreDia = comoDia(pr.ms);
+    var titulo = llenar(abierto ? c.titulo_abierto : c.titulo_cerrado, nombreDia);
+    var nota   = llenar(abierto ? c.nota_abierta   : c.nota_cerrada,   nombreDia);
+
+    var sh = montar(w, false); if (!sh) return;
+    pintar(sh,
+      '.c{display:flex;align-items:center;gap:14px;background:' + p.suave + ';border-left:3px solid ' + p.bg +
+        ';border-radius:10px;padding:14px 16px;margin:18px 0}' +
+      '.ic{flex:0 0 auto;font-size:20px;line-height:1}' +
+      '.tx{flex:1 1 auto;min-width:0}' +
+      'b{display:block;font-size:15px;font-weight:700;color:#2a2620;line-height:1.25}' +
+      'small{display:block;margin-top:3px;font-size:12.5px;color:#5a534a;line-height:1.4}' +
+      /* El reloj es tabular para que no se muevan las cifras al bajar los segundos. */
+      '.rl{flex:0 0 auto;background:' + p.bg + ';color:' + p.texto + ';border-radius:8px;padding:7px 11px;' +
+        'font-variant-numeric:tabular-nums;font-size:15px;font-weight:700;white-space:nowrap}' +
+      '@media(max-width:420px){.c{flex-wrap:wrap}.rl{order:3}}',
+      '<div class="c"><span class="ic">' + (abierto ? '🕒' : '📦') + '</span>' +
+      '<span class="tx"><b>' + esc(titulo) + '</b>' + (nota ? '<small>' + esc(nota) + '</small>' : '') + '</span>' +
+      (abierto ? '<span class="rl"></span>' : '') + '</div>');
+
+    if (abierto) {
+      var rl = sh.querySelector('.rl'), t = null;
+      function tic() {
+        var falta = pr.ms - Date.now();
+        // Cruzó el corte con la pestaña abierta: se recalcula el estado desde cero en
+        // vez de mostrar 00:00:00, que sería mentira a partir de ese segundo.
+        if (falta <= 0) { clearInterval(t); sh.host.remove(); R.corte_despacho(w); return; }
+        var s = Math.floor(falta / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
+        if (h >= umbral) { rl.textContent = hh; return; } // lejos: la hora, sin reloj corriendo
+        var dd = function (n) { return (n < 10 ? '0' : '') + n; };
+        rl.textContent = h > 0 ? h + ' h ' + dd(m) + ' min' : dd(m) + ':' + dd(s % 60);
+      }
+      tic();
+      t = setInterval(tic, 1000);
+      // Sin esto el intervalo sigue corriendo sobre un nodo que ya no está en la página.
+      window.addEventListener('pagehide', function () { clearInterval(t); });
+    }
+
+    verUnaVez(sh, w.id, c.animacion);
   };
 
   R.cuenta_regresiva = function (w) {
