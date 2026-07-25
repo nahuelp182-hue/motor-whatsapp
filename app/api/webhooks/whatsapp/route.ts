@@ -158,6 +158,9 @@ type Pedido = {
   esAndreani?: boolean
   pickup?: boolean         // envío a sucursal (retiro) vs domicilio
   despachado?: boolean     // shipping_status ya salió del depósito
+  // Pedido viejo que figura sin pagar: el estado en Tiendanube NO es confiable (puede
+  // estar cobrado y despachado sin haberse marcado). El bot no opina: deriva.
+  dudoso?: boolean
 }
 
 const soloDigitos = (s: string): string => (s || '').replace(/\D/g, '')
@@ -182,12 +185,16 @@ const CAMPOS_ORDEN =
   'number,status,payment_status,created_at,contact_name,contact_phone,contact_identification,products,' +
   'shipping_tracking_number,shipping_option,shipping_pickup_type,shipping_status'
 
-// Días tras los cuales un pedido PENDIENTE DE PAGO se considera zombi. Tiendanube deja
-// abiertas para siempre las transferencias que nunca se concretaron (hay pedidos de 2025
-// todavía en open+pending). Si el bot los matchea, a alguien que pregunta cualquier cosa
-// le contesta "encontré tu pedido #1197, está impago, mandame el comprobante" — un pedido
-// de hace nueve meses que la persona no recuerda haber hecho. Pasó el 25/07/26. Los
-// pedidos PAGOS no caducan: alguien puede pedir el manual de un equipo que compró en 2025.
+// Días tras los cuales el "pendiente de pago" de Tiendanube deja de ser información
+// confiable. Dos cosas se cruzan acá:
+//  1. TN deja abiertas para siempre las transferencias que nunca se concretaron (hay
+//     pedidos de 2025 en open+pending). El 25/07/26 el bot le contestó a una clienta
+//     "encontré tu pedido #1197, está impago, mandame el comprobante": era de nov-2025.
+//  2. Al revés y también real: a veces el pedido se cargó a mano, está cobrado y
+//     despachado, y nunca se marcó como pagado en TN (para no pagar la comisión).
+// En los dos casos el bot no puede saber, y en los dos reclamarle el pago a alguien que
+// ya pagó es ofensivo. Pasada esta ventana no afirma nada: lo mira una persona.
+// Los pedidos PAGOS no caducan: alguien puede pedir el manual de un equipo de 2025.
 const DIAS_PENDIENTE_ZOMBIE = 45
 
 // Normaliza para comparar nombres: sin tildes, sin puntuación, en minúsculas.
@@ -223,8 +230,10 @@ function matcheaNombre(orden: OrdenTN, candidatos: string[]): boolean {
   })
 }
 
-// Pedido pendiente de pago abierto hace meses: no es un pedido vivo, es residuo.
-function esPendienteZombie(o: OrdenTN): boolean {
+// Pedido viejo que figura sin pagar: el dato no es confiable en ninguna de las dos
+// direcciones (ver la nota de DIAS_PENDIENTE_ZOMBIE). No se descarta —descartarlo daría
+// "no encontré tu compra"— pero se marca para que el bot no afirme nada y derive.
+function esPagoDudoso(o: OrdenTN): boolean {
   if (o.payment_status === 'paid' || !o.created_at) return false
   const dias = (Date.now() - new Date(o.created_at).getTime()) / 86_400_000
   return dias > DIAS_PENDIENTE_ZOMBIE
@@ -232,7 +241,6 @@ function esPendienteZombie(o: OrdenTN): boolean {
 
 function esDeEsteCliente(o: OrdenTN, tel8: string, tokens: string[], nombres: string[]): boolean {
   if (o.status === 'cancelled') return false // orden cancelada = no es un pedido válido
-  if (esPendienteZombie(o)) return false     // pending de hace meses: no lo traemos a la charla
   const oPhone8 = soloDigitos(o.contact_phone ?? '').slice(-8)
   if (tel8.length >= 8 && oPhone8 === tel8) return true
   if (tokens.some((t) => String(o.number) === t || soloDigitos(o.contact_identification ?? '') === t)) return true
@@ -272,13 +280,25 @@ async function buscarPedido(phone: string, texto: string, perfil?: string): Prom
   const tel8 = soloDigitos(phone).slice(-8)
   const tokens = texto.match(/\d{3,9}/g) ?? [] // posible nº orden (4) o DNI (7-8)
   const nombres = nombresCandidatos(texto, perfil)
+  // Un pedido viejo sin pagar se guarda aparte y solo se usa si no aparece nada mejor:
+  // si el cliente tiene además un pedido reciente, ese es el que importa.
+  let dudoso: Pedido | null = null
+  const evaluar = (o: OrdenTN): Pedido | null => {
+    if (!esDeEsteCliente(o, tel8, tokens, nombres)) return null
+    if (esPagoDudoso(o)) {
+      if (!dudoso) dudoso = { ...aPedido(o), dudoso: true }
+      return null
+    }
+    return aPedido(o)
+  }
   try {
     // 1) Búsqueda directa de Tiendanube (nº de orden, nombre, mail). Barata y precisa.
     for (const term of [...tokens, ...nombres]) {
       const t = term.trim()
       if (t.length < 3) continue
       for (const o of await ordenesTN(`status=any&per_page=20&q=${encodeURIComponent(t)}`)) {
-        if (esDeEsteCliente(o, tel8, tokens, nombres)) return aPedido(o)
+        const p = evaluar(o)
+        if (p) return p
       }
     }
 
@@ -287,10 +307,12 @@ async function buscarPedido(phone: string, texto: string, perfil?: string): Prom
       const data = await ordenesTN(`status=any&per_page=50&page=${page}`)
       if (data.length === 0) break
       for (const o of data) {
-        if (esDeEsteCliente(o, tel8, tokens, nombres)) return aPedido(o)
+        const p = evaluar(o)
+        if (p) return p
       }
       if (data.length < 50) break
     }
+    if (dudoso) return dudoso
   } catch (e) {
     console.error('buscarPedido error:', e)
   }
@@ -794,8 +816,20 @@ export async function POST(req: NextRequest) {
             // Estado REAL del envío (Tiendanube + Andreani). Nunca inventa: si no hay dato
             // certero, deriva al equipo.
             const pedido = await buscarPedido(from, mensajeUsuario, nombre)
-            if (pedido.encontrado && !pedido.pagado) {
+            if (pedido.dudoso) {
+              // Pedido viejo que figura sin pagar: puede estar cobrado y despachado sin
+              // haberse marcado en TN. Reclamarle el pago a quien ya pagó es ofensivo, y
+              // afirmar que está pago sería inventar. No se nombra el estado: lo ve el equipo.
+              outText = 'Encontré una compra tuya pero desde acá no puedo confirmarte en qué estado está 🙌 ' +
+                'Te paso con el equipo, que lo revisa y te confirma 👇'
+              didDerivar = true
+              accion = 'pedido_viejo_sin_confirmar'
+              await derivarAlEquipo(from, outText)
+            } else if (pedido.encontrado && !pedido.pagado && !pedido.despachado && !pedido.tracking) {
               // La compra existe pero figura pendiente de pago → no hay envío que rastrear.
+              // (Si ya tiene tracking o salió del depósito, se cobró: nadie despacha un
+              // pedido impago. Ese caso sigue por el camino normal de seguimiento, sin
+              // reclamarle un pago que ya hizo.)
               // Le pedimos el comprobante acá mismo y avisamos a Mateo (verifica y marca en TN).
               outText = mensajePendientePago(pedido.numero)
               didDerivar = false
@@ -828,19 +862,36 @@ export async function POST(req: NextRequest) {
               didDerivar = true
               accion = 'seguimiento_no_verificado'
               await derivarAlEquipo(from, outText)
+            } else if (await huboAvisoReciente(from, 'pidio_dato_pedido', 48)) {
+              // Ya se le pidió el dato antes y la compra sigue sin aparecer: no se lo
+              // volvemos a pedir (quedaba pidiendo lo mismo en loop). Lo ve una persona.
+              outText = 'Sigo sin poder ubicar tu compra desde acá 🙌 Te paso con el equipo, que tiene todo a mano 👇'
+              didDerivar = true
+              accion = 'seguimiento_no_ubicado'
+              await derivarAlEquipo(from, outText)
             } else {
               // Falta con qué ubicar la compra: se lo pedimos (sin derivar aún).
               outText = respuesta || 'Para ver tu envío, pasame tu número de orden (está en el mail de compra) o el DNI con el que compraste 🙌'
               didDerivar = false
               accion = 'seguimiento_pide_dato'
               await enviarMensajeWA(from, outText)
+              await wdiag('pidio_dato_pedido', from, { accion })
             }
             }
           } else if (manual) {
             // Comprador pidió material → verificar compra por teléfono o dato numérico.
             const pedido = await buscarPedido(from, mensajeUsuario, nombre)
-            if (pedido.encontrado && !pedido.pagado) {
+            if (pedido.dudoso) {
+              // Compra vieja que figura sin pagar (ver 'pedido_viejo_sin_confirmar' arriba):
+              // puede estar cobrada hace meses. No le reclamamos el pago ni le negamos el
+              // material por un dato que no es confiable: lo resuelve una persona.
+              outText = 'Encontré una compra tuya pero necesito que el equipo la confirme antes de pasarte el material 🙌 Te paso con ellos 👇'
+              didDerivar = true
+              accion = 'pedido_viejo_sin_confirmar'
+              await derivarAlEquipo(from, outText)
+            } else if (pedido.encontrado && !pedido.pagado && !pedido.despachado && !pedido.tracking) {
               // Compró pero el pago aún no está confirmado → no mandamos material todavía.
+              // Si ya tiene tracking o se despachó, se cobró: le mandamos el material igual.
               outText = mensajePendientePago(pedido.numero)
               didDerivar = false
               accion = 'pago_pendiente'
@@ -868,12 +919,19 @@ export async function POST(req: NextRequest) {
               didDerivar = true
               accion = 'manual_no_verificado'
               await derivarAlEquipo(from, outText)
+            } else if (await huboAvisoReciente(from, 'pidio_dato_pedido', 48)) {
+              // Ya se le pidió el dato y la compra no aparece: no insistimos, deriva.
+              outText = 'Sigo sin poder confirmar tu compra desde acá 🙌 Te paso con el equipo para que te mande el material 👇'
+              didDerivar = true
+              accion = 'manual_no_ubicado'
+              await derivarAlEquipo(from, outText)
             } else {
               // Todavía no dio con qué verificar → se lo pedimos (sin derivar aún).
               outText = 'Con gusto te mando el material 🙌 Para confirmar tu compra, pasame tu número de orden (está en el mail de compra) o el DNI con el que compraste.'
               didDerivar = false
               accion = 'manual_pide_orden'
               await enviarMensajeWA(from, outText)
+              await wdiag('pidio_dato_pedido', from, { accion })
             }
           } else if (derivar) {
             outText = respuesta || 'Te paso con una persona del equipo 👇'
