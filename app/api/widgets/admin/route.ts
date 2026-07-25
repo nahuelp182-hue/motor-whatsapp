@@ -18,6 +18,20 @@ const PAGINAS = [
   { ruta: '/contacto', titulo: 'Contacto' },
 ]
 
+/**
+ * Las fichas de producto también son páginas donde acotar un widget, y son las únicas que
+ * importan para los tipos del contexto "producto". Faltaban: la lista traía solo guías, así
+ * que acotar un widget a un producto era imposible desde el panel.
+ */
+function paginasCon(productos: { nombre: string; ruta: string | null }[]) {
+  return [
+    ...PAGINAS,
+    ...productos
+      .filter(p => p.ruta)
+      .map(p => ({ ruta: p.ruta as string, titulo: `Ficha: ${p.nombre}` })),
+  ]
+}
+
 async function storeId(): Promise<string | null> {
   const s = await prisma.store.findFirst({
     where: { tiendanube_store_id: TN_STORE_ID },
@@ -52,7 +66,7 @@ export async function GET() {
 
   const productos = await productosTN()
 
-  return NextResponse.json({ widgets, metricas, tipos: TIPOS, paginas: PAGINAS, productos })
+  return NextResponse.json({ widgets, metricas, tipos: TIPOS, paginas: paginasCon(productos), productos })
 }
 
 /** Crea un widget con los valores por defecto del tipo. Nace APAGADO a propósito. */

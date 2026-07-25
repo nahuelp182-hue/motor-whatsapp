@@ -707,7 +707,16 @@ function Editor({
                     dirección a mano, que es la forma más fácil de equivocarse en una letra y no
                     enterarse nunca. */}
                 <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-white/[0.02] p-2.5">
-                  {paginas.map(p => {
+                  {/* Las páginas del contexto del widget van arriba: en un widget de ficha de
+                      producto, las fichas son lo único que se va a marcar, y buscarlas abajo de
+                      veinte guías es la parte del panel que más cuesta. */}
+                  {[...paginas]
+                    .sort((a, b) => {
+                      const rel = (r: string) =>
+                        widget.contexto === 'producto' ? (r.startsWith('/productos/') ? 0 : 1) : 0
+                      return rel(a.ruta) - rel(b.ruta)
+                    })
+                    .map(p => {
                     const marcada = (reglas.rutas ?? []).includes(p.ruta)
                     return (
                       <label

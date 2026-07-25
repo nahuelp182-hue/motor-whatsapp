@@ -13,6 +13,8 @@ export type ProductoTN = {
   nombre: string
   precio: number
   imagen: string | null
+  /** Ruta de la ficha en el storefront, para poder acotar un widget a un producto. */
+  ruta: string | null
 }
 
 type Cache = { al: number; datos: ProductoTN[] }
@@ -36,7 +38,7 @@ export async function productosTN(): Promise<ProductoTN[]> {
 
   try {
     const r = await fetch(
-      `https://api.tiendanube.com/v1/${TN_STORE}/products?published=true&per_page=200&fields=id,name,variants,images`,
+      `https://api.tiendanube.com/v1/${TN_STORE}/products?published=true&per_page=200&fields=id,name,handle,variants,images`,
       { headers: { Authentication: `bearer ${TN_TOKEN}`, 'User-Agent': TN_UA } },
     )
     if (!r.ok) return cache?.datos ?? []
@@ -44,6 +46,7 @@ export async function productosTN(): Promise<ProductoTN[]> {
     const crudos = (await r.json()) as Array<{
       id: number
       name?: unknown
+      handle?: unknown
       variants?: Array<{ price?: string | null }>
       images?: Array<{ src?: string }>
     }>
@@ -53,6 +56,11 @@ export async function productosTN(): Promise<ProductoTN[]> {
       nombre: nombre(p),
       precio: Number(p.variants?.[0]?.price ?? 0) || 0,
       imagen: p.images?.[0]?.src ?? null,
+      // `handle` viene por idioma, igual que `name`: se reusa el mismo desarmador.
+      ruta: (() => {
+        const h = nombre({ name: p.handle })
+        return h && h !== 'Sin nombre' ? `/productos/${h}` : null
+      })(),
     }))
 
     cache = { al: Date.now(), datos }
