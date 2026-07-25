@@ -217,6 +217,57 @@ export async function comprasParaSeguimiento(): Promise<CompraSeguimiento[]> {
   }
 }
 
+/** Alguien que dejó su email por la guía y todavía no compró nada. */
+export type LeadSeguimiento = {
+  email: string
+  /** Cuándo entró a la lista: el único reloj que tiene un lead. */
+  alta: Date
+}
+
+/**
+ * Leads sin compra de los últimos 20 días — la ventana que cubre la secuencia completa
+ * (día 2, 6 y 12) con margen para un día que el cron no haya corrido.
+ *
+ * Un lead es un contacto de Tiendanube con `accepts_marketing` y `total_spent` en cero:
+ * el mismo criterio que usa el cron que sube las audiencias a Meta, así que las dos
+ * cosas cuentan siempre lo mismo. En cuanto compra, `total_spent` deja de ser cero y sale
+ * solo de la secuencia sin que haya que darlo de baja en ningún lado.
+ *
+ * NO se devuelve el nombre a propósito: el popup crea el contacto con el prefijo del mail
+ * ("Littlefluffyflame"), así que saludar por nombre delataría que es automático.
+ */
+export async function leadsParaSeguimiento(): Promise<LeadSeguimiento[]> {
+  if (!TN_TOKEN) return []
+  const desde = new Date(Date.now() - 20 * 86_400_000).toISOString()
+
+  try {
+    const res = await fetch(
+      `${TN_BASE}/${TN_STORE_ID}/customers?per_page=200&created_at_min=${desde}` +
+        `&fields=email,created_at,accepts_marketing,total_spent`,
+      { headers: { Authentication: `bearer ${TN_TOKEN}`, 'User-Agent': UA } },
+    )
+    if (!res.ok) return []
+    const contactos = (await res.json()) as Array<{
+      email?: string
+      created_at?: string
+      accepts_marketing?: boolean
+      total_spent?: string
+    }>
+    if (!Array.isArray(contactos)) return []
+
+    const out: LeadSeguimiento[] = []
+    for (const c of contactos) {
+      const email = String(c.email ?? '').trim()
+      if (!email || !c.accepts_marketing || !c.created_at) continue
+      if (Number(c.total_spent ?? 0) > 0) continue
+      out.push({ email, alta: new Date(c.created_at) })
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
 export type EstadoEnvio = {
   tracking: string | null
   correo: string | null

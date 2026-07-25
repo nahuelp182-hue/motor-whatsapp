@@ -23,7 +23,7 @@ const TINTA = '#1f1c17'
 const TINTA_SUAVE = '#56504a'
 
 /** Envoltorio común: cabecera, cuerpo y firma. `cuerpo` es HTML ya armado. */
-function plantilla(titulo: string, cuerpo: string, cta?: { texto: string; url: string }): string {
+export function plantilla(titulo: string, cuerpo: string, cta?: { texto: string; url: string }): string {
   return `<!doctype html>
 <html lang="es"><body style="margin:0;padding:0;background:${CREMA};">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CREMA};padding:32px 12px;">
@@ -57,8 +57,12 @@ function plantilla(titulo: string, cuerpo: string, cta?: { texto: string; url: s
 </body></html>`
 }
 
-const p = (texto: string): string =>
+export const p = (texto: string): string =>
   `<p style="margin:0 0 14px;font-size:15px;line-height:1.7;color:${TINTA_SUAVE};">${texto}</p>`
+
+/** Resalte dentro de un párrafo. Existe para no repetir el color a mano en cada mail. */
+export const fuerte = (texto: string): string =>
+  `<strong style="color:${TINTA};">${texto}</strong>`
 
 /**
  * Bloque secundario, separado del cuerpo por una línea. Es para lo que NO es el motivo del

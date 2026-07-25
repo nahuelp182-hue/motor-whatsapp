@@ -13,7 +13,11 @@
 // molestia a callarnos el aviso.
 import { NextRequest, NextResponse } from 'next/server'
 import { chequearCron } from '@/lib/cron-auth'
-import { comprasParaSeguimiento, type CompraSeguimiento } from '@/lib/pedidos'
+import {
+  comprasParaSeguimiento,
+  leadsParaSeguimiento,
+  type CompraSeguimiento,
+} from '@/lib/pedidos'
 import { crearTokenEntrada } from '@/lib/session'
 import {
   BASE_URL,
@@ -23,6 +27,7 @@ import {
   mailEntrega,
   mailShock,
 } from '@/lib/mails-cliente'
+import { mailLead1, mailLead2, mailLead3 } from '@/lib/mails-lead'
 import { tomarLatch } from '@/lib/ratelimit'
 
 export const runtime = 'nodejs'
@@ -46,6 +51,21 @@ const HITOS: Hito[] = [
   { id: 'shock', reloj: 'entrega', desde: 21, hasta: 25, arma: mailShock },
   { id: 'cosecha', reloj: 'entrega', desde: 35, hasta: 40, arma: mailCosecha },
 ]
+
+// Los tres toques de quien descargó la guía y todavía no compró. Mismo mecanismo que los
+// hitos de compra: ventana amplia + latch, contados desde el alta en la lista.
+const HITOS_LEAD = [
+  { id: 'lead1', desde: 2, hasta: 5, arma: mailLead1 },
+  { id: 'lead2', desde: 6, hasta: 10, arma: mailLead2 },
+  { id: 'lead3', desde: 12, hasta: 16, arma: mailLead3 },
+]
+
+/**
+ * Interruptor de la secuencia de leads. Mientras esté apagado el cron igual la recorre y
+ * devuelve a quién le tocaría, pero no manda nada: sirve para ver el volumen real antes
+ * de que el primer mail salga a gente que no es cliente todavía.
+ */
+const LEADS_ACTIVO = process.env.LEADS_NURTURE_ENABLED === '1'
 
 function hitoDe(c: CompraSeguimiento): Hito | null {
   // SOLO compradores de la incubadora INC101. Los mails hablan de la sonda, del shock
@@ -98,5 +118,36 @@ export async function GET(req: NextRequest) {
     else fallidos++
   }
 
-  return NextResponse.json({ revisadas: compras.length, enviados, fallidos })
+  // ── Secuencia de leads ────────────────────────────────────────────────────────────
+  // Va después de las compras y en su propio try: un error acá no puede dejar sin mail a
+  // alguien que ya pagó.
+  const leads: Array<{ email: string; hito: string; enviado: boolean }> = []
+  try {
+    for (const l of await leadsParaSeguimiento()) {
+      const dias = (Date.now() - l.alta.getTime()) / 86_400_000
+      const hito = HITOS_LEAD.find((h) => dias >= h.desde && dias < h.hasta)
+      if (!hito) continue
+
+      // El latch se toma solo cuando la secuencia está activa. Si se tomara en seco, el
+      // día que se encienda todos estos leads ya figurarían como avisados y se perderían.
+      if (!LEADS_ACTIVO) {
+        leads.push({ email: l.email, hito: hito.id, enviado: false })
+        continue
+      }
+      if (!(await tomarLatch(`lead:${l.email}:${hito.id}`))) continue
+
+      const ok = await enviarMail(l.email, hito.arma())
+      leads.push({ email: l.email, hito: hito.id, enviado: ok })
+      if (!ok) fallidos++
+    }
+  } catch (e) {
+    console.error('[ciclo-cultivo] falló la secuencia de leads:', e)
+  }
+
+  return NextResponse.json({
+    revisadas: compras.length,
+    enviados,
+    fallidos,
+    leads: { activo: LEADS_ACTIVO, tocados: leads },
+  })
 }

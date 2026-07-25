@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { promises as dns } from 'dns'
 import { consumirLimite, ipDe, limpiarVencidos, respuesta429 } from '@/lib/ratelimit'
+import { p, plantilla } from '@/lib/mails-cliente'
 
 export const runtime = 'nodejs'
 
@@ -64,24 +65,20 @@ async function addToTiendanube(email: string): Promise<void> {
   } catch {}
 }
 
+// Usa la misma plantilla que el resto de los mails (paleta de marca, firma de Mateo).
+// Antes tenía su propio diseño en negro y terracota: era el PRIMER mail que recibía una
+// persona y no se parecía a ninguno de los que venían después.
 function emailHtml(): string {
-  return `
-  <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#2b2622">
-    <div style="background:#1c1a17;padding:26px 28px;text-align:center;border-radius:12px 12px 0 0">
-      <div style="color:#d8cfc6;font-weight:bold;letter-spacing:3px;font-size:13px">MICELIUM</div>
-      <div style="height:3px;width:44px;background:#b0341d;margin:10px auto"></div>
-      <div style="color:#fff;font-size:20px;font-weight:bold;margin-top:6px">Tu primer cultivo de hongos en casa</div>
-    </div>
-    <div style="background:#fff;padding:28px;border:1px solid #eee;border-top:none;border-radius:0 0 12px 12px">
-      <p style="font-size:15px;line-height:1.6">¡Gracias por sumarte! Acá tenés tu guía gratuita para lograr tu primer cultivo <b>sin experiencia</b> y sin frustrarte en el intento.</p>
-      <div style="text-align:center;margin:26px 0">
-        <a href="${PDF_URL}" style="background:#b0341d;color:#fff;text-decoration:none;padding:15px 34px;border-radius:9px;font-size:16px;font-weight:bold;display:inline-block">📥 Descargar mi guía</a>
-      </div>
-      <p style="font-size:13px;color:#6a6157;line-height:1.6">Adentro vas a encontrar las 4 etapas del cultivo, las 3 razones por las que la mayoría fracasa, las variedades más fáciles y 3 recetas para tu primera cosecha.</p>
-      <p style="font-size:13px;color:#6a6157;margin-top:18px">Cualquier duda, escribinos por WhatsApp al +54 351 214 5521.</p>
-      <p style="font-size:12px;color:#a89c8e;margin-top:20px;border-top:1px solid #eee;padding-top:14px">Micelium · infomicelium.com.ar · @incubadoras_micelium</p>
-    </div>
-  </div>`
+  return plantilla(
+    'Acá está tu guía',
+    p(
+      'Gracias por sumarte. Adentro está lo necesario para lograr un primer cultivo sin experiencia previa: las cuatro etapas, las tres razones por las que la mayoría fracasa, las variedades que más perdonan y tres recetas para la primera cosecha.',
+    ) +
+      p(
+        'Si vas a leer una sola parte, que sea la de contaminación: es lo que decide el resultado antes de que empiece nada.',
+      ),
+    { texto: 'Descargar mi guía', url: PDF_URL },
+  )
 }
 
 async function sendGuide(email: string): Promise<void> {

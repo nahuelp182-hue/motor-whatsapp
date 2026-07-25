@@ -100,9 +100,14 @@ export default async function MiEquipo() {
   const hardware = tieneHardware(sesion.eq)
   const biblioteca = bibliotecaDe(sesion.eq)
 
+  // Sesión abierta con el código impreso de la caja (comprador de MercadoLibre): no hay
+  // pedido de Tiendanube detrás, así que no hay envío ni número que mostrar. Ve las guías
+  // de su equipo y nada más.
+  const porCodigo = sesion.num === 0
+
   // A quien compró solo material digital no se le consulta el envío: no hay nada que
   // despachar, y mostrarle un bloque vacío parece un error del sistema.
-  const envio = hardware ? await estadoEnvio(sesion.num) : null
+  const envio = hardware && !porCodigo ? await estadoEnvio(sesion.num) : null
 
   return (
     <>
@@ -114,7 +119,9 @@ export default async function MiEquipo() {
         <h1 className="mic-titulo">Hola{sesion.nom ? `, ${sesion.nom}` : ''}</h1>
         <div className="mic-regla" />
         <p className="mic-bajada">
-          Pedido #{sesion.num}. Acá tenés todo lo de tu compra en un solo lugar.
+          {porCodigo
+            ? 'Acá tenés el manual y las guías de tu equipo en un solo lugar.'
+            : `Pedido #${sesion.num}. Acá tenés todo lo de tu compra en un solo lugar.`}
         </p>
       </section>
 
@@ -175,7 +182,7 @@ export default async function MiEquipo() {
                     </span>
                   </a>
                 ) : (
-                  <a href={`https://wa.me/543512145521?text=Hola,%20soy%20del%20pedido%20%23${sesion.num}%20y%20quiero%20mi%20material:%20${encodeURIComponent(item.titulo)}`}>
+                  <a href={`https://wa.me/543512145521?text=${encodeURIComponent(`Hola, ${porCodigo ? 'compré por MercadoLibre' : `soy del pedido #${sesion.num}`} y quiero mi material: ${item.titulo}`)}`}>
                     <span className="mic-item-num">{String(i + 1).padStart(2, '0')}</span>
                     <span>
                       <h3 className="mic-item-titulo">{item.titulo}</h3>
@@ -190,7 +197,7 @@ export default async function MiEquipo() {
         </section>
       )}
 
-      {hardware && (
+      {hardware && !porCodigo && (
         <section id="envio">
           <h2 className="mic-h2">Tu envío</h2>
           <BloqueEnvio envio={envio} />
@@ -200,9 +207,9 @@ export default async function MiEquipo() {
       <div className="mic-cierre">
         <h3>{hardware ? '¿Tenés una duda sobre tu equipo?' : '¿Tenés una duda sobre tu cultivo?'}</h3>
         <p>
-          El asistente ya sabe qué compraste y cómo viene tu envío: preguntale directamente. Y si
-          tu cultivo va mal o hay una falla, escribinos por WhatsApp con tu pedido (#{sesion.num})
-          y lo vemos con una persona.
+          {porCodigo
+            ? 'El asistente conoce tu equipo al detalle: preguntale directamente. Y si tu cultivo va mal o hay una falla, escribinos por WhatsApp y lo vemos con una persona.'
+            : `El asistente ya sabe qué compraste y cómo viene tu envío: preguntale directamente. Y si tu cultivo va mal o hay una falla, escribinos por WhatsApp con tu pedido (#${sesion.num}) y lo vemos con una persona.`}
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <Link className="mic-boton" href="/guia/asistente">

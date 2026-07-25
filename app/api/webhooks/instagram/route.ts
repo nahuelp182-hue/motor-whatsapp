@@ -22,12 +22,19 @@ const UA       = 'Micelium/1.0 (nahuelp182@gmail.com)'
 // Importado de lib/tienda para que el bot y el portal digan SIEMPRE el mismo precio.
 const TRANSFER_DISCOUNT = DESCUENTO_TRANSFERENCIA
 
-// WhatsApp de la empresa (a donde se deriva a los clientes de Instagram). Configurable por env.
-const EMPRESA_WA = process.env.WA_EMPRESA ?? '5493525623546'
+// WhatsApp público de la marca: el mismo que muestran el portal, las guías, la tienda y el
+// pie de los mails. Hasta el 25/07/2026 acá se derivaba al número humano (5493525623546),
+// así que Micelium mostraba DOS números distintos según por dónde llegara la persona —
+// justo la señal que dispara la desconfianza que ya está medida.
+//
+// Derivar al número del bot no deja a nadie sin atención: ese bot resuelve seguimiento de
+// envío y estado de pedido (que es la mitad de lo que se deriva desde Instagram) y, cuando
+// no puede, escala a una persona con su propia lógica. La escalada vive en un solo lugar.
+const EMPRESA_WA = process.env.WA_EMPRESA ?? '5493512145521'
 const WA_LINK = `https://wa.me/${EMPRESA_WA}?text=${encodeURIComponent('Hola! Escribo desde Instagram 🍄')}`
 // IG bloquea los links wa.me en DMs → al cliente se le da el WhatsApp en TEXTO PLANO.
 // Si cambia EMPRESA_WA, actualizar este display. (WA_LINK se sigue usando en el aviso interno a Nahuel.)
-const WA_PLAIN = 'Escribinos por WhatsApp al +54 9 3525 62-3546 🍄'
+const WA_PLAIN = 'Escribinos por WhatsApp al +54 9 351 214-5521 🍄'
 
 // Respuestas a postbacks (botones del menú / ice breakers) — se mantienen
 const POSTBACK_RESPONSES: Record<string, string> = {

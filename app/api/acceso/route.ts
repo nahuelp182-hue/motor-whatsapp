@@ -28,6 +28,35 @@ export async function POST(req: NextRequest) {
   void limpiarVencidos()
 
   const body = await req.json().catch(() => ({}))
+
+  // ── Acceso por código impreso (comprador de MercadoLibre) ────────────────────────
+  // Quien compra por MercadoLibre no tiene número de pedido de Tiendanube, así que hasta
+  // ahora no podía entrar al portal ni con el link en la mano: quedaba sin manual, sin
+  // guías y sin asistente. La tarjeta que va dentro de la caja trae este código.
+  //
+  // Da acceso a las guías del equipo, NO a datos personales: la sesión que se crea no
+  // tiene pedido (num 0) ni nombre, así que no muestra envío ni historial de compra.
+  // Si el código se filtra, se rota cambiando la variable de entorno y se reimprime.
+  const codigo = String(body?.codigo ?? '').trim().toUpperCase().replace(/[\s-]/g, '')
+  if (codigo) {
+    const esperado = (process.env.CODIGO_CAJA ?? '').trim().toUpperCase().replace(/[\s-]/g, '')
+    const porCodigo = await consumirLimite(`acceso:cod:${ipDe(req)}`, 6, 15 * 60)
+    if (!porCodigo.permitido) return respuesta429(porCodigo)
+    if (!esperado || codigo !== esperado) {
+      return NextResponse.json({ error: 'Ese código no es válido. Está impreso en la tarjeta que viene dentro de la caja.' }, { status: 401 })
+    }
+    const cookieCod = await crearSesionCliente({ num: 0, nom: '', eq: ['inc101'] }, secreto)
+    const resCod = NextResponse.json({ ok: true, nombre: '' })
+    resCod.cookies.set(COOKIE_CLIENTE_NOMBRE, cookieCod, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: MAX_AGE_CLIENTE,
+      path: '/',
+    })
+    return resCod
+  }
+
   const orden = String(body?.orden ?? '').trim().slice(0, 20)
   const factor = String(body?.factor ?? '').trim().slice(0, 20)
   if (!orden || !factor) {

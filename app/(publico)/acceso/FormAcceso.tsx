@@ -9,13 +9,18 @@ import { useState } from 'react'
 // La tercera puerta, la que de verdad usa la mayoría, no está en esta pantalla: es el enlace
 // pre-autenticado que va en cada mail nuestro (/e/<token>). Esta página es para quien lo
 // perdió.
-type Modo = 'email' | 'pedido'
+//
+// La cuarta puerta es para quien compró por MercadoLibre: no tiene pedido de Tiendanube ni
+// mail nuestro, así que ninguna de las otras tres le sirve. Entra con el código impreso en
+// la tarjeta que viene dentro de la caja.
+type Modo = 'email' | 'pedido' | 'codigo'
 
 export default function FormAcceso({ aviso }: { aviso?: 'vencido' | 'usado' }) {
   const [modo, setModo] = useState<Modo>('email')
   const [email, setEmail] = useState('')
   const [orden, setOrden] = useState('')
   const [factor, setFactor] = useState('')
+  const [codigo, setCodigo] = useState('')
   const [error, setError] = useState('')
   const [listo, setListo] = useState('')
   const [cargando, setCargando] = useState(false)
@@ -59,6 +64,30 @@ export default function FormAcceso({ aviso }: { aviso?: 'vencido' | 'usado' }) {
       }
       const d = await r.json().catch(() => ({}))
       setError(d.error ?? 'No pudimos verificar esos datos.')
+    } catch {
+      setError('Se cortó la conexión. Probá de nuevo en un momento.')
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  async function porCodigo(e: React.FormEvent) {
+    e.preventDefault()
+    if (cargando) return
+    setError('')
+    setCargando(true)
+    try {
+      const r = await fetch('/api/acceso', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo }),
+      })
+      if (r.ok) {
+        window.location.href = '/mi-equipo'
+        return
+      }
+      const d = await r.json().catch(() => ({}))
+      setError(d.error ?? 'Ese código no es válido.')
     } catch {
       setError('Se cortó la conexión. Probá de nuevo en un momento.')
     } finally {
@@ -116,6 +145,39 @@ export default function FormAcceso({ aviso }: { aviso?: 'vencido' | 'usado' }) {
             ¿No usás más ese correo?{' '}
             <button type="button" className="mic-link-boton" onClick={() => setModo('pedido')}>
               Entrar con el número de pedido
+            </button>
+          </p>
+          <p className="mic-chat-nota">
+            ¿Compraste por MercadoLibre?{' '}
+            <button type="button" className="mic-link-boton" onClick={() => setModo('codigo')}>
+              Entrar con el código de la caja
+            </button>
+          </p>
+        </form>
+      ) : modo === 'codigo' ? (
+        <form className="mic-acceso" onSubmit={porCodigo}>
+          <label className="mic-campo">
+            <span>Código de tu caja</span>
+            <input
+              value={codigo}
+              onChange={e => setCodigo(e.target.value)}
+              placeholder="Ej: MICELIUM-XXXX"
+              maxLength={40}
+              required
+              autoFocus
+            />
+            <small>Está impreso en la tarjeta que viene dentro de la caja, junto al QR.</small>
+          </label>
+
+          {error && <p className="mic-acceso-error">{error}</p>}
+
+          <button className="mic-boton" type="submit" disabled={cargando}>
+            {cargando ? 'Verificando…' : 'Entrar'}
+          </button>
+
+          <p className="mic-chat-nota">
+            <button type="button" className="mic-link-boton" onClick={() => setModo('email')}>
+              Compré en la tienda, mandame el acceso por email
             </button>
           </p>
         </form>

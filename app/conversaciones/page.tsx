@@ -229,6 +229,7 @@ export default function ConversacionesPage() {
                       </div>
                     ))}
                   </div>
+                  <Responder sender={actual.sender} onEnviado={cargar} />
                 </div>
               ) : (
                 <div className="flex h-40 items-center justify-center text-sm text-white/30">
@@ -239,6 +240,77 @@ export default function ConversacionesPage() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Responder al cliente con el número oficial de la marca, sin salir del panel.
+ *
+ * Antes la única forma de contestar era el link "abrir en WhatsApp", que abre el chat
+ * desde el celular de quien atiende: el cliente terminaba hablando con dos números
+ * distintos de Micelium en la misma conversación. Acá la respuesta sale del mismo número
+ * con el que el bot ya venía hablando.
+ *
+ * El backend rechaza el envío pasadas 24 h del último mensaje del cliente (límite de
+ * WhatsApp, no nuestro) y devuelve el motivo en texto claro, que es lo que se muestra.
+ */
+function Responder({ sender, onEnviado }: { sender: string; onEnviado: () => void }) {
+  const [texto, setTexto] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const enviar = async () => {
+    const cuerpo = texto.trim()
+    if (!cuerpo || enviando) return
+    setEnviando(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/conversaciones/responder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender, texto: cuerpo }),
+      })
+      const json = (await res.json()) as { ok?: boolean; error?: string }
+      if (json.ok) {
+        setTexto('')
+        onEnviado()
+      } else {
+        setError(json.error ?? 'No se pudo enviar')
+      }
+    } catch {
+      setError('No se pudo enviar')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <div className="border-t border-white/[0.06] p-4">
+      <div className="flex items-end gap-2">
+        <textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter manda, Shift+Enter hace salto de línea: como cualquier chat.
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              void enviar()
+            }
+          }}
+          rows={2}
+          placeholder="Responder como Micelium…"
+          className="flex-1 resize-none rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/25 focus:border-white/20 focus:outline-none"
+        />
+        <button
+          onClick={() => void enviar()}
+          disabled={enviando || !texto.trim()}
+          className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm text-emerald-100 hover:bg-emerald-500/30 disabled:opacity-40"
+        >
+          {enviando ? 'Enviando…' : 'Enviar'}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-amber-300/90">{error}</p>}
     </div>
   )
 }
