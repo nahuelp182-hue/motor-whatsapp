@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { SidebarNav } from '@/components/SidebarNav'
+import { FondoHolografico } from '@/components/FondoHolografico'
 
 type Contador = { enviados: number; fallidos: number; pendientes: number }
 type Template = { key: string; name: string; id: string; status: string; category?: string }
@@ -73,7 +75,9 @@ export default function MarketingAutomaticoPage() {
   const totalFallidos = eventos.reduce((s, [, c]) => s + c.fallidos, 0)
 
   return (
-    <div className="min-h-screen bg-[#0a0a12] text-white">
+    <div className="fx-holo fx-charts relative isolate min-h-screen bg-[#0a0a12] text-white max-lg:pt-14 lg:pl-[256px]">
+      <SidebarNav />
+      <FondoHolografico />
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         {/* Header */}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">

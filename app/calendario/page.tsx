@@ -3,6 +3,8 @@ import {
   type ItemCalendario, type PrepEstado,
 } from '@/lib/calendario'
 import { CopiarPlantilla } from '@/components/CopiarPlantilla'
+import { SidebarNav } from '@/components/SidebarNav'
+import { FondoHolografico } from '@/components/FondoHolografico'
 
 export const dynamic = 'force-dynamic' // recomputar countdowns en cada visita
 
@@ -121,7 +123,9 @@ export default async function CalendarioPage({
   const urgentes = items.filter((i) => i.faltan >= 0 && i.faltan <= 10).length
 
   return (
-    <div className="min-h-screen bg-[#0a0a12] text-white">
+    <div className="fx-holo fx-charts relative isolate min-h-screen bg-[#0a0a12] text-white max-lg:pt-14 lg:pl-[256px]">
+      <SidebarNav />
+      <FondoHolografico />
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         {/* Header */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

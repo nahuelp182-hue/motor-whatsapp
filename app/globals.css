@@ -311,33 +311,25 @@ main[data-light].fx-charts .recharts-active-dot circle {
 }
 
 /* ═══════════════ Cards de sección holográficas ═══════════════
-   Un hilo de luz cyan→violeta en el borde de cada tarjeta, vía ::before enmascarado (solo se
-   ve el anillo de 1px, el centro queda transparente). Toca TODAS las .rounded-2xl del panel
-   sin editar cada componente. Scoped a .fx-holo, desactivado en modo claro y en data-isolated. */
+   Borde luminoso + halo cyan/violeta en TODA .rounded-2xl del panel, sin editar cada
+   componente. box-shadow (siempre confiable, no depende de máscaras) para que se vea de
+   verdad. Se intensifica al hover. Scoped a .fx-holo, off en modo claro y en data-isolated. */
 .fx-holo:not([data-light]) .rounded-2xl:not([data-isolated]) {
-  position: relative;
-  border-color: rgba(125, 195, 255, 0.09);
+  border-color: rgba(125, 195, 255, 0.2);
+  box-shadow:
+    0 0 0 1px rgba(125, 195, 255, 0.06),
+    0 12px 38px -18px rgba(34, 211, 238, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
-.fx-holo:not([data-light]) .rounded-2xl:not([data-isolated])::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(
-    135deg,
-    rgba(34, 211, 238, 0.45) 0%,
-    rgba(34, 211, 238, 0) 38%,
-    rgba(167, 139, 250, 0) 62%,
-    rgba(167, 139, 250, 0.45) 100%
-  );
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-  opacity: 0.65;
-  transition: opacity 0.3s;
+.fx-holo:not([data-light]) .rounded-2xl:not([data-isolated]):hover {
+  border-color: rgba(167, 139, 250, 0.5);
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.22),
+    0 18px 48px -14px rgba(167, 139, 250, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-.fx-holo:not([data-light]) .rounded-2xl:not([data-isolated]):hover::before {
-  opacity: 1;
+/* Las cards .rounded-xl más chicas (paneles internos, ítems) toman un borde tintado, sin halo. */
+.fx-holo:not([data-light]) .rounded-xl:not([data-isolated]):not([data-mono]) {
+  border-color: rgba(125, 195, 255, 0.12);
 }

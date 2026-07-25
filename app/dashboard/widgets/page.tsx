@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BorderBeam } from '@/components/ui/border-beam'
 import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern'
+import { SidebarNav } from '@/components/SidebarNav'
 import { validarConfig } from '@/lib/widgets/validacion'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
 import { RefreshCw, Plus, Trash2, Check } from 'lucide-react'
@@ -139,13 +140,15 @@ export default function WidgetsPage() {
 
   return (
     <main
-      className="dark fx-holo relative isolate min-h-screen p-5 font-sans text-white/70 md:p-8"
+      className="dark fx-holo relative isolate min-h-screen px-5 pb-8 pt-16 font-sans text-white/70 md:px-8 lg:pl-[256px] lg:pt-8"
       style={{
         '--ac': '167 139 250',
         background:
           'radial-gradient(ellipse 90% 40% at 50% -5%, rgb(167 139 250 / 0.10) 0%, transparent 55%), #07070f',
       } as React.CSSProperties}
     >
+      <SidebarNav />
+
       {/* Ambiente holográfico igual que el dashboard: grilla animada + auroras difusas,
           decorativo, detrás del contenido, sin capturar el puntero. */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">

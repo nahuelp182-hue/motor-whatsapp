@@ -20,6 +20,7 @@ import { AttributionSection } from '@/components/AttributionSection'
 import { CuriososSection } from '@/components/CuriososSection'
 import { GlobalRoasGauge } from '@/components/GlobalRoasGauge'
 import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern'
+import { SidebarNav } from '@/components/SidebarNav'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = {
@@ -256,7 +257,7 @@ export default function DashboardPage() {
 
   return (
     <main
-      className="fx-charts fx-holo relative isolate min-h-screen p-5 md:p-8 font-sans"
+      className="fx-charts fx-holo relative isolate min-h-screen px-5 pb-8 pt-16 font-sans md:px-8 lg:pl-[256px] lg:pt-8"
       data-light={isLight ? '' : undefined}
       data-grayscale={isGrayscale ? '' : undefined}
       style={{
@@ -272,6 +273,7 @@ export default function DashboardPage() {
           : `radial-gradient(ellipse 90% 40% at 50% -5%, rgb(${theme.ac} / 0.07) 0%, transparent 60%), ${theme.bg}`,
       } as React.CSSProperties}
     >
+      <SidebarNav />
 
       {/* Ambiente holográfico: grilla animada + auroras difusas. Decorativo puro, detrás del
           contenido y sin capturar el puntero — no toca la legibilidad de los datos. Solo en
@@ -304,33 +306,6 @@ export default function DashboardPage() {
         <div>
           <p className="text-[11px] uppercase tracking-[0.2em] mb-1.5 font-semibold" style={{ color: acStr(0.7) }}>Motor WhatsApp</p>
           <h1 className="text-[26px] font-bold tracking-tight leading-none">Panel de métricas</h1>
-          {/* Navegación a las otras secciones del motor. Tiles y no links sueltos: son los
-              accesos que más se usan, tienen que verse de un vistazo aunque uno esté cansado. */}
-          <nav className="mt-4 flex flex-wrap gap-2">
-            {[
-              { href: '/conversaciones', icono: '💬', label: 'Conversaciones del bot' },
-              { href: '/marketing-automatico', icono: '📣', label: 'Marketing automático' },
-              { href: '/calendario', icono: '📅', label: 'Calendario comercial' },
-              { href: '/radar', icono: '🌱', label: 'Radar de tendencias' },
-              { href: '/dashboard/widgets', icono: '🧩', label: 'Widgets del sitio' },
-              { href: '/dashboard/resenas', icono: '⭐', label: 'Reseñas' },
-            ].map(n => (
-              <a
-                key={n.href}
-                href={n.href}
-                data-isolated=""
-                className="group relative rounded-xl bg-gradient-to-br from-cyan-400/30 via-white/10 to-violet-400/30 p-px transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgba(56,189,248,0.5)]"
-              >
-                <span className="flex items-center gap-2 rounded-[11px] bg-[#0a0a14]/85 px-3 py-2 text-[13px] font-medium text-white/85 backdrop-blur-sm transition-colors group-hover:bg-[#0a0a14]/70">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500/25 to-violet-500/25 text-sm leading-none shadow-[0_0_12px_-2px_rgba(56,189,248,0.55)]">
-                    {n.icono}
-                  </span>
-                  {n.label}
-                  <span className="text-[13px] text-cyan-300/80 transition-transform group-hover:translate-x-0.5">→</span>
-                </span>
-              </a>
-            ))}
-          </nav>
         </div>
 
         {/* Controles de fecha */}
