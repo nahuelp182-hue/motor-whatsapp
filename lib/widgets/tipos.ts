@@ -1317,8 +1317,28 @@ const TIPOS_BASE: TipoWidget[] = [
         label: 'Feriados y días sin despacho',
         tipo: 'textarea',
         placeholder: '2026-08-17\n2026-10-12\n2026-11-23',
+        // Feriados nacionales de descanso obligatorio, tomados del calendario «Laboral»
+        // (fuente Argentina.gob.ar + FEHGRA). Los cinco de 2026 que faltaban caen en día de
+        // despacho —lun, lun, lun, mar, vie—, así que sin esta lista el widget prometía
+        // «sale hoy» los cinco con el depósito cerrado.
+        //
+        // NO se incluye el puente del 7/12 (día no laborable turístico, a criterio del
+        // empleador): Andreani opera y diciembre es el mes más fuerte del año. Si ese lunes
+        // no se despacha, se agrega a mano.
+        //
+        // El 1/1/2027 no está en el calendario —solo tiene 2026 cargado— pero es feriado
+        // inamovible y cae viernes en plena temporada alta. Al cargar 2027 en el calendario,
+        // conviene revisar esta lista.
+        porDefecto: [
+          '2026-08-17', // Paso a la Inmortalidad del Gral. San Martín — lunes
+          '2026-10-12', // Día del Respeto a la Diversidad Cultural — lunes
+          '2026-11-23', // Día de la Soberanía Nacional — lunes
+          '2026-12-08', // Inmaculada Concepción de María — martes
+          '2026-12-25', // Navidad — viernes
+          '2027-01-01', // Año Nuevo — viernes
+        ].join('\n'),
         ayuda:
-          'Una fecha por línea, como año-mes-día. Esos días se saltean: el widget pasa al siguiente día de despacho en vez de prometer uno que no va a existir. Conviene cargar el año entero de una vez.',
+          'Una fecha por línea, como año-mes-día. Esos días se saltean: el widget pasa al siguiente día de despacho en vez de prometer uno que no va a existir. Vienen cargados los feriados nacionales hasta el 1/1/2027; sumá tus propios días sin despacho (vacaciones, cierre por inventario).',
       },
       CAMPO_COLOR,
     ],
