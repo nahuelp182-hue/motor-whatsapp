@@ -9,7 +9,11 @@
 // estos mails es bajo (uno por hito de cada cliente), muy dentro del límite de Gmail.
 import nodemailer from 'nodemailer'
 
-const GMAIL_USER = process.env.GMAIL_USER ?? 'nahuelp182@gmail.com'
+// Casilla de la EMPRESA, nunca la personal de Nahuel. El valor real viene del entorno; el
+// respaldo también es la casilla de empresa a propósito: si algún día falta la variable,
+// el peor caso tiene que ser mandar desde la dirección correcta, no exponer la personal
+// a toda la base de clientes.
+const GMAIL_USER = process.env.GMAIL_USER ?? 'info.micelium@gmail.com'
 const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD ?? ''
 const REMITENTE = process.env.MAIL_REMITENTE ?? `Micelium <${GMAIL_USER}>`
 
