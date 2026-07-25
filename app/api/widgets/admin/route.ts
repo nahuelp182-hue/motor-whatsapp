@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { porSlug, configPorDefecto, sanearConfig, sanearReglas, TIPOS, type Contexto } from '@/lib/widgets/tipos'
 import { GUIAS_PUBLICAS } from '@/lib/guias'
 import { productosTN } from '@/lib/widgets/productos'
+import { resenasPublicas } from '@/lib/widgets/datos'
 
 // CRUD del panel. NO figura en API_ABIERTAS del middleware, así que exige sesión de
 // dashboard como cualquier otra ruta privada.
@@ -43,7 +44,14 @@ async function storeId(): Promise<string | null> {
 /** Lista los widgets con su rendimiento de los últimos 30 días. */
 export async function GET() {
   const sid = await storeId()
-  if (!sid) return NextResponse.json({ widgets: [], tipos: TIPOS, paginas: PAGINAS, productos: [] })
+  if (!sid)
+    return NextResponse.json({
+      widgets: [],
+      tipos: TIPOS,
+      paginas: PAGINAS,
+      productos: [],
+      resenas: { items: [], promedio: null, total: 0 },
+    })
 
   const widgets = await prisma.widget.findMany({
     where: { store_id: sid },
@@ -65,8 +73,18 @@ export async function GET() {
   }
 
   const productos = await productosTN()
+  // Las reseñas publicadas viajan al panel para que la vista previa del widget de reseñas
+  // dibuje las de verdad —las mismas que va a ver un visitante— y no un relleno de ejemplo.
+  const resenas = await resenasPublicas(sid, 8, { modo: 'todas' })
 
-  return NextResponse.json({ widgets, metricas, tipos: TIPOS, paginas: paginasCon(productos), productos })
+  return NextResponse.json({
+    widgets,
+    metricas,
+    tipos: TIPOS,
+    paginas: paginasCon(productos),
+    productos,
+    resenas,
+  })
 }
 
 /** Crea un widget con los valores por defecto del tipo. Nace APAGADO a propósito. */

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { CampoEditor } from '@/components/widgets/CampoEditor'
-import { VistaPrevia } from '@/components/widgets/VistaPrevia'
+import { VistaPrevia, type Resenas } from '@/components/widgets/VistaPrevia'
 import { Metricas } from '@/components/widgets/Metricas'
 import { CARD, LABEL, AYUDA, AVISO, ACENTO, TITULO, SECCION, SECCION_SUB, SUBSECCION, TONOS, type TonoKey, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
 import { NumeroRodante } from '@/components/widgets/NumeroRodante'
@@ -15,6 +15,7 @@ import { BorderBeam } from '@/components/ui/border-beam'
 import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern'
 import { SidebarNav } from '@/components/SidebarNav'
 import { validarConfig } from '@/lib/widgets/validacion'
+import { campoVisible } from '@/lib/widgets/tipos'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
 import { RefreshCw, Plus, Trash2, Check } from 'lucide-react'
 
@@ -53,6 +54,9 @@ export default function WidgetsPage() {
   const [tipos, setTipos] = useState<TipoWidget[]>([])
   const [paginas, setPaginas] = useState<Pagina[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
+  // Reseñas publicadas: viajan al panel solo para que la vista previa del widget de reseñas
+  // dibuje las de verdad. No se editan desde acá.
+  const [resenas, setResenas] = useState<Resenas>({ items: [], promedio: null, total: 0 })
   const [ctx, setCtx] = useState<Contexto>('guias')
   const [editando, setEditando] = useState<Widget | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -68,6 +72,7 @@ export default function WidgetsPage() {
     setTipos(d.tipos ?? [])
     setPaginas(d.paginas ?? [])
     setProductos(d.productos ?? [])
+    setResenas(d.resenas ?? { items: [], promedio: null, total: 0 })
     setCargando(false)
   }, [])
 
@@ -288,6 +293,7 @@ export default function WidgetsPage() {
           tipo={tipoDe(editando.tipo)}
           paginas={paginas}
           productos={productos}
+          resenas={resenas}
           guardando={guardando}
           activo={widgets.find(w => w.id === editando.id)?.activo ?? false}
           onCerrar={() => setEditando(null)}
@@ -562,6 +568,7 @@ function Editor({
   tipo,
   paginas,
   productos,
+  resenas,
   guardando,
   activo,
   onCerrar,
@@ -574,6 +581,7 @@ function Editor({
   tipo?: TipoWidget
   paginas: Pagina[]
   productos: Producto[]
+  resenas: Resenas
   guardando: boolean
   activo: boolean
   onCerrar: () => void
@@ -681,7 +689,10 @@ function Editor({
               <p className={AYUDA}>Solo para reconocerlo en esta lista. No se ve en el sitio.</p>
             </div>
 
-            {tipo.campos.map(c => (
+            {/* Los campos que dependen de otro (los del recuadro, que solo importan si hay
+                recuadro) no se muestran hasta que corresponde: un formulario con cuatro
+                controles inertes es un formulario que hay que aprender a ignorar. */}
+            {tipo.campos.filter(c => campoVisible(c, widget.config)).map(c => (
               <CampoEditor
                 key={c.key}
                 campo={c}
@@ -804,7 +815,13 @@ function Editor({
         {/* ── Columna de vista previa ────────────────────────────── */}
         {/* Queda pegada arriba: se edita mirando el resultado, no alternando entre pestañas. */}
         <div className="lg:sticky lg:top-6">
-          <VistaPrevia tipo={widget.tipo} config={widget.config} />
+          <VistaPrevia
+            tipo={widget.tipo}
+            config={widget.config}
+            contexto={widget.contexto}
+            productos={productos}
+            resenas={resenas}
+          />
         </div>
       </div>
     </motion.div>

@@ -12,6 +12,9 @@ export type ProductoTN = {
   id: string
   nombre: string
   precio: number
+  /** Precio de lista (el tachado). 0 = sin promoción vigente. Lo usa la vista previa de la
+   *  ficha para que el desglose de pack pueda mostrar el ahorro real y no uno inventado. */
+  precioLista: number
   imagen: string | null
   /** Ruta de la ficha en el storefront, para poder acotar un widget a un producto. */
   ruta: string | null
@@ -47,7 +50,7 @@ export async function productosTN(): Promise<ProductoTN[]> {
       id: number
       name?: unknown
       handle?: unknown
-      variants?: Array<{ price?: string | null }>
+      variants?: Array<{ price?: string | null; compare_at_price?: string | null }>
       images?: Array<{ src?: string }>
     }>
 
@@ -55,6 +58,7 @@ export async function productosTN(): Promise<ProductoTN[]> {
       id: String(p.id),
       nombre: nombre(p),
       precio: Number(p.variants?.[0]?.price ?? 0) || 0,
+      precioLista: Number(p.variants?.[0]?.compare_at_price ?? 0) || 0,
       imagen: p.images?.[0]?.src ?? null,
       // `handle` viene por idioma, igual que `name`: se reusa el mismo desarmador.
       ruta: (() => {

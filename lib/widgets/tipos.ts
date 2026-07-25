@@ -36,6 +36,23 @@ export type Campo = {
   min?: number
   max?: number
   porDefecto?: unknown
+  /**
+   * El campo solo se muestra si otro campo tiene (o no tiene) cierto valor. Declarativo y
+   * no una función a propósito: el registro viaja como JSON al panel, y una función no
+   * sobrevive el viaje. Sirve para no mostrar cuatro campos de recuadro a quien no puso
+   * ninguno.
+   */
+  visibleSi?: { key: string; igualA?: string; distintoDe?: string }
+}
+
+/** ¿Corresponde mostrar este campo con la config actual? La usan el panel y la validación. */
+export function campoVisible(campo: Campo, config: Record<string, unknown> | undefined): boolean {
+  const v = campo.visibleSi
+  if (!v) return true
+  const actual = String(config?.[v.key] ?? '')
+  if (v.igualA !== undefined) return actual === v.igualA
+  if (v.distintoDe !== undefined) return actual !== v.distintoDe
+  return true
 }
 
 export type Contexto = 'guias' | 'tienda' | 'producto'
@@ -155,6 +172,71 @@ const CAMPO_ANIMACION: Campo = {
     { value: 'ninguna', label: 'Sin animación' },
   ],
 }
+
+// ── Recuadro ─────────────────────────────────────────────────────────────────
+// Borde alrededor del widget entero, para destacarlo del texto que lo rodea. Es común a
+// todos los widgets de bloque y lo aplica mic.js sobre el contenedor (el host del Shadow
+// DOM), no dentro de cada dibujo: así vale para los veinte tipos sin tocar ninguno, y un
+// tipo nuevo lo hereda sin escribir una línea.
+//
+// Se llama `recuadro` y no `borde` porque el widget de imagen ya usa `borde` para el filete
+// de la foto: dos cosas distintas con el mismo nombre en la misma config es una trampa.
+export const LINEAS_RECUADRO = [
+  { value: 'solida', label: 'Línea continua', css: 'solid' },
+  { value: 'rayada', label: 'Rayada', css: 'dashed' },
+  { value: 'punteada', label: 'Punteada', css: 'dotted' },
+  { value: 'doble', label: 'Doble', css: 'double' },
+] as const
+
+const CAMPOS_RECUADRO: Campo[] = [
+  {
+    key: 'recuadro',
+    label: 'Recuadro alrededor del widget',
+    tipo: 'select',
+    porDefecto: 'ninguno',
+    ayuda:
+      'Enmarca el widget para separarlo del texto. Sirve para destacar uno; si se le pone a todos, deja de destacar nada.',
+    opciones: [
+      { value: 'ninguno', label: 'Sin recuadro' },
+      { value: 'cuadrado', label: 'Esquinas rectas' },
+      { value: 'redondo', label: 'Esquinas redondeadas' },
+    ],
+  },
+  {
+    key: 'recuadro_color',
+    label: 'Color del recuadro',
+    tipo: 'color',
+    porDefecto: 'sage',
+    ayuda: 'Por defecto sigue al color principal del widget.',
+    visibleSi: { key: 'recuadro', distintoDe: 'ninguno' },
+  },
+  {
+    key: 'recuadro_grosor',
+    label: 'Grosor del trazo (px)',
+    tipo: 'numero',
+    min: 1,
+    max: 8,
+    porDefecto: 2,
+    ayuda: 'De 1 a 8. Arriba de 3 el marco pesa más que lo que hay adentro.',
+    visibleSi: { key: 'recuadro', distintoDe: 'ninguno' },
+  },
+  {
+    key: 'recuadro_linea',
+    label: 'Tipo de línea',
+    tipo: 'select',
+    porDefecto: 'solida',
+    opciones: LINEAS_RECUADRO.map(l => ({ value: l.value, label: l.label })),
+    visibleSi: { key: 'recuadro', distintoDe: 'ninguno' },
+  },
+  {
+    key: 'recuadro_fondo',
+    label: 'Pintar el fondo del recuadro',
+    tipo: 'booleano',
+    porDefecto: false,
+    ayuda: 'Rellena el marco con la versión clara del color. Destaca más, pero solo conviene en uno.',
+    visibleSi: { key: 'recuadro', distintoDe: 'ninguno' },
+  },
+]
 
 // Proporciones con su medida sugerida. El panel muestra la medida ANTES de subir, que es
 // cuando sirve: después de subir una foto mal encuadrada ya no hay nada que hacer.
@@ -1727,14 +1809,18 @@ const TIPOS_BASE: TipoWidget[] = [
   },
 ]
 
-// La animación de entrada es común a todos los widgets de bloque: se suma acá una sola vez, al
-// final de cada uno, en vez de repetir el campo veinte veces. Los flotantes no la llevan porque
-// no pasan por verUnaVez (tienen su propia aparición).
-export const TIPOS: TipoWidget[] = TIPOS_BASE.map(t =>
-  t.bloque && !t.campos.some(c => c.key === 'animacion')
-    ? { ...t, campos: [...t.campos, CAMPO_ANIMACION] }
-    : t,
-)
+// La animación de entrada y el recuadro son comunes a todos los widgets de bloque: se suman
+// acá una sola vez, al final de cada uno, en vez de repetir los campos veinte veces. Los
+// flotantes no los llevan porque no pasan por verUnaVez (tienen su propia aparición) y no
+// tienen un cuadro que enmarcar.
+export const TIPOS: TipoWidget[] = TIPOS_BASE.map(t => {
+  if (!t.bloque) return t
+  const extra = [
+    ...(t.campos.some(c => c.key === 'animacion') ? [] : [CAMPO_ANIMACION]),
+    ...CAMPOS_RECUADRO.filter(r => !t.campos.some(c => c.key === r.key)),
+  ]
+  return extra.length ? { ...t, campos: [...t.campos, ...extra] } : t
+})
 
 /**
  * Ids de producto referenciados por una config, mirando la declaración del tipo.

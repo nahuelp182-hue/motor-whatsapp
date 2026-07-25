@@ -291,6 +291,36 @@
     return true;
   }
 
+  /* ── Recuadro ──
+     Borde alrededor del widget entero, para destacarlo del texto que lo rodea. Se aplica
+     acá, sobre el host del Shadow DOM, y no dentro de cada dibujo: así vale para todos los
+     tipos de bloque con una sola función, y un tipo nuevo lo hereda sin escribir nada.
+     Va DESPUÉS de insertar, porque la rama de la ficha de producto pisa el style del host. */
+  var LINEAS = { solida: 'solid', rayada: 'dashed', punteada: 'dotted', doble: 'double' };
+
+  function aplicarRecuadro(host, c) {
+    var forma = c && c.recuadro;
+    if (!forma || forma === 'ninguno') return;
+    // Sin color propio sigue al color principal del widget: el caso normal es que el marco
+    // sea del mismo color que el resto, y así no hay que elegirlo dos veces.
+    var p = paleta(c.recuadro_color || c.color);
+    var g = Math.min(8, Math.max(1, Number(c.recuadro_grosor) || 2));
+    var linea = LINEAS[c.recuadro_linea] || 'solid';
+    // El BASE_CSS del Shadow DOM arranca con `:host{all:initial}`, y eso deja al host en
+    // `display:inline`. Un borde sobre una caja en línea se parte en pedazos: se ven los
+    // extremos y nada de los tramos rectos. Hay que pedir bloque explícitamente.
+    host.style.display = 'block';
+    host.style.border = g + 'px ' + linea + ' ' + p.bg;
+    host.style.borderRadius = forma === 'redondo' ? '14px' : '0';
+    // El borde ya corta el colapso de márgenes, así que los márgenes que cada widget trae
+    // adentro (los 20px de sus cajas) quedan como aire interno. Acá se agrega el costado, que
+    // ningún widget aporta, y un respiro arriba y abajo para los que empiezan con un título
+    // sin margen —si no, el título queda pegado al trazo.
+    host.style.padding = '8px 16px';
+    host.style.margin = '22px 0';
+    if (c.recuadro_fondo) host.style.background = p.suave;
+  }
+
   /* Contenedor aislado. Los flotantes van al body; los de bloque, al lugar elegido. */
   function montar(w, flotante) {
     var host = document.createElement('div');
@@ -306,10 +336,12 @@
     var slot = document.querySelector('[data-mic-slot="' + w.tipo + '"]');
     if (slot) {
       slot.appendChild(host);
+      aplicarRecuadro(host, w.config || {});
       return host.attachShadow({ mode: 'open' });
     }
 
     if (!insertar(host, (w.config && w.config.ubicacion) || 'final')) return null;
+    aplicarRecuadro(host, w.config || {});
     return host.attachShadow({ mode: 'open' });
   }
 
@@ -373,7 +405,10 @@
     var num = String(c.numero || '').replace(/\D/g, '');
     a.href = 'https://wa.me/' + num + '?text=' + encodeURIComponent(c.mensaje || '');
     a.addEventListener('click', function () { evento(w.id, 'interaccion'); evento(w.id, 'conversion'); });
-    setTimeout(function () { a.classList.add('on'); evento(w.id, 'impresion'); }, (Number(c.demora) || 0) * 1000);
+    // En vista previa no se espera la demora: quien está editando ya sabe que hay demora, y
+    // mirar un recuadro vacío quince segundos no le enseña nada.
+    setTimeout(function () { a.classList.add('on'); evento(w.id, 'impresion'); },
+      PREVIEW ? 60 : (Number(c.demora) || 0) * 1000);
   };
 
   R.cta_producto = function (w) {
@@ -657,6 +692,14 @@
       if (tx.length < 10) { msg.textContent = 'Contá un poco más tu experiencia.'; msg.className = 'msg err'; return; }
       enviar.disabled = true; msg.textContent = 'Enviando…';
 
+      // En vista previa el envío se simula: probar el formulario mientras se edita no puede
+      // dejar una reseña de prueba esperando moderación.
+      if (PREVIEW) {
+        msg.className = 'msg ok';
+        msg.textContent = c.mensajeGracias || '¡Gracias! Tu reseña se publicará luego de una breve revisión.';
+        return;
+      }
+
       var fd = new FormData();
       fd.append('autor', nm); fd.append('texto', tx); fd.append('rating', String(elegido));
       fd.append('website', hp);
@@ -727,7 +770,9 @@
     var c = w.config, p = paleta(c.color);
     var popup = c.modo !== 'bloque';
     var clave = '__mic_cap_' + w.id;
-    if (popup) { try { if (localStorage.getItem(clave) === '1') return; } catch (e) {} }
+    // La marca de "ya lo dejó" no corre en vista previa: si no, la ventana se ve una sola
+    // vez y el resto de la edición queda a ciegas.
+    if (popup && !PREVIEW) { try { if (localStorage.getItem(clave) === '1') return; } catch (e) {} }
 
     var sh = montar(w, popup); if (!sh) return;
 
@@ -760,6 +805,9 @@
       var msg = sh.querySelector('.m');
       msg.textContent = 'Enviando…';
       evento(w.id, 'interaccion');
+      // En vista previa se muestra el mensaje de gracias pero NO se da de alta el correo:
+      // probar el formulario mientras se edita no puede ensuciar la lista de suscriptores.
+      if (PREVIEW) { msg.textContent = c.gracias || '¡Listo!'; return; }
       fetch(BASE + '/api/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -801,7 +849,8 @@
         ov.classList.add('on');
         evento(w.id, 'impresion');
       }
-      setTimeout(abrir, (Number(c.demora) || 15) * 1000);
+      // Igual que la demora del botón de WhatsApp: en vista previa se abre enseguida.
+      setTimeout(abrir, PREVIEW ? 80 : (Number(c.demora) || 15) * 1000);
       if (c.salida) {
         document.addEventListener('mouseout', function (e) {
           if (!e.relatedTarget && e.clientY <= 0) abrir();
@@ -1151,7 +1200,9 @@
     var items = (c.items || []).filter(function (i) { return i.texto; });
     if (!items.length) return;
     var clave = '__mic_ban_' + w.id;
-    try { if (c.cerrable && sessionStorage.getItem(clave) === '1') return; } catch (e) {}
+    // El "ya lo cerró" no corre en vista previa: cerrarlo una vez no puede dejar el resto
+    // de la edición sin barra.
+    try { if (c.cerrable && !PREVIEW && sessionStorage.getItem(clave) === '1') return; } catch (e) {}
 
     var sh = montar(w, true); if (!sh) return;
     pintar(sh,
@@ -1539,16 +1590,12 @@
       (function siguiente() {
         if (i >= elegidos.length) {
           evento(w.id, 'conversion', montoTotal);
-          location.href = '/carrito/';
+          irAlCarrito();
           return;
         }
-        var fd = new FormData();
-        fd.append('add_to_cart', elegidos[i].getAttribute('data-id'));
-        fd.append('quantity', '1');
+        var id = elegidos[i].getAttribute('data-id');
         i++;
-        fetch('/comprar/', { method: 'POST', body: fd, credentials: 'same-origin' })
-          .then(siguiente)
-          .catch(siguiente);
+        agregarAlCarrito(id).then(siguiente, siguiente);
       })();
     });
 
@@ -1622,6 +1669,10 @@
     }
 
     function latir() {
+      // En vista previa no se avisa presencia (inflaría el conteo real del sitio) y se
+      // dibuja con el mínimo configurado: es el número más bajo que el visitante puede
+      // llegar a ver, o sea el peor caso del texto.
+      if (PREVIEW) { dibujar(minimo); return; }
       // Con la pestaña oculta no se avisa: quien está en otra solapa no está mirando esto.
       if (document.hidden) return;
       fetch(BASE + '/api/presencia', {
@@ -1651,12 +1702,20 @@
     return (w.catalogo && w.catalogo[String(id)]) || null;
   }
 
-  /* Agrega un producto al carrito de Tiendanube y espera a que termine. */
+  /* Agrega un producto al carrito de Tiendanube y espera a que termine.
+     En vista previa no se agrega nada ni se navega: los botones se pueden tocar para ver
+     cómo responden, sin tocar el carrito de nadie ni sacar al panel de la página. */
   function agregarAlCarrito(id) {
+    if (PREVIEW) return new Promise(function (r) { setTimeout(r, 400); });
     var fd = new FormData();
     fd.append('add_to_cart', String(id));
     fd.append('quantity', '1');
     return fetch('/comprar/', { method: 'POST', body: fd, credentials: 'same-origin' });
+  }
+
+  function irAlCarrito() {
+    if (PREVIEW) return;
+    location.href = '/carrito/';
   }
 
   /* Ids de producto que ya están en el carrito. Sirve para no ofrecer algo que la persona
@@ -1710,7 +1769,7 @@
       b.disabled = true; b.textContent = 'Agregando…';
       agregarAlCarrito(sup.id).then(function () {
         evento(w.id, 'conversion', sup.precio - actual);
-        location.href = '/carrito/';
+        irAlCarrito();
       });
     });
     verUnaVez(sh, w.id, c.animacion);
@@ -1726,8 +1785,11 @@
       var vistos = {}, salida = [];
       (c.items || []).forEach(function (regla) {
         if (!regla.si_lleva || !regla.ofrecer) return;
-        if (enCarrito.indexOf(String(regla.si_lleva)) === -1) return;   // no disparó
-        if (enCarrito.indexOf(String(regla.ofrecer)) !== -1) return;    // ya lo lleva
+        // En vista previa se muestran TODAS las reglas como si hubieran disparado: no hay
+        // un carrito real contra el cual medirlas, y lo que se está mirando es cómo queda
+        // la sugerencia cuando aparece.
+        if (!PREVIEW && enCarrito.indexOf(String(regla.si_lleva)) === -1) return; // no disparó
+        if (!PREVIEW && enCarrito.indexOf(String(regla.ofrecer)) !== -1) return;  // ya lo lleva
         if (vistos[regla.ofrecer]) return;                              // no repetir
         var pr = prod(w, regla.ofrecer);
         if (!pr) return;
@@ -1775,7 +1837,7 @@
           var monto = Number(b.getAttribute('data-precio')) || 0;
           agregarAlCarrito(b.getAttribute('data-id')).then(function () {
             evento(w.id, 'conversion', monto);
-            location.reload();
+            if (!PREVIEW) location.reload();
           });
         });
       });
@@ -1794,6 +1856,7 @@
 
     var clave = '__mic_ups_' + w.id;
     function yaMostrado() {
+      if (PREVIEW) return false; // en vista previa se vuelve a abrir con cada cambio
       try { return sessionStorage.getItem(clave) === '1'; } catch (e) { return false; }
     }
     function marcar() { try { sessionStorage.setItem(clave, '1'); } catch (e) {} }
@@ -1845,7 +1908,7 @@
         b.disabled = true; b.textContent = 'Sumando…';
         agregarAlCarrito(pr.id).then(function () {
           evento(w.id, 'conversion', pr.precio);
-          location.href = '/carrito/';
+          irAlCarrito();
         });
       });
     }
@@ -1933,8 +1996,25 @@
         var viejos = document.querySelectorAll('[data-mic]');
         for (var i = 0; i < viejos.length; i++) viejos[i].remove();
         var fn = R[w.tipo];
-        if (!fn) return;
-        try { fn(w); } catch (e) { console.warn('[mic] preview', w.tipo, e); }
+        var error = '';
+        if (fn) {
+          try { fn(w); } catch (e) { error = String(e && e.message || e); console.warn('[mic] preview', w.tipo, e); }
+        }
+        /* El panel necesita saber si esto dibujó algo. Un widget que se planta —sin precio
+           en la página, sin producto elegido, con la fecha vencida— hoy deja el recuadro en
+           blanco y parece que la vista previa está rota. Se avisa en vez de callar. */
+        if (window.parent !== window) {
+          // Con un respiro: algún widget se monta después de resolver algo (el carrito, una
+          // imagen), y preguntar en el mismo instante daría un "no dibujó" falso.
+          setTimeout(function () {
+            window.parent.postMessage({
+              mic: 'resultado',
+              tipo: w.tipo,
+              dibujado: !!document.querySelector('[data-mic]'),
+              error: error
+            }, '*');
+          }, 400);
+        }
       }
     };
     window.addEventListener('message', function (e) {
