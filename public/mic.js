@@ -786,6 +786,18 @@
     return 0;
   }
 
+  /* Precio con descuento por medio de pago (transferencia). Tiendanube ya lo muestra en un
+     renglón chico bajo el precio; leerlo de ahí evita repetir un porcentaje a mano que
+     después nadie recuerda actualizar cuando se cambia la configuración de pagos. */
+  function precioTransferencia() {
+    var el = document.querySelector('.js-payment-discount-price-product[data-priceraw-without-shipping]');
+    if (!el) return null;
+    var cent = Number(el.getAttribute('data-priceraw-without-shipping'));
+    if (!(cent > 0)) return null;
+    var nom = document.querySelector('.js-payment-discount-name-product');
+    return { monto: cent / 100, medio: (nom && nom.textContent.trim()) || 'transferencia' };
+  }
+
   function pesos(n) {
     try { return '$' + n.toLocaleString('es-AR', { maximumFractionDigits: 0 }); }
     catch (e) { return '$' + Math.round(n); }
@@ -1015,6 +1027,14 @@
         '<td class="n tach">' + esc(pesos(base)) + '</td></tr>' +
         '<tr class="pk"><td><b>' + esc(c.etiqueta_pack || 'Precio del pack') + '</b></td>' +
         '<td class="n"><b>' + esc(pesos(pagando)) + '</b></td></tr>';
+
+      // El mejor precio real de la tienda. Va como fila propia porque el renglón nativo de
+      // Tiendanube es chico y se pierde: quien está sumando piezas es justo quien lo mira.
+      var tr = c.mostrar_transferencia !== false ? precioTransferencia() : null;
+      if (tr && tr.monto < pagando) {
+        pie += '<tr class="tf"><td>Pagando con ' + esc(tr.medio.toLowerCase()) + '</td>' +
+          '<td class="n"><b>' + esc(pesos(tr.monto)) + '</b></td></tr>';
+      }
     }
 
     var ahorroTxt = '';
@@ -1037,6 +1057,8 @@
       '.t td{color:#6a6157}' +
       '.pk td{background:' + p.suave + ';border-top:1px solid ' + p.bg + ';padding:14px 10px}' +
       '.pk b{color:' + p.bg + ';font-size:18px}' +
+      '.tf td{color:#6a6157;border-top:0;padding-top:0;background:' + p.suave + '}' +
+      '.tf b{color:' + p.bg + '}' +
       '.ah{text-align:center;margin:14px 0 2px;font-size:14px;color:' + p.bg + '}' +
       '.nt{text-align:center;margin:0;font-size:12px;color:#6a6157}',
       (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +

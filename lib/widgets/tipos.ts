@@ -1035,6 +1035,13 @@ const TIPOS_BASE: TipoWidget[] = [
         ayuda: 'El monto en pesos además del porcentaje. El monto pega más fuerte que el %.',
       },
       {
+        key: 'mostrar_transferencia',
+        label: 'Sumar el precio con transferencia',
+        tipo: 'booleano',
+        porDefecto: true,
+        ayuda: 'El descuento por medio de pago que ya calcula Tiendanube, como fila propia. El renglón nativo es chico y se pierde justo para quien está mirando números.',
+      },
+      {
         key: 'nota',
         label: 'Nota al pie',
         tipo: 'texto',
