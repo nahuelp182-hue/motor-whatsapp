@@ -18,7 +18,11 @@ import { INPUT, LABEL, AYUDA, AVISO, BTN } from './ui'
 // Convertir el GIF a video es lo mismo que hacen Tiendanube y Mercado Libre, y por el mismo
 // motivo: el formato GIF no comprime video, guarda una tira de imágenes enteras.
 
-const ANCHO_MAX = 1600 // píxeles: alcanza para pantallas grandes sin pesar de más
+// Ancho por defecto: alcanza para una imagen a todo el ancho del texto en una pantalla
+// grande sin pesar de más. Un widget puede pedir menos (`anchoMax` en su declaración de
+// campo): una captura que se ve en una tarjeta de carrusel de 380 px no gana nada guardada
+// a 1600, y en un carrusel de diez la diferencia pasa el mega.
+const ANCHO_MAX = 1600
 const CALIDAD = 0.82
 const TOPE_VIDEO = 12 * 1024 * 1024
 
@@ -28,6 +32,8 @@ type Props = {
   ayuda?: string
   /** Texto con la medida sugerida, según la proporción elegida en el widget. */
   recomendado?: string
+  /** Ancho máximo en píxeles al que se achica la imagen. Sin esto, ANCHO_MAX. */
+  anchoMax?: number
   onChange: (url: string) => void
 }
 
@@ -37,14 +43,14 @@ function pesoLegible(bytes: number): string {
 }
 
 /** Achica manteniendo la proporción. Nunca agranda: estirar una foto chica la arruina. */
-function medidas(w: number, h: number): [number, number] {
-  if (w <= ANCHO_MAX) return [w, h]
-  return [ANCHO_MAX, Math.round((h * ANCHO_MAX) / w)]
+function medidas(w: number, h: number, tope: number): [number, number] {
+  if (w <= tope) return [w, h]
+  return [tope, Math.round((h * tope) / w)]
 }
 
-async function convertirImagen(file: File): Promise<File> {
+async function convertirImagen(file: File, tope: number): Promise<File> {
   const bitmap = await createImageBitmap(file)
-  const [w, h] = medidas(bitmap.width, bitmap.height)
+  const [w, h] = medidas(bitmap.width, bitmap.height, tope)
   const lienzo = document.createElement('canvas')
   lienzo.width = w
   lienzo.height = h
@@ -60,7 +66,7 @@ async function convertirImagen(file: File): Promise<File> {
  * GIF → WebM. Se decodifica cuadro por cuadro con WebCodecs y se graba el lienzo.
  * Lleva lo que dura el GIF, porque la grabación va en tiempo real.
  */
-async function convertirGif(file: File, avisar: (t: string) => void): Promise<File> {
+async function convertirGif(file: File, avisar: (t: string) => void, tope: number): Promise<File> {
   const Decoder = (window as unknown as { ImageDecoder?: unknown }).ImageDecoder
   if (!Decoder || typeof MediaRecorder === 'undefined') {
     throw new Error(
@@ -75,11 +81,11 @@ async function convertirGif(file: File, avisar: (t: string) => void): Promise<Fi
   const total: number = dec.tracks.selectedTrack?.frameCount ?? 1
   if (total < 2) {
     // Un GIF de un solo cuadro es una imagen: no tiene sentido volverlo video.
-    return convertirImagen(file)
+    return convertirImagen(file, tope)
   }
 
   const primero = await dec.decode({ frameIndex: 0 })
-  const [w, h] = medidas(primero.image.displayWidth, primero.image.displayHeight)
+  const [w, h] = medidas(primero.image.displayWidth, primero.image.displayHeight, tope)
   const lienzo = document.createElement('canvas')
   lienzo.width = w
   lienzo.height = h
@@ -114,7 +120,8 @@ async function convertirGif(file: File, avisar: (t: string) => void): Promise<Fi
   return new File([blob], file.name.replace(/\.\w+$/, '') + '.webm', { type: 'video/webm' })
 }
 
-export function SubirMedia({ valor, label, ayuda, recomendado, onChange }: Props) {
+export function SubirMedia({ valor, label, ayuda, recomendado, anchoMax, onChange }: Props) {
+  const tope = anchoMax && anchoMax > 0 ? anchoMax : ANCHO_MAX
   const input = useRef<HTMLInputElement>(null)
   const [estado, setEstado] = useState('')
   const [error, setError] = useState('')
@@ -129,7 +136,7 @@ export function SubirMedia({ valor, label, ayuda, recomendado, onChange }: Props
       let listo: File
       if (file.type === 'image/gif') {
         setEstado('Convirtiendo el GIF a video…')
-        listo = await convertirGif(file, setEstado)
+        listo = await convertirGif(file, setEstado, tope)
       } else if (file.type.startsWith('video/')) {
         if (file.size > TOPE_VIDEO) {
           throw new Error(
@@ -139,7 +146,7 @@ export function SubirMedia({ valor, label, ayuda, recomendado, onChange }: Props
         listo = file
       } else if (file.type.startsWith('image/')) {
         setEstado('Optimizando la imagen…')
-        listo = await convertirImagen(file)
+        listo = await convertirImagen(file, tope)
       } else {
         throw new Error('Formato no admitido. Serviría una imagen, un GIF o un video.')
       }
@@ -215,7 +222,7 @@ export function SubirMedia({ valor, label, ayuda, recomendado, onChange }: Props
       <p className={AYUDA}>
         {recomendado ? `Medida sugerida: ${recomendado}. ` : ''}
         Los GIF se convierten a video (pesan hasta veinte veces menos y se ven igual) y las
-        fotos se achican a {ANCHO_MAX} px y pasan a WebP. Nunca se sube el archivo original.
+        fotos se achican a {tope} px y pasan a WebP. Nunca se sube el archivo original.
       </p>
       {ayuda && <p className={AYUDA}>{ayuda}</p>}
     </div>

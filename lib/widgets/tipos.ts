@@ -51,6 +51,13 @@ export type Campo = {
   opciones?: { value: string; label: string }[] // select
   campos?: Campo[] // lista: forma de cada ítem
   maxItems?: number
+  /**
+   * Solo para `media`: a cuántos píxeles de ancho se achica la imagen antes de subirla.
+   * Sin esto todas las imágenes del panel se guardan a 1600 px, que es lo correcto para una
+   * foto a todo el ancho del texto y un derroche para una captura de pantalla que se ve en
+   * una tarjeta de 380 px. En un carrusel de diez capturas la diferencia es más de un mega.
+   */
+  anchoMax?: number
   min?: number
   max?: number
   porDefecto?: unknown
@@ -341,6 +348,88 @@ const CAMPOS_RECUADRO: Campo[] = [
   },
 ]
 
+// ── Gráfico de fondo ─────────────────────────────────────────────────────────
+// Con qué dibujo se pinta la caja del widget por detrás del texto.
+//
+// Hasta acá todos los bloques usaban el mismo: relleno suave y un filete vertical a la
+// izquierda. Con un widget en la página pasa desapercibido; con seis, la página entera
+// es la misma caja repetida seis veces y se lee como plantilla, que es exactamente la
+// sensación que un producto de $300.000 no se puede permitir.
+//
+// Los nueve fondos se dibujan con CSS puro —degradados, `radial-gradient` repetido,
+// máscaras—: ni una imagen, ni un pedido más al servidor, ni un byte de descarga. El
+// aspecto cambia sin costar velocidad, que es la única razón por la que se puede ofrecer
+// esta variedad sin arrepentirse después.
+export const FONDOS = [
+  { value: 'parentesis', label: 'Filete al costado', ayuda: 'Relleno suave con una barra vertical a la izquierda. El clásico.' },
+  { value: 'plano', label: 'Relleno liso', ayuda: 'Solo el fondo suave, sin filete. El más discreto.' },
+  { value: 'ninguno', label: 'Sin fondo', ayuda: 'Transparente: el widget se apoya sobre el fondo de la página.' },
+  { value: 'degradado', label: 'Degradado', ayuda: 'El color se desvanece en diagonal. Da profundidad sin ruido.' },
+  { value: 'puntos', label: 'Trama de puntos', ayuda: 'Puntitos regulares muy tenues. Textura de papel técnico.' },
+  { value: 'rayas', label: 'Rayas diagonales', ayuda: 'Líneas finas a 45°. Marca «atención» sin gritar.' },
+  { value: 'esquinas', label: 'Esquinas marcadas', ayuda: 'Cuatro escuadras en las puntas, sin marco completo. Se lee como un recorte.' },
+  { value: 'aura', label: 'Halo difuso', ayuda: 'Una mancha de color desenfocada detrás. El más suave de todos.' },
+  { value: 'filete_sup', label: 'Filete arriba', ayuda: 'Una línea gruesa de color al tope de la caja, como una pestaña.' },
+] as const
+
+const camposFondo = (porDefecto: string): Campo[] => [
+  {
+    key: 'grafico',
+    label: 'Gráfico de fondo',
+    tipo: 'select',
+    porDefecto,
+    grupo: 'estilo',
+    ayuda:
+      'Con qué se pinta la caja por detrás. Se dibuja con CSS, así que ninguno pesa más que otro. Conviene variar entre widgets de una misma página: seis cajas idénticas se leen como plantilla.',
+    opciones: FONDOS.map(f => ({ value: f.value, label: f.label })),
+  },
+  {
+    key: 'grafico_fuerza',
+    label: 'Intensidad del gráfico (%)',
+    tipo: 'numero',
+    min: 10,
+    max: 100,
+    porDefecto: 100,
+    grupo: 'estilo',
+    ayuda:
+      'Cuánto se nota la textura o el degradado. Por debajo de 40 queda como un papel apenas tramado; en 100 el dibujo compite con el texto.',
+    visibleSi: { key: 'grafico', distintoDe: 'ninguno' },
+  },
+]
+
+/**
+ * Widgets a los que se les suma el gráfico de fondo, con el dibujo que cada uno tenía
+ * ANTES de que esta opción existiera.
+ *
+ * Dos cosas se resuelven acá. Una: la lista es explícita —y no «todos los de bloque»—
+ * porque el panel no debe ofrecer una opción que el dibujo del sitio ignora; una casilla
+ * que no hace nada es peor que no tenerla. Dos: el valor por defecto es distinto en cada
+ * uno a propósito. Los widgets ya configurados no tienen `grafico` guardado, así que caen
+ * en el default, y si el default fuera uno solo, media docena de widgets que ya están
+ * publicados cambiarían de aspecto solos al desplegar esto. Un cambio de aspecto tiene que
+ * ser algo que alguien eligió.
+ */
+const CON_GRAFICO: Record<string, string> = {
+  cta_producto: 'parentesis',
+  garantia: 'plano',
+  barra_confianza: 'plano',
+  pasos: 'ninguno',
+  cuenta_regresiva: 'plano',
+  corte_despacho: 'parentesis',
+}
+
+// ── Texto en movimiento ──────────────────────────────────────────────────────
+// Un cartel quieto se lee una vez y se vuelve mueble. Estos son los cuatro gestos con los
+// que un mismo espacio dice más de una cosa: importa que sean POCOS y siempre los mismos,
+// porque el movimiento es lo primero que hace ver barato a un sitio cuando cada bloque se
+// mueve distinto.
+export const EFECTOS_TEXTO = [
+  { value: 'fundido', label: 'Se funde con el siguiente' },
+  { value: 'subir', label: 'Sube y entra el que sigue' },
+  { value: 'escribir', label: 'Se escribe letra por letra' },
+  { value: 'pasante', label: 'Cinta continua (marquesina)' },
+] as const
+
 // Proporciones con su medida sugerida. El panel muestra la medida ANTES de subir, que es
 // cuando sirve: después de subir una foto mal encuadrada ya no hay nada que hacer.
 export const PROPORCIONES = [
@@ -444,6 +533,36 @@ const TIPOS_BASE: TipoWidget[] = [
         label: 'Título',
         tipo: 'texto',
         ayuda: 'La frase grande del recuadro. Funciona mejor si continúa lo que la persona venía leyendo.',
+      },
+      {
+        key: 'titulo_alterna',
+        label: 'Finales que se van turnando',
+        tipo: 'lista',
+        maxItems: 5,
+        ayuda:
+          'El título queda fijo y solo cambia la última parte, que se reemplaza sola cada tantos segundos. Sirve para decir tres cosas en el lugar de una: «Empezá hoy con…» → «una cosecha en 21 días» / «el equipo que se maneja solo» / «asesoría por WhatsApp». Vacío = el título no se mueve.',
+        campos: [
+          { key: 'texto', label: 'Final', tipo: 'texto', ayuda: 'Dos o tres palabras. Que todos entren en el mismo renglón: si uno es mucho más largo, el título salta de alto al cambiar.' },
+        ],
+      },
+      {
+        key: 'titulo_efecto',
+        label: 'Cómo cambia el final',
+        tipo: 'select',
+        porDefecto: 'subir',
+        grupo: 'estilo',
+        ayuda: 'Solo se usa si cargaste finales acá arriba.',
+        opciones: EFECTOS_TEXTO.filter(e => e.value !== 'pasante').map(e => ({ value: e.value, label: e.label })),
+      },
+      {
+        key: 'titulo_segundos',
+        label: 'Cada cuántos segundos cambia el final',
+        tipo: 'numero',
+        min: 2,
+        max: 20,
+        porDefecto: 3,
+        grupo: 'comportamiento',
+        ayuda: 'Tres segundos alcanza para leer dos o tres palabras sin que el bloque parezca un cartel de neón.',
       },
       {
         key: 'texto',
@@ -1315,13 +1434,23 @@ const TIPOS_BASE: TipoWidget[] = [
         campos: [{ key: 'texto', label: 'Mensaje', tipo: 'texto', ayuda: 'Una línea corta. Un beneficio concreto por mensaje.' }],
       },
       {
+        key: 'movimiento',
+        label: 'Cómo cambia de mensaje',
+        tipo: 'select',
+        porDefecto: 'fundido',
+        grupo: 'estilo',
+        ayuda:
+          'La cinta continua no espera a nadie: los mensajes desfilan uno atrás del otro sin cortar, y es lo único que sirve cuando hay cuatro o cinco. Con dos, el fundido se lee mejor. A quien pidió menos movimiento en su sistema siempre se le muestra el primer mensaje quieto.',
+        opciones: EFECTOS_TEXTO.map(e => ({ value: e.value, label: e.label })),
+      },
+      {
         key: 'segundos',
         label: 'Cada cuántos segundos cambia',
         tipo: 'numero',
         porDefecto: 5,
         min: 2,
         max: 20,
-        ayuda: 'Menos de cuatro segundos no da tiempo a leer en celular.',
+        ayuda: 'Menos de cuatro segundos no da tiempo a leer en celular. En la cinta continua marca cuánto tarda cada mensaje en cruzar.',
       },
       {
         key: 'cerrable',
@@ -1936,6 +2065,313 @@ const TIPOS_BASE: TipoWidget[] = [
       CAMPO_COLOR,
     ],
   },
+  {
+    slug: 'carrusel',
+    nombre: 'Carrusel de imágenes',
+    descripcion:
+      'Varias imágenes que se pasan de a una, con flechas, puntos y avance solo. El lugar natural de las capturas de WhatsApp: una conversación real de un cliente convence más que cualquier texto escrito por la marca.',
+    categoria: 'confianza',
+    contextos: ['guias', 'tienda', 'producto'],
+    bloque: true,
+    uso:
+      'Se inserta donde elijas. Se pasa arrastrando con el dedo (en celular es el gesto que la gente ya hace solo), con las flechas o con las teclas. Solo se descarga la imagen que se está por ver: un carrusel de doce capturas pesa al abrir lo mismo que una sola.',
+    cuidado:
+      'Si son capturas de conversaciones, tapá el nombre y la foto de la otra persona antes de subirlas. Y elegí «Entera, sin recortar» abajo: con «Recortada» una captura pierde justo los renglones de arriba y de abajo, que es donde está lo que dice.',
+    campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'final',
+        ayuda: 'Se elige de la lista.',
+      },
+      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: '', ayuda: 'Encabezado del bloque. Vacío = sin encabezado.' },
+      {
+        key: 'subtitulo',
+        label: 'Subtítulo',
+        tipo: 'texto',
+        porDefecto: '',
+        ayuda: 'Línea chica bajo el título. Sirve para decir de dónde salen las imágenes («Mensajes de clientes tras recibir el equipo»).',
+      },
+      {
+        key: 'items',
+        label: 'Imágenes',
+        tipo: 'lista',
+        maxItems: 15,
+        ayuda:
+          'Se muestran en este orden. La primera es la que ve todo el mundo, aunque nadie arrastre: poné ahí la más fuerte. De seis a diez es lo que se recorre entero; con quince, las últimas no las ve nadie.',
+        campos: [
+          {
+            key: 'archivo',
+            label: 'Imagen',
+            tipo: 'media',
+            // 1080 px alcanza para una tarjeta de carrusel incluso en pantalla retina, y es
+            // la mitad de peso que los 1600 px del widget de imagen suelta.
+            anchoMax: 1080,
+            ayuda: 'Se achica y pasa a WebP antes de subirse. Una captura de celular queda en unos 100 KB.',
+          },
+          {
+            key: 'titulo',
+            label: 'Título sobre la imagen',
+            tipo: 'texto',
+            ayuda: 'Opcional. Va debajo de la imagen, en negrita. Con capturas de WhatsApp funciona el nombre de pila y la ciudad.',
+          },
+          {
+            key: 'texto',
+            label: 'Texto al pie',
+            tipo: 'texto',
+            ayuda: 'Opcional. Un renglón que ubique lo que se está viendo.',
+          },
+          {
+            key: 'alt',
+            label: 'Descripción para quien no puede verla',
+            tipo: 'texto',
+            ayuda: 'Qué se ve, en una frase. La usan los lectores de pantalla y los buscadores. Vacía, se usa el título.',
+          },
+        ],
+      },
+      {
+        key: 'proporcion',
+        label: 'Proporción de cada tarjeta',
+        tipo: 'select',
+        previsual: 'proporcion',
+        porDefecto: '4:5',
+        grupo: 'estilo',
+        ayuda:
+          'Todas las tarjetas ocupan lo mismo, así el carrusel no salta de alto al pasar de una a otra. Para capturas de celular, la vertical (4:5) es la que menos aire desperdicia.',
+        opciones: [
+          { value: '4:5', label: 'Vertical (4:5) — capturas de celular' },
+          { value: '1:1', label: 'Cuadrado (1:1)' },
+          { value: '4:3', label: 'Clásico (4:3)' },
+          { value: '16:9', label: 'Apaisado (16:9)' },
+          { value: '3:4', label: 'Vertical suave (3:4)' },
+        ],
+      },
+      {
+        key: 'ajuste',
+        label: 'Cómo entra la imagen en la tarjeta',
+        tipo: 'select',
+        porDefecto: 'entera',
+        grupo: 'estilo',
+        ayuda:
+          '«Entera» muestra todo el archivo y rellena lo que sobra con un fondo neutro: es la única opción válida para una captura, donde recortar se lleva el texto. «Recortada» llena la tarjeta sin bordes y queda mejor con fotos.',
+        opciones: [
+          { value: 'entera', label: 'Entera, sin recortar' },
+          { value: 'recortada', label: 'Recortada al centro' },
+        ],
+      },
+      {
+        key: 'por_vista',
+        label: 'Cuántas se ven a la vez (en pantalla grande)',
+        tipo: 'numero',
+        min: 1,
+        max: 4,
+        porDefecto: 2,
+        grupo: 'estilo',
+        ayuda:
+          'En celular siempre se ve una sola, sin importar lo que pongas acá: no hay ancho para otra cosa. Ver dos o tres a la vez sugiere que hay más y hace que la gente arrastre.',
+      },
+      {
+        key: 'auto',
+        label: 'Avanza solo',
+        tipo: 'booleano',
+        porDefecto: true,
+        grupo: 'comportamiento',
+        ayuda:
+          'Pasa de tarjeta sin que nadie toque nada. Se frena solo mientras el puntero está encima, mientras alguien arrastra, si la pestaña no está a la vista, y para quien pidió menos movimiento en su sistema.',
+      },
+      {
+        key: 'segundos',
+        label: 'Cada cuántos segundos avanza',
+        tipo: 'numero',
+        min: 2,
+        max: 20,
+        porDefecto: 5,
+        grupo: 'comportamiento',
+        ayuda: 'Menos de cuatro no da tiempo a leer una captura en celular.',
+        visibleSi: { key: 'auto', igualA: 'true' },
+      },
+      {
+        key: 'bucle',
+        label: 'Vuelve al principio al terminar',
+        tipo: 'booleano',
+        porDefecto: true,
+        grupo: 'comportamiento',
+        ayuda: 'Apagado, se planta en la última y el avance solo se detiene ahí. Prendido, no termina nunca.',
+      },
+      {
+        key: 'flechas',
+        label: 'Mostrar flechas',
+        tipo: 'booleano',
+        porDefecto: true,
+        grupo: 'estilo',
+        ayuda: 'Los botones a los costados. En celular no hacen falta —se arrastra— pero en escritorio sin ellos mucha gente no se entera de que hay más.',
+      },
+      {
+        key: 'indicador',
+        label: 'Indicador de posición',
+        tipo: 'select',
+        porDefecto: 'puntos',
+        grupo: 'estilo',
+        ayuda: 'Lo que dice en qué parte del carrusel está. La barra de progreso es la más honesta cuando hay más de ocho.',
+        opciones: [
+          { value: 'puntos', label: 'Puntos' },
+          { value: 'barras', label: 'Barritas' },
+          { value: 'barra', label: 'Barra de progreso' },
+          { value: 'numeros', label: 'Número (3 / 10)' },
+          { value: 'ninguno', label: 'Sin indicador' },
+        ],
+      },
+      {
+        key: 'ampliar',
+        label: 'Se puede tocar para verla en grande',
+        tipo: 'booleano',
+        porDefecto: true,
+        grupo: 'comportamiento',
+        ayuda:
+          'Al tocar una tarjeta se abre a pantalla completa. Con capturas es casi obligatorio: en la tarjeta la letra queda chica y quien quiere leer de verdad la conversación no puede.',
+      },
+      {
+        key: 'marco',
+        label: 'Marco de cada tarjeta',
+        tipo: 'select',
+        previsual: 'marco',
+        porDefecto: 'redondo',
+        opciones: [
+          { value: 'ninguno', label: 'Sin marco' },
+          { value: 'suave', label: 'Esquinas suaves' },
+          { value: 'redondo', label: 'Esquinas redondeadas' },
+        ],
+      },
+      {
+        key: 'sombra',
+        label: 'Sombra bajo las tarjetas',
+        tipo: 'booleano',
+        porDefecto: true,
+        grupo: 'estilo',
+        ayuda: 'Las despega del fondo. Con capturas de fondo claro es lo que evita que se confundan con la página.',
+      },
+      CAMPO_COLOR,
+    ],
+  },
+  {
+    slug: 'antes_despues',
+    nombre: 'Antes y después',
+    descripcion:
+      'Dos fotos superpuestas con una manija que se arrastra para pasar de una a la otra. Es la prueba visual más difícil de discutir: el resultado se ve, no se promete.',
+    categoria: 'confianza',
+    contextos: ['guias', 'tienda', 'producto'],
+    bloque: true,
+    uso:
+      'Se inserta donde elijas. Se arrastra con el dedo o el puntero, y también se mueve con las flechas del teclado. La primera vez que entra en pantalla hace un barrido solo para que se entienda que se puede mover.',
+    cuidado:
+      'Las dos fotos tienen que estar sacadas desde el MISMO lugar y con la misma luz. Si el encuadre cambia entre una y otra, la comparación no prueba nada y se nota enseguida: lo que se lee es «me están vendiendo», que es lo contrario de lo que este bloque busca.',
+    campos: [
+      {
+        key: 'ubicacion',
+        label: 'Dónde se inserta en la página',
+        tipo: 'ubicacion',
+        porDefecto: 'medio',
+        ayuda: 'Se elige de la lista.',
+      },
+      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: '', ayuda: 'Encabezado del bloque. Vacío = sin encabezado.' },
+      {
+        key: 'antes',
+        label: 'Imagen de antes',
+        tipo: 'media',
+        anchoMax: 1400,
+        ayuda: 'La que se ve del lado izquierdo (o arriba, si elegís el corte horizontal).',
+      },
+      {
+        key: 'despues',
+        label: 'Imagen de después',
+        tipo: 'media',
+        anchoMax: 1400,
+        ayuda: 'La que se ve del lado derecho. Tiene que ser el mismo encuadre que la anterior.',
+      },
+      {
+        key: 'et_antes',
+        label: 'Etiqueta de la primera',
+        tipo: 'texto',
+        porDefecto: 'Día 1',
+        ayuda: 'El cartelito sobre la imagen. Un dato concreto (un día, una medida) convence más que la palabra «antes».',
+      },
+      {
+        key: 'et_despues',
+        label: 'Etiqueta de la segunda',
+        tipo: 'texto',
+        porDefecto: 'Día 21',
+        ayuda: 'Ídem. Si son días, que sean los que de verdad tarda: una promesa de calendario se verifica sola.',
+      },
+      {
+        key: 'pie',
+        label: 'Texto al pie',
+        tipo: 'texto',
+        porDefecto: '',
+        ayuda: 'Opcional. Dónde y cuándo se sacaron las fotos. Sumar el contexto es lo que la vuelve creíble.',
+      },
+      {
+        key: 'orientacion',
+        label: 'Cómo se corta',
+        tipo: 'select',
+        porDefecto: 'vertical',
+        grupo: 'estilo',
+        ayuda: 'La manija vertical se arrastra a lo ancho; la horizontal, de arriba abajo. La vertical es la que la gente ya conoce.',
+        opciones: [
+          { value: 'vertical', label: 'Corte vertical (se arrastra a los costados)' },
+          { value: 'horizontal', label: 'Corte horizontal (se arrastra hacia arriba y abajo)' },
+        ],
+      },
+      {
+        key: 'proporcion',
+        label: 'Proporción',
+        tipo: 'select',
+        previsual: 'proporcion',
+        porDefecto: '4:3',
+        grupo: 'estilo',
+        ayuda: 'Las dos imágenes se recortan a esta medida para que coincidan exactamente. Sin esto, la comparación se desalinea.',
+        opciones: [
+          { value: '4:3', label: 'Clásico (4:3)' },
+          { value: '16:9', label: 'Apaisado (16:9)' },
+          { value: '1:1', label: 'Cuadrado (1:1)' },
+          { value: '4:5', label: 'Vertical (4:5)' },
+        ],
+      },
+      {
+        key: 'inicio',
+        label: 'Dónde arranca la manija (%)',
+        tipo: 'numero',
+        min: 5,
+        max: 95,
+        porDefecto: 50,
+        grupo: 'comportamiento',
+        ayuda:
+          'En 50 se ven las dos mitades. Correrla hacia un lado (por ejemplo 25) deja ver más del «después» de entrada, que es lo que conviene mostrar primero.',
+      },
+      {
+        key: 'demo',
+        label: 'Hace un barrido solo al aparecer',
+        tipo: 'booleano',
+        porDefecto: true,
+        grupo: 'comportamiento',
+        ayuda:
+          'La primera vez que entra en pantalla la manija se mueve sola de punta a punta y vuelve. Sin eso, mucha gente ve una foto rara y sigue de largo sin descubrir que se arrastra.',
+      },
+      {
+        key: 'marco',
+        label: 'Marco',
+        tipo: 'select',
+        previsual: 'marco',
+        porDefecto: 'redondo',
+        opciones: [
+          { value: 'ninguno', label: 'Sin marco' },
+          { value: 'suave', label: 'Esquinas suaves' },
+          { value: 'redondo', label: 'Esquinas redondeadas' },
+        ],
+      },
+      CAMPO_COLOR,
+    ],
+  },
 ]
 
 // La animación de entrada y el recuadro son comunes a todos los widgets de bloque: se suman
@@ -1943,8 +2379,12 @@ const TIPOS_BASE: TipoWidget[] = [
 // flotantes no los llevan porque no pasan por verUnaVez (tienen su propia aparición) y no
 // tienen un cuadro que enmarcar.
 export const TIPOS: TipoWidget[] = TIPOS_BASE.map(t => {
-  if (!t.bloque) return t
+  const conFondo = CON_GRAFICO[t.slug]
+    ? camposFondo(CON_GRAFICO[t.slug]).filter(f => !t.campos.some(c => c.key === f.key))
+    : []
+  if (!t.bloque) return conFondo.length ? { ...t, campos: [...t.campos, ...conFondo] } : t
   const extra = [
+    ...conFondo,
     ...(t.campos.some(c => c.key === 'animacion') ? [] : [CAMPO_ANIMACION]),
     ...CAMPOS_RECUADRO.filter(r => !t.campos.some(c => c.key === r.key)),
   ]

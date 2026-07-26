@@ -235,6 +235,7 @@ export function CampoEditor({ campo, valor, productos = [], config, contexto, on
         label={campo.label}
         ayuda={campo.ayuda}
         recomendado={prop?.medida}
+        anchoMax={campo.anchoMax}
         onChange={onChange}
       />
     )
@@ -406,6 +407,10 @@ export function CampoEditor({ campo, valor, productos = [], config, contexto, on
                     campo={sub}
                     valor={item[sub.key]}
                     productos={productos}
+                    // La config del widget, no la del ítem: la medida sugerida de una imagen
+                    // del carrusel sale de la proporción elegida para TODAS las tarjetas.
+                    config={config}
+                    contexto={contexto}
                     onChange={v => {
                       const c = [...items]
                       c[i] = { ...c[i], [sub.key]: v }

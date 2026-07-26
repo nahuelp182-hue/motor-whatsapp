@@ -132,6 +132,42 @@ const REGLAS: Record<string, Regla> = {
     return []
   },
 
+  carrusel(c) {
+    const avisos: Aviso[] = []
+    const imgs = lista(c.items).filter(i => txt(i.archivo))
+    if (!imgs.length)
+      return [{ key: 'items', nivel: 'error', mensaje: 'No hay ninguna imagen cargada: el carrusel no va a aparecer.' }]
+
+    // Con una sola tarjeta no hay carrusel: hay una imagen, y para eso está el widget de
+    // imagen suelta, que no arrastra flechas ni puntos que no llevan a ninguna parte.
+    if (imgs.length === 1)
+      avisos.push({ key: 'items', nivel: 'aviso', mensaje: 'Con una sola imagen no hay nada que pasar. Para una imagen conviene el widget «Imagen o animación»: pesa menos y no muestra controles que no hacen nada.' })
+
+    // Recortar una captura se lleva justo los renglones de arriba y de abajo.
+    if (c.ajuste === 'recortada')
+      avisos.push({ key: 'ajuste', nivel: 'aviso', mensaje: 'Con «Recortada al centro», una captura de pantalla pierde el principio y el final del mensaje, que es lo que se quería mostrar. Para capturas va «Entera, sin recortar».' })
+
+    const sinTexto = imgs.filter(i => !txt(i.alt) && !txt(i.titulo)).length
+    if (sinTexto)
+      avisos.push({ key: 'items', nivel: 'aviso', mensaje: `${sinTexto} imagen${sinTexto > 1 ? 'es' : ''} sin descripción ni título. Los buscadores y los lectores de pantalla no ven la imagen: sin texto, para ellos el bloque está vacío.` })
+
+    if (num(c.por_vista) > 1 && imgs.length <= num(c.por_vista))
+      avisos.push({ key: 'por_vista', nivel: 'aviso', mensaje: 'Entran todas a la vez en pantalla grande, así que ahí no queda nada para pasar. Sumá más imágenes o bajá cuántas se ven a la vez.' })
+
+    return avisos
+  },
+
+  antes_despues(c) {
+    const avisos: Aviso[] = []
+    if (!txt(c.antes) || !txt(c.despues))
+      return [{ nivel: 'error', mensaje: 'Faltan las dos imágenes: con una sola no hay comparación y el widget no se muestra.' }]
+    if (txt(c.antes) === txt(c.despues))
+      avisos.push({ nivel: 'error', mensaje: 'Las dos imágenes son el mismo archivo: arrastrar la manija no va a mostrar ningún cambio.' })
+    if (!txt(c.pie))
+      avisos.push({ key: 'pie', nivel: 'aviso', mensaje: 'Sin un pie que diga cuándo y dónde se sacaron, la comparación se lee como un montaje. El contexto es lo que la vuelve creíble.' })
+    return avisos
+  },
+
   pack_complementarios: sinProductos,
   upsell_upgrade: sinProductos,
   upsell_al_agregar: sinProductos,

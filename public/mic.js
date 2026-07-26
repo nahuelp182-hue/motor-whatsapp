@@ -381,6 +381,162 @@
     obs.observe(el);
   }
 
+  /* ── Gráfico de fondo del cartel ───────────────────────────────────────────
+     Con qué se pinta la caja por detrás del texto.
+
+     Hasta acá todos los bloques usaban el mismo dibujo: relleno suave y un filete vertical
+     a la izquierda. Con un widget en la página no se nota; con seis, la página entera es la
+     misma caja repetida seis veces y se lee como plantilla — que es justo la sensación que
+     un producto de $300.000 no se puede permitir.
+
+     Los nueve fondos son CSS puro: degradados, gradientes repetidos y máscaras. Ni una
+     imagen, ni un pedido más al servidor, ni un byte de descarga. Por eso se puede ofrecer
+     esta variedad sin que cueste velocidad, que es la única razón por la que existe.
+
+     La intensidad multiplica la opacidad del DIBUJO, nunca la del texto: un fondo al 100 %
+     compite con lo que hay escrito encima, pero nunca lo vuelve ilegible. */
+  function rgbDe(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+    var n = parseInt(h, 16);
+    if (isNaN(n)) return '111,138,95'; // sage, por si el color guardado no es un hex
+    return ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255);
+  }
+
+  /* `defecto` es el dibujo que ese widget tenía antes de que esta opción existiera. Los
+     widgets ya publicados no tienen `grafico` guardado y caen acá: sin este parámetro,
+     media docena de bloques que están en el sitio cambiarían de aspecto solos al desplegar.
+     Un cambio de aspecto tiene que ser algo que alguien eligió. */
+  function graficoDe(c, defecto) {
+    return c.grafico == null || c.grafico === '' ? (defecto || 'parentesis') : c.grafico;
+  }
+
+  function fondo(c, p, radio, defecto) {
+    var g = graficoDe(c, defecto);
+    var f = Math.max(10, Math.min(100, Number(c.grafico_fuerza) || 100)) / 100;
+    var rgb = rgbDe(p.bg);
+    function t(a) { return 'rgba(' + rgb + ',' + (a * f).toFixed(3) + ')'; }
+    var r = 'border-radius:' + (radio || '10px') + ';';
+
+    if (g === 'ninguno') return 'background:none;';
+    if (g === 'plano') return r + 'background:' + p.suave + ';';
+    if (g === 'degradado') {
+      return r + 'background:linear-gradient(135deg,' + t(0.2) + ' 0%,' + t(0.02) + ' 72%),' + p.suave + ';';
+    }
+    if (g === 'puntos') {
+      return r + 'background:radial-gradient(' + t(0.4) + ' 1px,transparent 1px) 0 0/11px 11px,' + p.suave + ';';
+    }
+    if (g === 'rayas') {
+      return r + 'background:repeating-linear-gradient(45deg,' + t(0.17) + ' 0 1.5px,transparent 1.5px 10px),' + p.suave + ';';
+    }
+    if (g === 'aura') {
+      return r + 'background:radial-gradient(150px 110px at 88% 6%,' + t(0.45) + ',transparent 68%),' +
+        'radial-gradient(130px 95px at 4% 98%,' + t(0.28) + ',transparent 70%),' + p.suave + ';';
+    }
+    if (g === 'filete_sup') return r + 'background:' + p.suave + ';border-top:4px solid ' + p.bg + ';';
+    if (g === 'esquinas') {
+      /* Cuatro escuadras dibujadas con ocho gradientes planos, un brazo cada uno. Un marco
+         entero encajona el contenido; la escuadra sugiere el recorte y lo deja respirar. */
+      var b = 'linear-gradient(' + p.bg + ',' + p.bg + ')';
+      var pos = ['0% 0%', '100% 0%', '0% 100%', '100% 100%'];
+      var capas = [];
+      for (var i = 0; i < 4; i++) {
+        capas.push(b + ' ' + pos[i] + '/17px 2px no-repeat');
+        capas.push(b + ' ' + pos[i] + '/2px 17px no-repeat');
+      }
+      return r + 'background:' + capas.join(',') + ',' + t(0.07) + ';';
+    }
+    // parentesis: el de siempre, y el que siguen usando los widgets ya configurados.
+    return r + 'background:' + p.suave + ';border-left:4px solid ' + p.bg + ';';
+  }
+
+  /* ── Texto en movimiento ───────────────────────────────────────────────────
+     Un cartel quieto se lee una vez y a la segunda visita ya es mueble. Estos son los tres
+     gestos con los que un mismo renglón dice más de una cosa (el cuarto, la cinta continua,
+     es del banner y vive en su renderer porque no rota: desfila).
+
+     Que sean POCOS y siempre los mismos es parte del diseño: lo primero que hace ver barato
+     a un sitio es que cada bloque se mueva distinto.
+
+     Nada de esto corre para quien pidió menos movimiento en su sistema: ahí se muestra la
+     primera frase, quieta. No es un detalle de accesibilidad al margen — es gente que se
+     marea con el movimiento en pantalla. */
+  function menosMovimiento() {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  }
+
+  var CSS_TEXTO =
+    '.mic-tx{display:inline-block;transition:opacity .38s ease,transform .38s ease}' +
+    '.mic-tx.mic-fuera{opacity:0}' +
+    '.mic-tx.mic-sube.mic-fuera{transform:translateY(-.45em)}' +
+    '.mic-tx.mic-entra{opacity:0}' +
+    '.mic-tx.mic-sube.mic-entra{transform:translateY(.45em)}' +
+    /* El cursor de la máquina de escribir. Parpadea en saltos, no con un fundido: un cursor
+       que se desvanece parece un error de render, uno que prende y apaga se lee como cursor. */
+    '.mic-cur{display:inline-block;width:.075em;height:1em;background:currentColor;margin-left:.09em;' +
+    'vertical-align:-.14em;animation:mic-parp 1.05s steps(1) infinite}' +
+    '@keyframes mic-parp{50%{opacity:0}}' +
+    '@media (prefers-reduced-motion:reduce){.mic-tx{transition:none}.mic-cur{display:none}}';
+
+  /**
+   * Va turnando `frases` dentro de `el`. Devuelve la función para frenarlo.
+   * `modo`: 'fundido' | 'subir' | 'escribir'.
+   */
+  function rotarTexto(el, frases, modo, ms) {
+    var nada = function () {};
+    if (!el) return nada;
+    frases = (frases || []).filter(function (x) { return x; });
+    if (!frases.length) return nada;
+    if (frases.length === 1 || menosMovimiento()) { el.textContent = frases[0]; return nada; }
+
+    var i = 0, vivo = true, timer = null;
+    // Se SUMAN las clases, no se reemplazan: el elemento suele traer la suya (`.alt` en el
+    // título del bloque de llamada a la acción, que es la que le da el color de marca), y
+    // pisarla dejaba el texto que cambia idéntico al que no cambia.
+    el.classList.add('mic-tx');
+    if (modo === 'subir') el.classList.add('mic-sube');
+    el.textContent = frases[0];
+
+    function escribir(txt) {
+      el.textContent = '';
+      var t = document.createTextNode('');
+      var cur = document.createElement('span');
+      cur.className = 'mic-cur';
+      el.appendChild(t);
+      el.appendChild(cur);
+      var n = 0;
+      (function paso() {
+        if (!vivo) return;
+        if (n < txt.length) { t.nodeValue = txt.slice(0, ++n); setTimeout(paso, 45); return; }
+        // El cursor se queda un rato al final y recién ahí se va: sin esa pausa el efecto
+        // termina de golpe y no se entiende que terminó de escribir.
+        setTimeout(function () { if (cur.parentNode) cur.parentNode.removeChild(cur); }, 900);
+      })();
+    }
+
+    function siguiente() {
+      i = (i + 1) % frases.length;
+      if (modo === 'escribir') { escribir(frases[i]); return; }
+      el.classList.add('mic-fuera');
+      setTimeout(function () {
+        if (!vivo) return;
+        // Se apaga la transición para poner el estado de entrada sin que se vea el salto, se
+        // fuerza un reflow y recién ahí se vuelve a prender. Sin el reflow el navegador junta
+        // los dos cambios en uno y la frase aparece de golpe, sin entrada.
+        el.style.transition = 'none';
+        el.classList.remove('mic-fuera');
+        el.classList.add('mic-entra');
+        el.textContent = frases[i];
+        void el.offsetWidth;
+        el.style.transition = '';
+        el.classList.remove('mic-entra');
+      }, 380);
+    }
+
+    timer = setInterval(siguiente, Math.max(2000, Number(ms) || 3000));
+    return function () { vivo = false; clearInterval(timer); };
+  }
+
   /* ══════════════ RENDERERS ══════════════
    * Uno por tipo, con la misma firma. Agregar un tipo nuevo = declararlo en
    * lib/widgets/tipos.ts y sumar una función acá. Nada más.
@@ -414,15 +570,34 @@
   R.cta_producto = function (w) {
     var c = w.config, p = paleta(c.color);
     var sh = montar(w, false); if (!sh) return;
+
+    /* El título puede terminar en una parte que se va turnando: «Empezá hoy con…» y después
+       «una cosecha en 21 días» / «el equipo que se maneja solo» / «asesoría por WhatsApp».
+       Es decir tres cosas en el lugar de una, sin agrandar el bloque ni pedir otro clic. */
+    var finales = (c.titulo_alterna || []).map(function (x) { return x.texto; })
+      .filter(function (x) { return x; });
+
     pintar(sh,
-      '.c{background:' + p.suave + ';border-left:4px solid ' + p.bg + ';border-radius:10px;padding:26px 28px;margin:32px 0}' +
+      CSS_TEXTO +
+      '.c{' + fondo(c, p, '10px', 'parentesis') + 'padding:26px 28px;margin:32px 0}' +
       'h3{margin:0 0 8px;font-size:20px;color:#2a2620;line-height:1.3}' +
+      // El final que cambia va en el color de marca: sin esa marca visual, un texto que se
+      // reemplaza solo se lee como un error de carga.
+      '.alt{color:' + p.bg + ';font-weight:700}' +
       'p{margin:0 0 18px;font-size:15px;line-height:1.6;color:#4e4840}' +
       'a{display:inline-block;background:' + p.bg + ';color:' + p.texto + ';padding:12px 24px;border-radius:8px;' +
       'font-weight:600;font-size:15px;text-decoration:none}',
-      '<div class="c">' + (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
+      '<div class="c">' +
+      (c.titulo || finales.length
+        ? '<h3>' + esc(c.titulo || '') + (finales.length ? ' <span class="alt"></span>' : '') + '</h3>'
+        : '') +
       (c.texto ? '<p>' + esc(c.texto) + '</p>' : '') +
       (c.url ? '<a href="' + esc(c.url) + '">' + esc(c.etiqueta || 'Ver más') + '</a>' : '') + '</div>');
+
+    if (finales.length) {
+      rotarTexto(sh.querySelector('.alt'), finales, c.titulo_efecto || 'subir',
+                 (Number(c.titulo_segundos) || 3) * 1000);
+    }
 
     var a = sh.querySelector('a');
     if (a) a.addEventListener('click', function () { evento(w.id, 'interaccion'); evento(w.id, 'conversion'); });
@@ -448,7 +623,7 @@
     var c = w.config, p = paleta(c.color);
     var sh = montar(w, false); if (!sh) return;
     pintar(sh,
-      '.g{display:flex;gap:14px;align-items:flex-start;background:' + p.suave + ';border-radius:10px;padding:18px 20px;margin:20px 0}' +
+      '.g{display:flex;gap:14px;align-items:flex-start;' + fondo(c, p, '10px', 'plano') + 'padding:18px 20px;margin:20px 0}' +
       '.e{font-size:26px;line-height:1}' +
       'b{display:block;font-size:15px;color:#2a2620;margin-bottom:3px}' +
       'span.t{font-size:13.5px;line-height:1.55;color:#5a534a}',
@@ -1038,7 +1213,8 @@
     }).join('');
     pintar(sh,
       'h3{margin:0 0 16px;font-size:20px;color:#2a2620}' +
-      'ol{list-style:none;margin:24px 0;padding:0;display:grid;gap:16px}' +
+      'ol{list-style:none;margin:24px 0;display:grid;gap:16px;' + fondo(c, p, '10px', 'ninguno') +
+      'padding:' + (graficoDe(c, 'ninguno') === 'ninguno' ? '0' : '20px 22px') + '}' +
       'li{display:flex;gap:14px;align-items:flex-start}' +
       '.n{flex:0 0 30px;height:30px;border-radius:999px;background:' + p.bg + ';color:' + p.texto + ';' +
       'display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}' +
@@ -1057,7 +1233,7 @@
     }).join('');
     pintar(sh,
       '.g{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));' +
-      'background:' + p.suave + ';border-radius:10px;padding:18px;margin:20px 0}' +
+      fondo(c, p, '10px', 'plano') + 'padding:18px;margin:20px 0}' +
       '.it{text-align:center}' +
       '.e{display:block;font-size:22px;margin-bottom:5px}' +
       'b{display:block;font-size:13.5px;color:#2a2620;margin-bottom:2px}' +
@@ -1205,14 +1381,46 @@
     try { if (c.cerrable && !PREVIEW && sessionStorage.getItem(clave) === '1') return; } catch (e) {}
 
     var sh = montar(w, true); if (!sh) return;
+
+    /* Cuatro maneras de decir tres cosas en una franja de un renglón. La cinta continua es
+       la que rinde con cuatro o cinco mensajes: no espera a nadie, desfila, y quien mira dos
+       segundos ya vio dos. Con dos mensajes conviene el fundido, que se lee más tranquilo.
+       Para quien pidió menos movimiento, siempre el primero y quieto: eso lo resuelve
+       `rotarTexto`, y en la cinta lo apaga el @media de abajo. */
+    var modo = c.movimiento || 'fundido';
+    var textos = items.map(function (i) { return i.texto; });
+    var cinta = modo === 'pasante' && textos.length > 1 && !menosMovimiento();
+    // Un mensaje tarda `segundos` en cruzar; la vuelta entera es la suma de todos.
+    var vuelta = Math.max(2, Number(c.segundos) || 5) * textos.length;
+    var tira = textos.concat(textos).map(function (t) {
+      return '<span class="u">' + esc(t) + '</span>';
+    }).join('<span class="pt">•</span>');
+
     pintar(sh,
+      CSS_TEXTO +
       '.b{position:fixed;top:0;left:0;right:0;z-index:99996;background:' + p.bg + ';color:' + p.texto + ';' +
       'display:flex;align-items:center;justify-content:center;gap:10px;padding:9px 34px;' +
       'font-size:13.5px;text-align:center;line-height:1.35}' +
       '.m{opacity:0;transition:opacity .4s}.m.on{opacity:1}' +
+      /* La máscara desvanece las puntas: sin ella el texto aparece y desaparece de golpe
+         contra el borde de la pantalla y se lee como un corte, no como una cinta. */
+      '.cinta{flex:1 1 auto;overflow:hidden;min-width:0;' +
+      '-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);' +
+      'mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}' +
+      /* La tira lleva la lista DOS veces y se corre justo la mitad: al terminar el ciclo el
+         primer duplicado quedó donde arrancó el original, así que el salto no se ve. */
+      '.tira{display:inline-flex;align-items:center;gap:26px;white-space:nowrap;will-change:transform;' +
+      'animation:mic-cinta ' + vuelta + 's linear infinite}' +
+      '@keyframes mic-cinta{to{transform:translateX(-50%)}}' +
+      '.cinta:hover .tira{animation-play-state:paused}' +
+      '.pt{opacity:.55}' +
+      '@media (prefers-reduced-motion:reduce){.tira{animation:none}}' +
       '.x{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;' +
       'color:inherit;font-size:19px;opacity:.75;line-height:1}',
-      '<div class="b"><span class="m on">' + esc(items[0].texto) + '</span>' +
+      '<div class="b">' +
+      (cinta
+        ? '<div class="cinta"><div class="tira">' + tira + '</div></div>'
+        : '<span class="m on">' + esc(textos[0]) + '</span>') +
       (c.cerrable ? '<button class="x" aria-label="Cerrar">×</button>' : '') + '</div>');
 
     // Empuja el contenido para no tapar el encabezado del sitio.
@@ -1221,13 +1429,20 @@
     document.body.style.paddingTop = alto + 'px';
 
     var m = sh.querySelector('.m'), n = 0;
-    if (items.length > 1) {
-      setInterval(function () {
-        conTransicion(m, 'mic-ban-' + w.id, function () {
-          n = (n + 1) % items.length;
-          m.textContent = items[n].texto;
-        });
-      }, Math.max(2, Number(c.segundos) || 5) * 1000);
+    if (m && textos.length > 1) {
+      if (modo === 'fundido') {
+        // El fundido de siempre: lo hace el navegador entre dos contenidos distintos, que es
+        // algo que una transición de CSS no sabe hacer sola.
+        setInterval(function () {
+          conTransicion(m, 'mic-ban-' + w.id, function () {
+            n = (n + 1) % textos.length;
+            m.textContent = textos[n];
+          });
+        }, Math.max(2, Number(c.segundos) || 5) * 1000);
+      } else {
+        rotarTexto(m, textos, modo === 'pasante' ? 'fundido' : modo,
+                   Math.max(2, Number(c.segundos) || 5) * 1000);
+      }
     }
     var x = sh.querySelector('.x');
     if (x) x.addEventListener('click', function () {
@@ -1349,8 +1564,8 @@
 
     var sh = montar(w, false); if (!sh) return;
     pintar(sh,
-      '.c{display:flex;align-items:center;gap:14px;background:' + p.suave + ';border-left:3px solid ' + p.bg +
-        ';border-radius:10px;padding:14px 16px;margin:18px 0}' +
+      '.c{display:flex;align-items:center;gap:14px;' + fondo(c, p, '10px', 'parentesis') +
+        'padding:14px 16px;margin:18px 0}' +
       '.ic{flex:0 0 auto;font-size:20px;line-height:1}' +
       '.tx{flex:1 1 auto;min-width:0}' +
       'b{display:block;font-size:15px;font-weight:700;color:#2a2620;line-height:1.25}' +
@@ -1390,7 +1605,7 @@
     if (!fin || fin <= Date.now()) return; // vencida: desaparece sola, sin que nadie la apague
     var sh = montar(w, false); if (!sh) return;
     pintar(sh,
-      '.c{background:' + p.suave + ';border-radius:10px;padding:18px 20px;margin:20px 0;text-align:center}' +
+      '.c{' + fondo(c, p, '10px', 'plano') + 'padding:18px 20px;margin:20px 0;text-align:center}' +
       'b{display:block;font-size:15px;color:#2a2620;margin-bottom:10px}' +
       '.r{display:flex;justify-content:center;gap:10px}' +
       '.u{background:' + p.bg + ';color:' + p.texto + ';border-radius:8px;padding:8px 12px;min-width:56px}' +
@@ -1971,6 +2186,423 @@
           else { v.pause(); }
         });
       }, { threshold: 0.25 }).observe(v);
+    }
+
+    verUnaVez(sh, w.id, c.animacion);
+  };
+
+  /* ── Carrusel ──────────────────────────────────────────────────────────────
+   * Sobre `scroll-snap` del navegador, no sobre una librería ni sobre `transform`.
+   * Eso da gratis y sin código lo que una librería cobra en kilobytes: el arrastre con el
+   * dedo con su inercia, el frenado en la tarjeta justa, la rueda del mouse, la navegación
+   * por teclado y el comportamiento correcto cuando alguien hace zoom. Las flechas y los
+   * puntos solo llaman a `scrollTo`: el estado real es la posición del scroll, y por eso no
+   * puede desincronizarse de lo que se ve.
+   *
+   * Peso: se descarga la imagen que se está viendo y la de al lado, nada más. Un carrusel
+   * de doce capturas abre pesando lo que una sola. */
+  R.carrusel = function (w) {
+    var c = w.config, p = paleta(c.color);
+    var items = (c.items || []).filter(function (i) { return i.archivo; });
+    if (!items.length) return;
+    var sh = montar(w, false); if (!sh) return;
+
+    var PROPS = { '4:5': '4/5', '1:1': '1/1', '4:3': '4/3', '16:9': '16/9', '3:4': '3/4' };
+    var prop = PROPS[c.proporcion] || '4/5';
+    var RADIOS = { ninguno: '0', suave: '8px', redondo: '16px' };
+    var radio = RADIOS[c.marco] || '16px';
+    var porVista = Math.max(1, Math.min(4, Number(c.por_vista) || 2));
+    var GAP = 14;
+    // «Entera» es lo que corresponde a una captura de pantalla: recortarla se lleva justo
+    // los renglones de arriba y de abajo, que es donde está lo que dice.
+    var ajuste = c.ajuste === 'recortada' ? 'cover' : 'contain';
+    var ind = c.indicador == null ? 'puntos' : c.indicador;
+    var conFlechas = c.flechas !== false && items.length > porVista;
+
+    var slides = items.map(function (it, n) {
+      var alt = esc(it.alt || it.titulo || '');
+      // La primera se pide de una (es la que ve todo el mundo, arrastre o no). Las demás
+      // arrancan sin `src`: se lo pone `cargarCerca` cuando están por entrar.
+      var img = n === 0
+        ? '<img src="' + esc(it.archivo) + '" alt="' + alt + '" decoding="async">'
+        : '<img data-src="' + esc(it.archivo) + '" alt="' + alt + '" loading="lazy" decoding="async">';
+      var pie = (it.titulo || it.texto)
+        ? '<figcaption>' + (it.titulo ? '<b>' + esc(it.titulo) + '</b>' : '') +
+          (it.texto ? '<span>' + esc(it.texto) + '</span>' : '') + '</figcaption>'
+        : '';
+      return '<figure class="s" role="group" aria-label="' + (n + 1) + ' de ' + items.length + '">' +
+        '<div class="m">' + img + '</div>' + pie +
+        '</figure>';
+    }).join('');
+
+    pintar(sh,
+      'h3{margin:0 0 4px;font-size:20px;color:#2a2620;line-height:1.3}' +
+      '.sub{margin:0 0 14px;font-size:13.5px;color:#6a6157;line-height:1.5}' +
+      '.marco{position:relative;margin:22px 0}' +
+      /* scrollbar-width/::-webkit-scrollbar: la barra se oculta pero el scroll sigue vivo,
+         que es lo que hace funcionar el arrastre y el teclado. */
+      '.pista{display:flex;gap:' + GAP + 'px;overflow-x:auto;scroll-snap-type:x mandatory;' +
+      'scrollbar-width:none;-ms-overflow-style:none;scroll-behavior:smooth;padding:2px 0 4px}' +
+      '.pista::-webkit-scrollbar{display:none}' +
+      '.pista:focus-visible{outline:2px solid ' + p.bg + ';outline-offset:3px;border-radius:' + radio + '}' +
+      '.s{flex:0 0 calc((100% - ' + (GAP * (porVista - 1)) + 'px) / ' + porVista + ');' +
+      'scroll-snap-align:center;margin:0;min-width:0}' +
+      '@media(max-width:620px){.s{flex-basis:100%}}' +
+      '.m{position:relative;width:100%;aspect-ratio:' + prop + ';overflow:hidden;border-radius:' + radio + ';' +
+      'background:' + p.suave + ';display:block' + (c.sombra !== false ? ';box-shadow:0 4px 16px rgba(28,26,23,.10)' : '') + '}' +
+      (c.ampliar !== false ? '.m{cursor:zoom-in}' : '') +
+      'img{width:100%;height:100%;object-fit:' + ajuste + ';display:block}' +
+      'figcaption{margin-top:9px;text-align:center;line-height:1.45}' +
+      'figcaption b{display:block;font-size:14px;color:#2a2620}' +
+      'figcaption span{display:block;margin-top:2px;font-size:12.5px;color:#6a6157}' +
+      /* Las flechas se apoyan sobre el borde de la tarjeta, no flotando encima de la imagen:
+         sobre una captura clara un botón translúcido no se ve, y sobre una oscura tapa texto. */
+      '.fl{position:absolute;top:calc(50% - 22px);width:38px;height:38px;border-radius:999px;' +
+      'background:#fff;color:#2a2620;box-shadow:0 3px 14px rgba(28,26,23,.22);display:flex;' +
+      'align-items:center;justify-content:center;font-size:20px;line-height:1;z-index:2;' +
+      'transition:opacity .2s,transform .15s}' +
+      '.fl:hover{transform:scale(1.07)}' +
+      '.fl[disabled]{opacity:.32;cursor:default;transform:none}' +
+      '.fl.ant{left:-6px}.fl.sig{right:-6px}' +
+      '@media(max-width:620px){.fl{display:none}}' +
+      '.ind{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:12px;min-height:14px}' +
+      '.pt{width:8px;height:8px;border-radius:999px;background:' + p.suave + ';border:1px solid rgba(0,0,0,.10);padding:0;transition:all .25s}' +
+      '.pt.on{background:' + p.bg + ';border-color:' + p.bg + ';transform:scale(1.25)}' +
+      '.br{width:20px;height:4px;border-radius:999px;background:' + p.suave + ';padding:0;transition:all .25s}' +
+      '.br.on{background:' + p.bg + ';width:34px}' +
+      '.pg{width:min(220px,60%);height:4px;border-radius:999px;background:' + p.suave + ';overflow:hidden}' +
+      '.pg i{display:block;height:100%;background:' + p.bg + ';border-radius:999px;transition:width .3s ease}' +
+      '.nm{font-size:12.5px;color:#6a6157;font-variant-numeric:tabular-nums}' +
+      '.lb{display:none;position:fixed;inset:0;z-index:100000;background:rgba(10,9,7,.9);' +
+      'align-items:center;justify-content:center;padding:20px;cursor:zoom-out}' +
+      '.lb.on{display:flex}.lb img{max-width:100%;max-height:100%;width:auto;height:auto;border-radius:10px;object-fit:contain}',
+
+      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
+      (c.subtitulo ? '<p class="sub">' + esc(c.subtitulo) + '</p>' : '') +
+      '<div class="marco">' +
+      (conFlechas ? '<button class="fl ant" aria-label="Anterior">‹</button>' : '') +
+      '<div class="pista" tabindex="0" role="group" aria-roledescription="carrusel" aria-label="' +
+      esc(c.titulo || 'Imágenes') + '">' + slides + '</div>' +
+      (conFlechas ? '<button class="fl sig" aria-label="Siguiente">›</button>' : '') +
+      '</div>' +
+      '<div class="ind"></div>' +
+      (c.ampliar !== false ? '<div class="lb"><img alt=""></div>' : ''));
+
+    var pista = sh.querySelector('.pista');
+    var figs = sh.querySelectorAll('.s');
+    var cajaInd = sh.querySelector('.ind');
+    var actual = 0;
+
+    /* Descarga la que se está viendo y sus vecinas, nada más. El `loading="lazy"` del
+       navegador no alcanza acá: dentro de un scroll horizontal varios navegadores dan por
+       "visible" toda la fila y terminan pidiendo las doce imágenes juntas. */
+    function cargarCerca(i) {
+      for (var n = Math.max(0, i - 1); n <= Math.min(figs.length - 1, i + porVista); n++) {
+        var img = figs[n].querySelector('img[data-src]');
+        if (img) { img.src = img.getAttribute('data-src'); img.removeAttribute('data-src'); }
+      }
+    }
+
+    function irA(i, suave) {
+      if (!figs.length) return;
+      var max = figs.length - 1;
+      if (i < 0) i = c.bucle !== false ? max : 0;
+      if (i > max) i = c.bucle !== false ? 0 : max;
+      cargarCerca(i);
+      var destino = figs[i].offsetLeft - (pista.clientWidth - figs[i].clientWidth) / 2;
+      // 'auto' para el salto del bucle: un desplazamiento suave de la última a la primera
+      // barre las diez del medio y marea.
+      pista.scrollTo({ left: Math.max(0, destino), behavior: suave === false ? 'auto' : 'smooth' });
+    }
+
+    // La tarjeta cuyo centro está más cerca del centro de la ventana. Se calcula desde el
+    // scroll y no desde un contador propio: así arrastrar con el dedo, tocar una flecha y
+    // el avance solo llegan todos al mismo número, sin poder desincronizarse.
+    function calcularActual() {
+      var centro = pista.scrollLeft + pista.clientWidth / 2;
+      var mejor = 0, dmin = Infinity;
+      for (var i = 0; i < figs.length; i++) {
+        var d = Math.abs(figs[i].offsetLeft + figs[i].clientWidth / 2 - centro);
+        if (d < dmin) { dmin = d; mejor = i; }
+      }
+      return mejor;
+    }
+
+    var puntos = [];
+    function armarIndicador() {
+      if (ind === 'ninguno' || !cajaInd) return;
+      if (ind === 'numeros') { cajaInd.innerHTML = '<span class="nm"></span>'; return; }
+      if (ind === 'barra') { cajaInd.innerHTML = '<div class="pg"><i></i></div>'; return; }
+      var clase = ind === 'barras' ? 'br' : 'pt';
+      var html = '';
+      for (var i = 0; i < figs.length; i++) {
+        html += '<button class="' + clase + '" aria-label="Ir a la ' + (i + 1) + '"></button>';
+      }
+      cajaInd.innerHTML = html;
+      puntos = cajaInd.querySelectorAll('button');
+      for (var j = 0; j < puntos.length; j++) {
+        (function (n) {
+          puntos[n].addEventListener('click', function () { manual(); irA(n); });
+        })(j);
+      }
+    }
+
+    function pintarIndicador() {
+      if (ind === 'ninguno' || !cajaInd) return;
+      if (ind === 'numeros') {
+        var nm = cajaInd.querySelector('.nm');
+        if (nm) nm.textContent = (actual + 1) + ' / ' + figs.length;
+        return;
+      }
+      if (ind === 'barra') {
+        var i2 = cajaInd.querySelector('.pg i');
+        if (i2) i2.style.width = Math.round(((actual + 1) / figs.length) * 100) + '%';
+        return;
+      }
+      for (var i = 0; i < puntos.length; i++) {
+        puntos[i].classList.toggle('on', i === actual);
+        if (i === actual) puntos[i].setAttribute('aria-current', 'true');
+        else puntos[i].removeAttribute('aria-current');
+      }
+    }
+
+    var bAnt = sh.querySelector('.fl.ant'), bSig = sh.querySelector('.fl.sig');
+    function pintarFlechas() {
+      if (!bAnt || c.bucle !== false) return; // con bucle nunca se llega a un extremo
+      bAnt.disabled = actual === 0;
+      bSig.disabled = actual >= figs.length - 1;
+    }
+
+    function sincronizar() {
+      actual = calcularActual();
+      cargarCerca(actual);
+      pintarIndicador();
+      pintarFlechas();
+    }
+
+    // ── Avance solo ──
+    // Se frena con el puntero encima, mientras alguien arrastra, con la pestaña de fondo y
+    // para quien pidió menos movimiento. Un carrusel que sigue girando mientras la persona
+    // está leyendo una tarjeta le saca de la vista justo lo que estaba mirando.
+    var reloj = null, quieto = false;
+    var autoOn = !!c.auto && figs.length > porVista && !menosMovimiento();
+    function arrancarAuto() {
+      if (!autoOn || reloj) return;
+      reloj = setInterval(function () {
+        if (quieto || document.hidden) return;
+        if (c.bucle === false && actual >= figs.length - 1) { pararAuto(); return; }
+        irA(actual + 1);
+      }, Math.max(2, Number(c.segundos) || 5) * 1000);
+    }
+    function pararAuto() { if (reloj) { clearInterval(reloj); reloj = null; } }
+
+    var tocado = false;
+    function manual() {
+      // El avance solo se apaga apenas alguien toma el control: seguir moviéndolo por
+      // detrás de la decisión de la persona es pelearle la pantalla.
+      pararAuto();
+      if (!tocado) { tocado = true; evento(w.id, 'interaccion'); }
+    }
+
+    if (bAnt) {
+      bAnt.addEventListener('click', function () { manual(); irA(actual - 1); });
+      bSig.addEventListener('click', function () { manual(); irA(actual + 1); });
+    }
+
+    var espera = null;
+    pista.addEventListener('scroll', function () {
+      quieto = true;
+      clearTimeout(espera);
+      espera = setTimeout(function () { quieto = false; sincronizar(); }, 120);
+    }, { passive: true });
+
+    pista.addEventListener('pointerdown', manual);
+    pista.addEventListener('mouseenter', function () { quieto = true; });
+    pista.addEventListener('mouseleave', function () { quieto = false; });
+    pista.addEventListener('focusin', function () { quieto = true; });
+    pista.addEventListener('focusout', function () { quieto = false; });
+    pista.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      manual();
+      irA(actual + (e.key === 'ArrowRight' ? 1 : -1));
+    });
+
+    // ── Ver en grande ──
+    var lb = sh.querySelector('.lb');
+    if (lb) {
+      var lbi = lb.querySelector('img');
+      for (var k = 0; k < figs.length; k++) {
+        (function (fig) {
+          fig.querySelector('.m').addEventListener('click', function () {
+            var img = fig.querySelector('img');
+            var url = img.getAttribute('src') || img.getAttribute('data-src');
+            if (!url) return;
+            lbi.src = url;
+            lbi.alt = img.alt || '';
+            lb.classList.add('on');
+            manual();
+          });
+        })(figs[k]);
+      }
+      function cerrarLb() { lb.classList.remove('on'); lbi.src = ''; }
+      lb.addEventListener('click', cerrarLb);
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && lb.classList.contains('on')) cerrarLb();
+      });
+    }
+
+    armarIndicador();
+    sincronizar();
+    // El arranque del avance solo espera a que el bloque esté a la vista: si empieza a girar
+    // mientras está abajo de todo, para cuando la persona llega ya pasaron las tres primeras.
+    if (autoOn && 'IntersectionObserver' in window) {
+      new IntersectionObserver(function (es) {
+        for (var i = 0; i < es.length; i++) {
+          if (es[i].isIntersecting) arrancarAuto(); else pararAuto();
+        }
+      }, { threshold: 0.3 }).observe(sh.host);
+    } else if (autoOn) {
+      arrancarAuto();
+    }
+
+    verUnaVez(sh, w.id, c.animacion);
+  };
+
+  /* ── Antes y después ───────────────────────────────────────────────────────
+   * Dos imágenes exactamente superpuestas; la de arriba se recorta con `clip-path` según
+   * dónde esté la manija. Recortar y no achicar es lo que importa: si la de arriba se
+   * estirara, las dos dejarían de coincidir y la comparación —que es todo el punto— dejaría
+   * de probar nada.
+   *
+   * Se arrastra con el dedo o el puntero, se toca en cualquier parte para saltar ahí, y se
+   * mueve con las flechas del teclado. */
+  R.antes_despues = function (w) {
+    var c = w.config, p = paleta(c.color);
+    if (!c.antes || !c.despues) return; // con una sola imagen no hay nada que comparar
+    var sh = montar(w, false); if (!sh) return;
+
+    var PROPS = { '4:3': '4/3', '16:9': '16/9', '1:1': '1/1', '4:5': '4/5' };
+    var prop = PROPS[c.proporcion] || '4/3';
+    var RADIOS = { ninguno: '0', suave: '8px', redondo: '16px' };
+    var radio = RADIOS[c.marco] || '16px';
+    var vert = c.orientacion !== 'horizontal';
+    var pos = Math.max(5, Math.min(95, Number(c.inicio) || 50));
+
+    pintar(sh,
+      'h3{margin:0 0 12px;font-size:20px;color:#2a2620;line-height:1.3}' +
+      'figure{margin:24px 0}' +
+      '.cj{position:relative;width:100%;aspect-ratio:' + prop + ';overflow:hidden;border-radius:' + radio + ';' +
+      'background:' + p.suave + ';touch-action:' + (vert ? 'pan-y' : 'pan-x') + ';cursor:' +
+      (vert ? 'ew-resize' : 'ns-resize') + ';user-select:none;-webkit-user-select:none}' +
+      '.cj:focus-visible{outline:2px solid ' + p.bg + ';outline-offset:3px}' +
+      '.cj img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;' +
+      '-webkit-user-drag:none;user-select:none;pointer-events:none}' +
+      '.tapa{position:absolute;inset:0}' +
+      /* Sin transición mientras se arrastra: la manija tiene que ir pegada al dedo. La
+         transición se prende solo para el barrido de demostración. */
+      '.tapa,.mango{transition:none}' +
+      '.suave .tapa,.suave .mango{transition:clip-path .5s ease,left .5s ease,top .5s ease}' +
+      '.mango{position:absolute;' + (vert ? 'top:0;bottom:0;width:2px' : 'left:0;right:0;height:2px') +
+      ';background:#fff;box-shadow:0 0 0 1px rgba(28,26,23,.18);z-index:3;pointer-events:none}' +
+      '.bola{position:absolute;' + (vert ? 'top:50%;left:50%' : 'left:50%;top:50%') +
+      ';transform:translate(-50%,-50%);width:42px;height:42px;border-radius:999px;background:#fff;' +
+      'box-shadow:0 3px 14px rgba(28,26,23,.3);display:flex;align-items:center;justify-content:center;' +
+      'color:' + p.bg + ';font-size:16px;line-height:1' + (vert ? '' : ';rotate:90deg') + '}' +
+      '.et{position:absolute;z-index:2;background:rgba(20,18,15,.72);color:#fff;font-size:12px;' +
+      'font-weight:600;padding:5px 11px;border-radius:999px;letter-spacing:.01em;pointer-events:none}' +
+      '.et.a{top:12px;left:12px}.et.d{top:12px;right:12px}' +
+      'figcaption{margin-top:10px;font-size:13px;line-height:1.5;color:#6a6157;text-align:center}',
+
+      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
+      '<figure><div class="cj" tabindex="0" role="slider" aria-label="' +
+      esc((c.et_antes || 'antes') + ' contra ' + (c.et_despues || 'después')) +
+      '" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pos + '">' +
+      '<img src="' + esc(c.despues) + '" alt="' + esc(c.et_despues || 'Después') + '">' +
+      '<div class="tapa"><img src="' + esc(c.antes) + '" alt="' + esc(c.et_antes || 'Antes') + '"></div>' +
+      (c.et_antes ? '<span class="et a">' + esc(c.et_antes) + '</span>' : '') +
+      (c.et_despues ? '<span class="et d">' + esc(c.et_despues) + '</span>' : '') +
+      '<div class="mango"><span class="bola">⇄</span></div>' +
+      '</div>' +
+      (c.pie ? '<figcaption>' + esc(c.pie) + '</figcaption>' : '') +
+      '</figure>');
+
+    var cj = sh.querySelector('.cj');
+    var tapa = sh.querySelector('.tapa');
+    var mango = sh.querySelector('.mango');
+    var tocado = false;
+
+    function poner(v) {
+      pos = Math.max(0, Math.min(100, v));
+      // inset() recorta desde los cuatro lados: se tapa lo que sobra del lado contrario.
+      tapa.style.clipPath = vert
+        ? 'inset(0 ' + (100 - pos) + '% 0 0)'
+        : 'inset(0 0 ' + (100 - pos) + '% 0)';
+      if (vert) mango.style.left = pos + '%'; else mango.style.top = pos + '%';
+      cj.setAttribute('aria-valuenow', Math.round(pos));
+    }
+
+    function desdeEvento(e) {
+      var r = cj.getBoundingClientRect();
+      return vert
+        ? ((e.clientX - r.left) / r.width) * 100
+        : ((e.clientY - r.top) / r.height) * 100;
+    }
+
+    function usuario() {
+      cj.classList.remove('suave');
+      if (!tocado) { tocado = true; evento(w.id, 'interaccion'); }
+    }
+
+    var arrastrando = false;
+    cj.addEventListener('pointerdown', function (e) {
+      arrastrando = true;
+      usuario();
+      try { cj.setPointerCapture(e.pointerId); } catch (err) {}
+      poner(desdeEvento(e));
+    });
+    cj.addEventListener('pointermove', function (e) {
+      if (!arrastrando) return;
+      e.preventDefault();
+      poner(desdeEvento(e));
+    });
+    function soltar() { arrastrando = false; }
+    cj.addEventListener('pointerup', soltar);
+    cj.addEventListener('pointercancel', soltar);
+    cj.addEventListener('keydown', function (e) {
+      var paso = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -3
+               : e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 3 : 0;
+      if (!paso && e.key !== 'Home' && e.key !== 'End') return;
+      e.preventDefault();
+      usuario();
+      poner(e.key === 'Home' ? 0 : e.key === 'End' ? 100 : pos + paso);
+    });
+
+    poner(pos);
+
+    /* Barrido de demostración: la primera vez que el bloque entra en pantalla la manija va
+       de punta a punta y vuelve. Sin eso, mucha gente ve una foto rara y sigue de largo sin
+       enterarse de que se arrastra — y entonces el widget no probó nada. Se corta apenas la
+       persona toca, y no corre para quien pidió menos movimiento. */
+    if (c.demo && !menosMovimiento() && 'IntersectionObserver' in window) {
+      var inicio = pos, hecho = false;
+      var obs = new IntersectionObserver(function (es) {
+        for (var i = 0; i < es.length; i++) {
+          if (!es[i].isIntersecting || hecho) continue;
+          hecho = true;
+          obs.disconnect();
+          cj.classList.add('suave');
+          var pasos = [[400, 85], [1000, 15], [1600, inicio]];
+          pasos.forEach(function (t) {
+            setTimeout(function () {
+              if (tocado) return; // ya tomó el control: no se le mueve por debajo
+              poner(t[1]);
+              if (t[1] === inicio) setTimeout(function () { cj.classList.remove('suave'); }, 600);
+            }, t[0]);
+          });
+        }
+      }, { threshold: 0.45 });
+      obs.observe(sh.host);
     }
 
     verUnaVez(sh, w.id, c.animacion);
