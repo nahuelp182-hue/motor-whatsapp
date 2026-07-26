@@ -45,7 +45,17 @@ export async function POST(req: NextRequest) {
 
   // Corte global primero: si el sitio ya gastó su cupo del día, nadie pasa (pero se ofrece
   // el WhatsApp humano, así el visitante no queda en la nada).
-  const global = await consumirLimite(`asist:global:${hoy()}`, LIM_GLOBAL.n, LIM_GLOBAL.ventana)
+  //
+  // Los tres topes van en modo 'rechazar': acá el rate limit no protege un recurso, protege
+  // la factura de Anthropic. Si la base no responde no se puede contar, y un techo que
+  // desaparece cuando la base se cae no es un techo. El visitante igual se va con el
+  // WhatsApp humano en la mano, que es el canal que de verdad vende.
+  const global = await consumirLimite(
+    `asist:global:${hoy()}`,
+    LIM_GLOBAL.n,
+    LIM_GLOBAL.ventana,
+    'rechazar',
+  )
   if (!global.permitido) {
     return NextResponse.json({
       respuesta:
@@ -56,8 +66,13 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  const porIp = await consumirLimite(`asist:ip:${ipDe(req)}`, LIM_IP.n, LIM_IP.ventana)
-  const porSesion = await consumirLimite(`asist:sid:${sid}`, LIM_SESION.n, LIM_SESION.ventana)
+  const porIp = await consumirLimite(`asist:ip:${ipDe(req)}`, LIM_IP.n, LIM_IP.ventana, 'rechazar')
+  const porSesion = await consumirLimite(
+    `asist:sid:${sid}`,
+    LIM_SESION.n,
+    LIM_SESION.ventana,
+    'rechazar',
+  )
   void limpiarVencidos()
   if (!porIp.permitido || !porSesion.permitido) {
     return NextResponse.json({

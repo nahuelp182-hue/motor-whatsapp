@@ -16,25 +16,47 @@ export type ResultadoLimite = {
   limite: number
   /** Segundos que faltan para que se libere la ventana. */
   resetEn: number
+  /** true cuando el veredicto no se pudo calcular y salió del modo de falla. */
+  degradado?: boolean
 }
+
+/**
+ * Qué hacer cuando la base no responde y el cupo no se puede contar.
+ *
+ *  - `permitir` (default): para tracking, leads y captura. Un problema de conectividad no
+ *    puede dejar la tienda sin registrar visitas ni sin tomar un lead. Se pierde el tope,
+ *    que es el mal menor.
+ *  - `rechazar`: para los topes que protegen PLATA (llamadas a la API de Claude). Un
+ *    control de gasto que falla abierto no es un control de gasto: justo cuando la base se
+ *    cae —cuando menos mirando estás— desaparece el techo diario y la factura queda sin
+ *    tope. Si no se puede contar, no se gasta.
+ */
+export type ModoFalla = 'permitir' | 'rechazar'
 
 /**
  * Consume una unidad del cupo de `clave`. Devuelve `permitido:false` cuando se pasó.
  *
- * Ante un error de base falla ABIERTO: un problema de conectividad no puede dejar la
- * tienda sin captura de leads ni sin tracking. Queda logueado para que se vea.
+ * Ante un error de base aplica `modoFalla` (ver arriba). Siempre queda logueado.
  */
 export async function consumirLimite(
   clave: string,
   limite: number,
   ventanaSegundos: number,
+  modoFalla: ModoFalla = 'permitir',
 ): Promise<ResultadoLimite> {
-  const pool = getPool()
-  if (!pool) {
-    // Sin DB configurada no se puede limitar. Falla abierto, pero deja rastro.
-    console.error('[ratelimit] sin pool de DB — no se limita:', clave)
-    return { permitido: true, contador: 0, limite, resetEn: 0 }
+  const anteFalla = (motivo: string): ResultadoLimite => {
+    console.error(`[ratelimit] ${motivo} — modo ${modoFalla}:`, clave)
+    return {
+      permitido: modoFalla === 'permitir',
+      contador: 0,
+      limite,
+      resetEn: modoFalla === 'rechazar' ? 60 : 0,
+      degradado: true,
+    }
   }
+
+  const pool = getPool()
+  if (!pool) return anteFalla('sin pool de DB')
   try {
     const { rows } = await pool.query(
       `INSERT INTO "RateLimit" ("key", "ventana_inicio", "contador")
@@ -59,8 +81,8 @@ export async function consumirLimite(
       resetEn: Math.max(0, ventanaSegundos - edad),
     }
   } catch (e) {
-    console.error('[ratelimit] falla abierta:', clave, e)
-    return { permitido: true, contador: 0, limite, resetEn: 0 }
+    console.error('[ratelimit] error de base:', clave, e)
+    return anteFalla('error de base')
   }
 }
 
@@ -97,9 +119,16 @@ export function respuesta429(r: ResultadoLimite, headersExtra: Record<string, st
 // todos los mails del ciclo.
 const PREFIJO_LATCH = 'latch:'
 
-/** Devuelve true la PRIMERA vez que se llama con esa clave, y false siempre después. */
+/**
+ * Devuelve true la PRIMERA vez que se llama con esa clave, y false siempre después.
+ *
+ * Falla CERRADO: si la base no responde no hay forma de saber si el latch ya estaba tomado,
+ * y acá "permitir" significa mandarle otra vez el mismo mail a un cliente. Ante la duda no
+ * se manda: el ciclo lo reintenta en la corrida siguiente y el mail sale tarde en vez de
+ * salir dos veces.
+ */
 export async function tomarLatch(clave: string): Promise<boolean> {
-  const r = await consumirLimite(`${PREFIJO_LATCH}${clave}`, 1, 100 * 365 * 86400)
+  const r = await consumirLimite(`${PREFIJO_LATCH}${clave}`, 1, 100 * 365 * 86400, 'rechazar')
   return r.permitido
 }
 
