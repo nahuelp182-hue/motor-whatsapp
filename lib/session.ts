@@ -9,8 +9,58 @@
 //
 // Usa Web Crypto (`crypto.subtle`), NO `node:crypto`, porque el middleware de Next corre en
 // el runtime Edge donde los módulos de Node no existen. Web Crypto anda en Edge y en Node.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// SEPARACIÓN DE DOMINIOS (arreglo de escalada de privilegios)
+//
+// Acá conviven tres credenciales distintas —sesión del panel, sesión de cliente y token de
+// entrada por mail— y las tres se firmaban con el MISMO secreto (`DASHBOARD_PASSWORD`).
+// Como `verificarSesion` solo miraba firma y vencimiento, un cliente podía copiar su cookie
+// `mic-cliente` (o el token del mail) al lugar de `dash-auth` y entrar al panel interno:
+// la firma verificaba, el `exp` era válido, y nadie chequeaba QUÉ era ese token.
+//
+// Se corrige en dos capas independientes, a propósito:
+//
+//  1. VALIDACIÓN DE TIPO EN EL PAYLOAD. Cada verificador exige la forma de su propio token
+//     y rechaza las otras dos. Es lo que cierra el agujero de verdad, y sigue cerrándolo
+//     aunque mañana alguien vuelva a compartir la clave sin darse cuenta.
+//  2. CLAVE DERIVADA POR DOMINIO. Cada tipo firma con una clave distinta derivada del
+//     secreto. Así una firma de un dominio ni siquiera verifica en otro.
+//
+// Una sola de las dos alcanzaría hoy. Van las dos porque la capa 1 protege de un error de
+// configuración y la capa 2 de un error de lógica, y no se equivocan juntas.
 const COOKIE = 'dash-auth'
 const DIAS = 30
+
+/** Tipos de token que emite este módulo. Nunca deben ser intercambiables. */
+type Dominio = 'dashboard' | 'cliente' | 'entrada'
+
+/**
+ * Deriva la clave de firma de cada dominio a partir del secreto del servidor.
+ *
+ * El prefijo `mic.v2` es el que hace la separación; el `v2` además invalida de una todas
+ * las cookies emitidas con el esquema viejo (ver ACEPTAR_FIRMA_LEGADO abajo).
+ */
+function secretoDe(secreto: string, dom: Dominio): string {
+  return `mic.v2.${dom}.${secreto}`
+}
+
+/**
+ * Ventana de transición: acepta además firmas del esquema viejo (secreto sin derivar), para
+ * que el cambio no deslogueé a los clientes con sesión activa ni rompa los links de acceso
+ * que ya salieron por mail (viven 7 días).
+ *
+ * NO afecta a la seguridad del arreglo: la validación de tipo del payload (capa 1) corre
+ * igual sobre los tokens viejos, y es esa la que impide usar uno de cliente como si fuera
+ * del panel. Lo único que se posterga es la capa 2.
+ *
+ * El panel queda afuera a propósito: son dos personas y volver a loguearse es gratis, así
+ * que ahí el corte es limpio desde el minuto cero.
+ *
+ * PONER EN false (y borrar el código muerto) después del 2026-08-15: para esa fecha ya
+ * vencieron todos los tokens de entrada y las sesiones se renovaron solas.
+ */
+const ACEPTAR_FIRMA_LEGADO = true
 
 export type Sesion = { sub: string; iat: number; exp: number }
 
@@ -46,34 +96,67 @@ function igualSeguro(a: string, b: string): boolean {
   return dif === 0
 }
 
-/** Genera el valor de cookie para un sujeto (`dashboard`, o un id de cliente a futuro). */
-export async function crearSesion(sub: string, secreto: string, dias = DIAS): Promise<string> {
-  const ahora = Math.floor(Date.now() / 1000)
-  const sesion: Sesion = { sub, iat: ahora, exp: ahora + dias * 86400 }
-  const payload = b64url(enc.encode(JSON.stringify(sesion)))
-  return `${payload}.${await firmar(payload, secreto)}`
+/** Empaqueta un objeto como `<payload>.<firma>` con la clave del dominio. */
+async function sellar(datos: object, secreto: string, dom: Dominio): Promise<string> {
+  const payload = b64url(enc.encode(JSON.stringify(datos)))
+  return `${payload}.${await firmar(payload, secretoDe(secreto, dom))}`
 }
 
-/** Verifica firma y vencimiento. Devuelve null si algo no cierra. */
-export async function verificarSesion(
+/**
+ * Verifica firma y vencimiento y devuelve el payload crudo. NO valida el tipo: eso lo hace
+ * cada verificador público, que es el que sabe qué forma espera.
+ */
+async function abrir(
   valor: string | undefined,
   secreto: string,
-): Promise<Sesion | null> {
+  dom: Dominio,
+  legado: boolean,
+): Promise<Record<string, unknown> | null> {
   if (!valor) return null
   const punto = valor.lastIndexOf('.')
   if (punto < 1) return null
 
   const payload = valor.slice(0, punto)
   const firma = valor.slice(punto + 1)
-  if (!igualSeguro(firma, await firmar(payload, secreto))) return null
+
+  let firmaOk = igualSeguro(firma, await firmar(payload, secretoDe(secreto, dom)))
+  if (!firmaOk && legado && ACEPTAR_FIRMA_LEGADO) {
+    firmaOk = igualSeguro(firma, await firmar(payload, secreto))
+  }
+  if (!firmaOk) return null
 
   try {
-    const s = JSON.parse(desdeB64url(payload)) as Sesion
-    if (typeof s.exp !== 'number' || s.exp < Math.floor(Date.now() / 1000)) return null
-    return s
+    const o = JSON.parse(desdeB64url(payload)) as Record<string, unknown>
+    if (typeof o.exp !== 'number' || o.exp < Math.floor(Date.now() / 1000)) return null
+    return o
   } catch {
     return null
   }
+}
+
+/** Genera el valor de cookie para un sujeto (`dashboard`, o un id de cliente a futuro). */
+export async function crearSesion(sub: string, secreto: string, dias = DIAS): Promise<string> {
+  const ahora = Math.floor(Date.now() / 1000)
+  const sesion: Sesion = { sub, iat: ahora, exp: ahora + dias * 86400 }
+  return sellar(sesion, secreto, 'dashboard')
+}
+
+/**
+ * Verifica una sesión del PANEL. Devuelve null si algo no cierra.
+ *
+ * El chequeo de `sub` no es cosmético: es lo que impide que una credencial de cliente
+ * —que no lo lleva— pase por sesión de panel.
+ */
+export async function verificarSesion(
+  valor: string | undefined,
+  secreto: string,
+): Promise<Sesion | null> {
+  // legado: false → las cookies del panel viejas no se aceptan, se vuelve a loguear.
+  const o = await abrir(valor, secreto, 'dashboard', false)
+  if (!o) return null
+  if (typeof o.sub !== 'string' || !o.sub) return null
+  if ('num' in o || 'jti' in o) return null // forma de cliente o de token de entrada
+  return o as unknown as Sesion
 }
 
 export const COOKIE_SESION = COOKIE
@@ -106,28 +189,21 @@ export async function crearSesionCliente(
 ): Promise<string> {
   const ahora = Math.floor(Date.now() / 1000)
   const s: SesionCliente = { ...datos, iat: ahora, exp: ahora + dias * 86400 }
-  const payload = b64url(enc.encode(JSON.stringify(s)))
-  return `${payload}.${await firmar(payload, secreto)}`
+  return sellar(s, secreto, 'cliente')
 }
 
 export async function verificarSesionCliente(
   valor: string | undefined,
   secreto: string,
 ): Promise<SesionCliente | null> {
-  if (!valor) return null
-  const punto = valor.lastIndexOf('.')
-  if (punto < 1) return null
-  const payload = valor.slice(0, punto)
-  const firma = valor.slice(punto + 1)
-  if (!igualSeguro(firma, await firmar(payload, secreto))) return null
-  try {
-    const s = JSON.parse(desdeB64url(payload)) as SesionCliente
-    if (typeof s.exp !== 'number' || s.exp < Math.floor(Date.now() / 1000)) return null
-    if (typeof s.num !== 'number') return null
-    return s
-  } catch {
-    return null
-  }
+  const o = await abrir(valor, secreto, 'cliente', true)
+  if (!o) return null
+  if (typeof o.num !== 'number') return null
+  // Un token de entrada trae `jti` y es de un solo uso: aceptarlo como sesión sería saltear
+  // el quemado de /e/[token] y darle vida de 30 días a un enlace de 7.
+  if ('jti' in o) return null
+  if ('sub' in o) return null // sesión del panel
+  return o as unknown as SesionCliente
 }
 
 export const COOKIE_CLIENTE_NOMBRE = COOKIE_CLIENTE
@@ -163,26 +239,16 @@ export async function crearTokenEntrada(
     jti: crypto.randomUUID(),
     exp: Math.floor(Date.now() / 1000) + dias * 86400,
   }
-  const payload = b64url(enc.encode(JSON.stringify(t)))
-  return `${payload}.${await firmar(payload, secreto)}`
+  return sellar(t, secreto, 'entrada')
 }
 
 export async function verificarTokenEntrada(
   valor: string | undefined,
   secreto: string,
 ): Promise<TokenEntrada | null> {
-  if (!valor) return null
-  const punto = valor.lastIndexOf('.')
-  if (punto < 1) return null
-  const payload = valor.slice(0, punto)
-  const firma = valor.slice(punto + 1)
-  if (!igualSeguro(firma, await firmar(payload, secreto))) return null
-  try {
-    const t = JSON.parse(desdeB64url(payload)) as TokenEntrada
-    if (typeof t.exp !== 'number' || t.exp < Math.floor(Date.now() / 1000)) return null
-    if (typeof t.num !== 'number' || !t.jti) return null
-    return t
-  } catch {
-    return null
-  }
+  const o = await abrir(valor, secreto, 'entrada', true)
+  if (!o) return null
+  if (typeof o.num !== 'number' || typeof o.jti !== 'string' || !o.jti) return null
+  if ('sub' in o) return null
+  return o as unknown as TokenEntrada
 }
