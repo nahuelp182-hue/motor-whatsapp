@@ -1,5 +1,6 @@
 import { Store, CampaignType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { tokenWhatsApp, tokenTiendanube } from '@/lib/credenciales'
 import { uploadClickConversion } from './GoogleAdsConversionService'
 
 // ── Tipos Tiendanube ──────────────────────────────────────────────────────────
@@ -185,7 +186,7 @@ export class CampaignService {
         `https://api.tiendanube.com/v1/${this.store.tiendanube_store_id}/orders/${id}`,
         {
           headers: {
-            Authentication: `bearer ${this.store.tiendanube_access_token}`,
+            Authentication: `bearer ${tokenTiendanube(this.store)}`,
             'User-Agent': 'MotorWhatsApp (nahuelp182@gmail.com)',
           },
         }
@@ -233,7 +234,7 @@ export class CampaignService {
     })
     const result = await sendWhatsAppTemplate(
       config.wa_phone_number_id,
-      this.store.whatsapp_api_token,
+      tokenWhatsApp(this.store),
       customer.telefono,
       TEMPLATE_TRANSFER,
       TEMPLATE_LANG,
@@ -278,7 +279,7 @@ export class CampaignService {
     })
     const result = await sendWhatsAppTemplate(
       config.wa_phone_number_id,
-      this.store.whatsapp_api_token,
+      tokenWhatsApp(this.store),
       customer.telefono,
       TEMPLATE_TRANSFER_REMINDER,
       TEMPLATE_LANG,
@@ -454,7 +455,7 @@ export class CampaignService {
 
       const result = await sendWhatsAppTemplate(
         config.wa_phone_number_id,
-        this.store.whatsapp_api_token,
+        tokenWhatsApp(this.store),
         customer.telefono,
         config.template_name,
         config.template_lang,
@@ -476,7 +477,7 @@ export class CampaignService {
       `https://api.tiendanube.com/v1/${this.store.tiendanube_store_id}/orders?status=open&payment_status=pending&per_page=100`,
       {
         headers: {
-          Authentication: `bearer ${this.store.tiendanube_access_token}`,
+          Authentication: `bearer ${tokenTiendanube(this.store)}`,
           'User-Agent': 'MotorWhatsApp (nahuelp182@gmail.com)',
         },
       }
@@ -497,7 +498,7 @@ export class CampaignService {
         `https://api.tiendanube.com/v1/${this.store.tiendanube_store_id}/products/${productId}`,
         {
           headers: {
-            Authentication: `bearer ${this.store.tiendanube_access_token}`,
+            Authentication: `bearer ${tokenTiendanube(this.store)}`,
             'User-Agent': 'MotorWhatsApp (nahuelp182@gmail.com)',
           },
         }
@@ -594,7 +595,7 @@ export class CampaignService {
 
       const result = await sendWhatsAppTemplate(
         config.wa_phone_number_id,
-        this.store.whatsapp_api_token,
+        tokenWhatsApp(this.store),
         customer.telefono,
         config.template_name,
         config.template_lang,
@@ -618,7 +619,7 @@ export class CampaignService {
       `https://api.tiendanube.com/v1/${this.store.tiendanube_store_id}/orders?payment_status=paid&per_page=100&created_at_min=${since}`,
       {
         headers: {
-          Authentication: `bearer ${this.store.tiendanube_access_token}`,
+          Authentication: `bearer ${tokenTiendanube(this.store)}`,
           'User-Agent': 'MotorWhatsApp (nahuelp182@gmail.com)',
         },
       }
@@ -769,7 +770,7 @@ export class CampaignService {
 
     const result = await sendWhatsAppCloud(
       params.waPhoneNumberId,
-      this.store.whatsapp_api_token,
+      tokenWhatsApp(this.store),
       params.phone,
       params.message
     )

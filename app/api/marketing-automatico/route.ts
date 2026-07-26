@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { tokenWhatsApp } from '@/lib/credenciales'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
   )
 
   const templates = await Promise.all(
-    TEMPLATES.map(async (t) => ({ ...t, ...(await fetchTemplateStatus(t.id, store.whatsapp_api_token)) }))
+    TEMPLATES.map(async (t) => ({ ...t, ...(await fetchTemplateStatus(t.id, tokenWhatsApp(store))) }))
   )
 
   const recientes = logs.slice(0, 30).map((l) => ({
