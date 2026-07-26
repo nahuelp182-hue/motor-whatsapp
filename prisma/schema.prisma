@@ -84,6 +84,14 @@ model MessageLog {
   store    Store    @relation(fields: [store_id], references: [id])
   customer Customer @relation(fields: [customer_id], references: [id])
   campaign Campaign @relation(fields: [campaign_id], references: [id])
+
+  // Índices derivados de los patrones de consulta reales (ver la migración
+  // 20260726150000_messagelog_indices). El nombre va explícito para que coincida con el SQL
+  // escrito a mano y Prisma no lo marque como drift.
+  @@index([store_id, customer_id, campaign_id, tipo_evento], map: "MessageLog_store_customer_campaign_tipo_idx")
+  @@index([estado, scheduled_for], map: "MessageLog_estado_scheduled_idx")
+  @@index([store_id, estado, createdAt], map: "MessageLog_store_estado_creado_idx")
+  @@index([store_id, tipo_evento, createdAt], map: "MessageLog_store_tipo_creado_idx")
 }
 
 // Respuesta de un cliente tras la plantilla resena_post_entrega — capturada
