@@ -10,6 +10,7 @@ import {
   type Campo,
 } from '@/lib/widgets/tipos'
 import { SubirMedia } from './SubirMedia'
+import { OpcionVisual, tieneDibujo } from './OpcionVisual'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -294,6 +295,54 @@ export function CampoEditor({ campo, valor, productos = [], config, contexto, on
         {ayuda}
       </div>
     )
+  }
+
+  // ── Select con dibujo: se elige mirando, no leyendo ────────────────────────
+  // Solo cuando TODAS las opciones tienen dibujo. Media tabla ilustrada y media en texto se
+  // lee peor que la lista entera en texto: la comparación visual se corta a la mitad.
+  if (campo.tipo === 'select' && campo.previsual) {
+    const opciones = campo.opciones ?? []
+    const ilustrables = opciones.length > 0 && opciones.every(o => tieneDibujo(campo.previsual!, o.value))
+    if (ilustrables) {
+      const actual = String(valor ?? campo.porDefecto ?? opciones[0].value)
+      return (
+        <div>
+          {etiqueta}
+          <div className="flex flex-wrap gap-2">
+            {opciones.map(o => {
+              const activo = o.value === actual
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => onChange(o.value)}
+                  title={o.label}
+                  className={cn(
+                    'w-[104px] rounded-xl border p-2 text-left transition-all',
+                    activo
+                      ? 'border-primary/55 bg-primary/8 ring-2 ring-primary/15'
+                      : 'border-border bg-card hover:border-foreground/20',
+                  )}
+                >
+                  <div className={cn('mb-1.5', activo ? 'opacity-100' : 'opacity-70')}>
+                    <OpcionVisual previsual={campo.previsual!} value={o.value} />
+                  </div>
+                  <span
+                    className={cn(
+                      'block text-[11px] leading-tight',
+                      activo ? 'text-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    {o.label}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          {ayuda}
+        </div>
+      )
+    }
   }
 
   // ── Lista: ítems repetibles con reordenar y borrar ─────────────────────────

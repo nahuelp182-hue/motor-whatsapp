@@ -14,8 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { BorderBeam } from '@/components/ui/border-beam'
 import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern'
 import { SidebarNav } from '@/components/SidebarNav'
+import { Acordeon } from '@/components/widgets/Acordeon'
+import { resumenDeGrupo } from '@/components/widgets/resumen'
 import { validarConfig } from '@/lib/widgets/validacion'
-import { campoVisible } from '@/lib/widgets/tipos'
+import { campoVisible, agruparCampos, GRUPOS } from '@/lib/widgets/tipos'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
 import { RefreshCw, Plus, Trash2, Check } from 'lucide-react'
 
@@ -609,6 +611,19 @@ function Editor({
   // Avisos de carga (no bloquean guardar). Se recalculan en cada tecla, como la vista previa.
   const avisos = validarConfig(tipo, widget.config)
 
+  // Los campos del tipo, ya filtrados por visibilidad y repartidos en secciones.
+  const grupos = agruparCampos(tipo.campos.filter(c => campoVisible(c, widget.config)))
+
+  // Resumen de las reglas para el encabezado plegado: sin esto hay que abrir la sección
+  // para enterarse de que el widget está acotado a tres páginas o vencido desde el martes.
+  const resumenReglas = [
+    reglas.rutas?.length ? `${reglas.rutas.length} ${reglas.rutas.length === 1 ? 'página' : 'páginas'}` : 'Todas las páginas',
+    reglas.dispositivo === 'movil' ? 'Solo celular' : reglas.dispositivo === 'escritorio' ? 'Solo escritorio' : null,
+    reglas.desde || reglas.hasta ? 'Con ventana de fechas' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -679,37 +694,57 @@ function Editor({
             {tipo.cuidado && <p className={`mt-2 ${AVISO}`}>⚠ {tipo.cuidado}</p>}
           </div>
 
-          <div className={`${CARD} space-y-5 p-4`}>
-            <div>
-              <label className={LABEL}>Nombre interno</label>
-              <Input
-                value={widget.nombre}
-                onChange={e => onCambio({ ...widget, nombre: e.target.value })}
-              />
-              <p className={AYUDA}>Solo para reconocerlo en esta lista. No se ve en el sitio.</p>
-            </div>
-
-            {/* Los campos que dependen de otro (los del recuadro, que solo importan si hay
-                recuadro) no se muestran hasta que corresponde: un formulario con cuatro
-                controles inertes es un formulario que hay que aprender a ignorar. */}
-            {tipo.campos.filter(c => campoVisible(c, widget.config)).map(c => (
-              <CampoEditor
-                key={c.key}
-                campo={c}
-                valor={widget.config?.[c.key]}
-                productos={productos}
-                config={widget.config}
-                contexto={widget.contexto}
-                onChange={v => onCambio({ ...widget, config: { ...widget.config, [c.key]: v } })}
-              />
-            ))}
+          <div className={`${CARD} p-4`}>
+            <label className={LABEL}>Nombre interno</label>
+            <Input
+              value={widget.nombre}
+              onChange={e => onCambio({ ...widget, nombre: e.target.value })}
+            />
+            <p className={AYUDA}>Solo para reconocerlo en esta lista. No se ve en el sitio.</p>
           </div>
 
-          <details className={`${CARD} p-4`}>
-            <summary className="cursor-pointer text-[14px] font-semibold tracking-tight text-white">
-              Dónde y cuándo aparece
-            </summary>
-            <div className="mt-4 space-y-5">
+          {/* El formulario, por secciones plegables. Un widget puede tener veinte campos y
+              todos al mismo nivel obligan a leerlo entero para encontrar el único que se
+              venía a cambiar. Se abre lo que casi siempre se toca —el texto y el lugar— y el
+              resto queda a un clic, con su estado resumido en el encabezado.
+
+              Los campos que dependen de otro (los del recuadro, que solo importan si hay
+              recuadro) siguen sin mostrarse hasta que corresponde: un formulario con cuatro
+              controles inertes es un formulario que hay que aprender a ignorar. */}
+          {grupos.map(g => {
+            const meta = GRUPOS[g.key]
+            return (
+              <Acordeon
+                key={g.key}
+                icono={meta.icono}
+                titulo={meta.label}
+                ayuda={meta.ayuda}
+                resumen={resumenDeGrupo(g.campos, widget.config)}
+                cantidad={g.campos.length}
+                defaultAbierto={g.key === 'contenido' || g.key === 'lugar'}
+              >
+                {g.campos.map(c => (
+                  <CampoEditor
+                    key={c.key}
+                    campo={c}
+                    valor={widget.config?.[c.key]}
+                    productos={productos}
+                    config={widget.config}
+                    contexto={widget.contexto}
+                    onChange={v => onCambio({ ...widget, config: { ...widget.config, [c.key]: v } })}
+                  />
+                ))}
+              </Acordeon>
+            )
+          })}
+
+          <Acordeon
+            icono="🎯"
+            titulo="Dónde y cuándo aparece"
+            ayuda="Páginas, dispositivo y ventana de fechas."
+            resumen={resumenReglas}
+          >
+            <div className="space-y-5">
               <div>
                 <label className={LABEL}>En qué páginas</label>
                 <p className="mb-2 text-[13px] leading-relaxed text-white/50">
@@ -802,7 +837,7 @@ function Editor({
                 </div>
               </div>
             </div>
-          </details>
+          </Acordeon>
 
           <div className="flex items-center gap-4 px-1">
             <Button variant="ghost" size="sm" onClick={onBorrar} className="text-destructive hover:text-destructive">

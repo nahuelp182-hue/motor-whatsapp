@@ -24,6 +24,24 @@ export type TipoCampo =
   | 'media'
   | 'lista'
 
+/**
+ * Dibujo chico que acompaña a cada opción de un select, en vez de una lista de texto.
+ * Elegir "esquinas redondeadas" o "16:9" es una decisión visual: leerla en palabras obliga
+ * a imaginarse el resultado, y cuando hay veinte widgets que configurar eso se paga caro.
+ * El panel lo dibuja en components/widgets/OpcionVisual.tsx; un valor sin dibujo cae solo
+ * en el select común, así que agregar `previsual` nunca rompe nada.
+ */
+export type Previsual =
+  | 'recuadro'
+  | 'linea'
+  | 'animacion'
+  | 'posicion'
+  | 'proporcion'
+  | 'marco'
+  | 'ancho'
+  | 'alineacion'
+  | 'modo'
+
 export type Campo = {
   key: string
   label: string
@@ -36,6 +54,10 @@ export type Campo = {
   min?: number
   max?: number
   porDefecto?: unknown
+  /** Sección del formulario donde cae. Si no se declara, se deduce (ver `grupoDe`). */
+  grupo?: GrupoKey
+  /** Dibuja las opciones en vez de listarlas. Solo para `select`. */
+  previsual?: Previsual
   /**
    * El campo solo se muestra si otro campo tiene (o no tiene) cierto valor. Declarativo y
    * no una función a propósito: el registro viaja como JSON al panel, y una función no
@@ -53,6 +75,84 @@ export function campoVisible(campo: Campo, config: Record<string, unknown> | und
   if (v.igualA !== undefined) return actual === v.igualA
   if (v.distintoDe !== undefined) return actual !== v.distintoDe
   return true
+}
+
+// ── Grupos del formulario ────────────────────────────────────────────────────
+// Un widget puede tener veinte campos. Todos al mismo nivel, uno abajo del otro, obligan a
+// leer el formulario entero para encontrar el único que se venía a cambiar. Agrupados y
+// plegados, la pantalla muestra primero lo que casi siempre se toca (el texto) y guarda lo
+// demás a un clic.
+//
+// El orden de esta tabla es el orden en que se dibujan las secciones, y es deliberado: qué
+// dice → dónde va → cuándo aparece → cómo se ve → cómo se enmarca.
+export const GRUPOS = {
+  contenido: {
+    label: 'Contenido',
+    icono: '✍️',
+    ayuda: 'Lo que se lee: títulos, textos, ítems, productos.',
+  },
+  lugar: {
+    label: 'Ubicación',
+    icono: '📍',
+    ayuda: 'En qué parte de la página se inserta.',
+  },
+  comportamiento: {
+    label: 'Comportamiento',
+    icono: '⚙️',
+    ayuda: 'Cuándo aparece, a quién y con qué reglas.',
+  },
+  estilo: {
+    label: 'Aspecto',
+    icono: '🎨',
+    ayuda: 'Color, tamaño, íconos y animación.',
+  },
+  marco: {
+    label: 'Marco y borde',
+    icono: '🔲',
+    ayuda: 'El recuadro que lo separa del contenido de alrededor.',
+  },
+} as const
+
+export type GrupoKey = keyof typeof GRUPOS
+
+/**
+ * Grupo de un campo que no lo declara. La tabla cubre los nombres que se repiten en varios
+ * widgets (color, demora, recuadro…); lo que no está cae en «Contenido», que es el default
+ * correcto: un campo nuevo aparece arriba y a la vista, nunca escondido en una sección
+ * plegada donde nadie lo encuentre.
+ */
+const GRUPO_POR_KEY: Record<string, GrupoKey> = {
+  // Marco y borde
+  recuadro: 'marco', recuadro_color: 'marco', recuadro_grosor: 'marco',
+  recuadro_linea: 'marco', recuadro_fondo: 'marco', marco: 'marco', borde: 'marco',
+  // Aspecto
+  color: 'estilo', color_texto: 'estilo', fondo: 'estilo', iconos: 'estilo',
+  animacion: 'estilo', proporcion: 'estilo', ancho: 'estilo', sello: 'estilo',
+  estrellaTamano: 'estilo', estrellaColor: 'estilo', estrellaAlineacion: 'estilo',
+  promedio: 'estilo', mostrarFecha: 'estilo', mostrarFotos: 'estilo',
+  mostrar_precio: 'estilo', mostrar_ahorro: 'estilo', mostrar_transferencia: 'estilo',
+  mostrar_limite: 'estilo', rango: 'estilo',
+  // Comportamiento
+  posicion: 'comportamiento', demora: 'comportamiento', salida: 'comportamiento',
+  scroll: 'comportamiento', segundos: 'comportamiento', cerrable: 'comportamiento',
+  solo_movil: 'comportamiento', fijo: 'comportamiento', modo: 'comportamiento',
+  ventana: 'comportamiento', factor: 'comportamiento', minimo: 'comportamiento',
+  cantidad: 'comportamiento', formulario: 'comportamiento', permitirFoto: 'comportamiento',
+  filtroProducto: 'comportamiento', productos: 'comportamiento', hasta: 'comportamiento',
+  objetivo: 'comportamiento', corte: 'comportamiento', dias_envio: 'comportamiento',
+  dias_entrega: 'comportamiento', sabados: 'comportamiento', hora_corte: 'comportamiento',
+  dia_sab: 'comportamiento', horas_reloj: 'comportamiento', feriados: 'comportamiento',
+}
+
+export const grupoDe = (campo: Campo): GrupoKey =>
+  campo.grupo ?? (campo.tipo === 'ubicacion' ? 'lugar' : GRUPO_POR_KEY[campo.key] ?? 'contenido')
+
+/** Campos repartidos en secciones, en el orden de GRUPOS y sin secciones vacías. */
+export function agruparCampos(campos: Campo[]): { key: GrupoKey; campos: Campo[] }[] {
+  const orden = Object.keys(GRUPOS) as GrupoKey[]
+  return orden
+    .map(key => ({ key, campos: campos.filter(c => grupoDe(c) === key) }))
+    .filter(g => g.campos.length > 0)
 }
 
 export type Contexto = 'guias' | 'tienda' | 'producto'
@@ -162,6 +262,7 @@ const CAMPO_ANIMACION: Campo = {
   key: 'animacion',
   label: 'Animación de entrada',
   tipo: 'select',
+  previsual: 'animacion',
   porDefecto: 'subir',
   ayuda:
     'Cómo aparece cuando el visitante llega a él al bajar. Sutil a propósito: se nota sin distraer. «Ninguna» lo deja fijo. A quien pidió menos movimiento en su sistema se le muestra sin animar.',
@@ -193,6 +294,7 @@ const CAMPOS_RECUADRO: Campo[] = [
     key: 'recuadro',
     label: 'Recuadro alrededor del widget',
     tipo: 'select',
+    previsual: 'recuadro',
     porDefecto: 'ninguno',
     ayuda:
       'Enmarca el widget para separarlo del texto. Sirve para destacar uno; si se le pone a todos, deja de destacar nada.',
@@ -224,6 +326,7 @@ const CAMPOS_RECUADRO: Campo[] = [
     key: 'recuadro_linea',
     label: 'Tipo de línea',
     tipo: 'select',
+    previsual: 'linea',
     porDefecto: 'solida',
     opciones: LINEAS_RECUADRO.map(l => ({ value: l.value, label: l.label })),
     visibleSi: { key: 'recuadro', distintoDe: 'ninguno' },
@@ -296,6 +399,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'posicion',
         label: 'Posición en pantalla',
         tipo: 'select',
+        previsual: 'posicion',
         porDefecto: 'derecha',
         ayuda: 'De qué lado flota. En celular la derecha queda bajo el pulgar de la mayoría.',
         opciones: [
@@ -566,6 +670,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'estrellaAlineacion',
         label: 'Alineación de las estrellas',
         tipo: 'select',
+        previsual: 'alineacion',
         porDefecto: 'izquierda',
         opciones: [
           { value: 'izquierda', label: 'Izquierda' },
@@ -754,6 +859,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'modo',
         label: 'Cómo aparece',
         tipo: 'select',
+        previsual: 'modo',
         porDefecto: 'popup',
         ayuda:
           'Ventana emergente: tapa la pantalla, capta más y molesta más. Bloque: queda dentro del texto, no interrumpe y capta menos.',
@@ -1768,6 +1874,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'proporcion',
         label: 'Proporción',
         tipo: 'select',
+        previsual: 'proporcion',
         porDefecto: '16:9',
         ayuda:
           'Define el lugar que ocupa. Elegirla evita el salto del texto mientras carga y que una imagen mal medida deforme la página.',
@@ -1783,6 +1890,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'marco',
         label: 'Marco',
         tipo: 'select',
+        previsual: 'marco',
         porDefecto: 'redondo',
         ayuda: 'El círculo solo queda bien con proporción cuadrada.',
         opciones: [
@@ -1816,6 +1924,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'ancho',
         label: 'Ancho',
         tipo: 'select',
+        previsual: 'ancho',
         porDefecto: 'completo',
         ayuda: 'Hasta dónde se estira dentro del texto.',
         opciones: [
