@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { CampaignService } from '@/services/CampaignService'
+import { igualSeguro } from '@/lib/meta-signature'
 
+// Comparación de tiempo constante, igual que en los webhooks de Meta y en /api/cron: `===`
+// corta apenas encuentra un byte distinto, y esa diferencia de tiempo alcanza para ir
+// adivinando la firma byte por byte.
 function verifyHmac(body: string, signature: string | null, secret: string): boolean {
   if (!signature) return false
   const expected = createHmac('sha256', secret).update(body).digest('hex')
-  return expected === signature
+  return igualSeguro(expected, signature)
 }
 
 export async function POST(req: NextRequest) {
@@ -20,8 +24,19 @@ export async function POST(req: NextRequest) {
 
   const rawBody = await req.text()
 
+  // FALLA CERRADO. Antes era `if (clientSecret && !verifyHmac(...))`: sin TN_CLIENT_SECRET
+  // configurado se aceptaba CUALQUIER cuerpo sin firmar, y este webhook dispara mensajes de
+  // WhatsApp desde el número oficial (riesgo de baneo del WABA) además de escribir en la
+  // base. Un webhook mudo se nota y se arregla; uno abierto no se nota hasta que es tarde.
+  // Es el mismo criterio que ya estaba en lib/cron-auth.ts y lib/meta-signature.ts.
   const clientSecret = process.env.TN_CLIENT_SECRET
-  if (clientSecret && !verifyHmac(rawBody, hmac, clientSecret)) {
+  if (!clientSecret) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[webhook tn] TN_CLIENT_SECRET no configurado: se rechaza por seguridad')
+      return NextResponse.json({ error: 'Servicio mal configurado' }, { status: 503 })
+    }
+    console.warn('[webhook tn] sin TN_CLIENT_SECRET: firma no verificada (solo fuera de producción)')
+  } else if (!verifyHmac(rawBody, hmac, clientSecret)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
