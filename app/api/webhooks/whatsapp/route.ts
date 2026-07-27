@@ -6,7 +6,8 @@ import {
   diag, getHistorial, logClaudeUsage, hayMensajePosterior, textosDeLaRafaga,
   wamidEsNuevo, ultimaDerivacion, huboAvisoReciente, type Turno,
 } from '@/lib/diag'
-import { getEstadoAndreani } from '@/lib/andreani'
+import { getEstadoAndreani, pareceTrackingAndreani } from '@/lib/andreani'
+import { mensajeSeguimientoGenerico, esEnvioViejo } from '@/lib/seguimiento'
 import { esConsultaIntervencion, RESPUESTA_INTERVENCION } from '@/lib/intervencion'
 import { notifyNahuelAdjunto } from '@/lib/notify'
 import { prisma } from '@/lib/prisma'
@@ -160,6 +161,7 @@ type Pedido = {
   esAndreani?: boolean
   pickup?: boolean         // envío a sucursal (retiro) vs domicilio
   despachado?: boolean     // shipping_status ya salió del depósito
+  diasDesdeCompra?: number // antigüedad del pedido: un envío de hace meses ya no "viaja"
   // Pedido viejo que figura sin pagar: el estado en Tiendanube NO es confiable (puede
   // estar cobrado y despachado sin haberse marcado). El bot no opina: deriva.
   dudoso?: boolean
@@ -251,16 +253,24 @@ function esDeEsteCliente(o: OrdenTN, tel8: string, tokens: string[], nombres: st
 
 function aPedido(o: OrdenTN): Pedido {
   const correo = o.shipping_option ?? ''
+  const tracking = o.shipping_tracking_number || undefined
   return {
     encontrado: true,
     pagado: o.payment_status === 'paid',
     manuales: manualesDeProductos(o.products ?? []),
     numero: o.number,
-    tracking: o.shipping_tracking_number || undefined,
+    tracking,
     correo: correo || undefined,
-    esAndreani: /andreani/i.test(correo),
+    // El método de envío de Tiendanube NO alcanza para saber el correo: un despacho de
+    // Andreani puede figurar como "Punto de retiro". Si el número tiene forma de Andreani,
+    // se le pregunta a Andreani; la respuesta de la API es la que decide (ver
+    // mensajeSeguimiento).
+    esAndreani: /andreani/i.test(correo) || pareceTrackingAndreani(tracking),
     pickup: o.shipping_pickup_type === 'pickup',
     despachado: o.shipping_status === 'shipped',
+    diasDesdeCompra: o.created_at
+      ? Math.floor((Date.now() - new Date(o.created_at).getTime()) / 86_400_000)
+      : undefined,
   }
 }
 
@@ -340,6 +350,9 @@ async function mensajeSeguimiento(pedido: Pedido): Promise<string | null> {
   // Todavía sin nº de seguimiento: o no se despachó, o recién sale.
   if (!pedido.tracking) {
     if (pedido.despachado) return null // despachado sin tracking cargado → derivar, no arriesgar
+    // Un pedido de hace meses sin seguimiento cargado no está "por salir del depósito":
+    // el dato de Tiendanube quedó viejo. No se afirma nada.
+    if (esEnvioViejo(pedido.diasDesdeCompra)) return null
     return `Tu pedido #${pedido.numero} está confirmado 🙌 Todavía no salió del depósito; ` +
       `normalmente se despacha al día siguiente hábil a la mañana. Apenas tenga seguimiento te lo paso.`
   }
@@ -347,7 +360,13 @@ async function mensajeSeguimiento(pedido: Pedido): Promise<string | null> {
   // Andreani: estado en vivo, certero.
   if (pedido.esAndreani) {
     const est = await getEstadoAndreani(pedido.tracking)
-    if (!est.ok || est.orden == null) return null // sin dato certero → derivar
+    // Si el número tenía forma de Andreani pero la API no lo reconoce, no era de Andreani:
+    // sigue por el camino genérico en vez de derivar (antes de preguntar no hay forma de
+    // saberlo, y adivinar el correo es justo lo que causó el error del 27/07).
+    if (!est.ok || est.orden == null) {
+      if (!/andreani/i.test(pedido.correo ?? '')) return mensajeSeguimientoGenerico(pedido)
+      return null // decía Andreani y Andreani no sabe nada → sin dato certero, deriva
+    }
     const link = `https://www.andreani.com/envio/${pedido.tracking}`
     if (est.entregado) {
       return `Tu pedido #${pedido.numero} figura como ENTREGADO ✅ Si no lo recibiste, avisame y lo revisamos.\n\nSeguimiento: ${link}`
@@ -361,10 +380,7 @@ async function mensajeSeguimiento(pedido: Pedido): Promise<string | null> {
       `El plazo habitual es de 3 a 5 días hábiles.\n\nSeguílo acá: ${link}`
   }
 
-  // Correo Argentino u otro: no hay estado en vivo → damos link + código (certero, sin inventar estado).
-  return `Tu pedido #${pedido.numero} viaja por ${pedido.correo || 'el correo'} 📦 ` +
-    `Seguilo con este código: ${pedido.tracking}\n` +
-    `https://www.correoargentino.com.ar/formularios/ondnc`
+  return mensajeSeguimientoGenerico(pedido)
 }
 
 function linkDeManual(m: ManualId): string {

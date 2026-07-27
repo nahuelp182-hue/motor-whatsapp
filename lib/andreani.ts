@@ -79,3 +79,20 @@ export async function getEstadoAndreani(numero: string, timeoutMs = 15000): Prom
   }
   return res
 }
+
+/**
+ * ¿El número de seguimiento TIENE FORMA de Andreani? (15 dígitos, sin letras)
+ *
+ * Hace falta porque el correo NO se puede deducir del método de envío de Tiendanube: el
+ * 27/07/26 un pedido despachado por Andreani figuraba con `shipping_option` = "Punto de
+ * retiro", y el bot, al no leer "andreani" ahí, lo trató como Correo Argentino: le dio a la
+ * clienta un link inútil y le dijo que su envío estaba viajando cuando Andreani lo tenía
+ * como ENTREGADO desde hacía catorce meses.
+ *
+ * Es solo un filtro barato para decidir si vale la pena preguntarle a la API: la que manda
+ * es la respuesta de Andreani. Correo Argentino usa códigos con letras (CD123456789AR) o de
+ * otro largo, así que no entran acá.
+ */
+export function pareceTrackingAndreani(tracking?: string | null): boolean {
+  return !!tracking && /^\d{15}$/.test(tracking.trim())
+}
