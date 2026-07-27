@@ -8,6 +8,7 @@ import {
 } from '@/lib/diag'
 import { getEstadoAndreani, pareceTrackingAndreani } from '@/lib/andreani'
 import { mensajeSeguimientoGenerico, esEnvioViejo } from '@/lib/seguimiento'
+import { pideManual, esSoloIdentificador } from '@/lib/intencion'
 import { esConsultaIntervencion, RESPUESTA_INTERVENCION } from '@/lib/intervencion'
 import { notifyNahuelAdjunto } from '@/lib/notify'
 import { prisma } from '@/lib/prisma'
@@ -22,6 +23,18 @@ const DEBOUNCE_MS = 20000
 // Una vez que el chat se derivó al equipo, durante estas horas lo maneja una persona:
 // el bot no vuelve a responder (más allá de un recordatorio cada 2 h).
 const HANDOFF_HORAS = 6
+
+// Cuánto vale el "te pedí el dato para mandarte el material". Pasada esa ventana, un número
+// suelto vuelve a ser lo que parece: una consulta por el envío.
+const HORAS_MANUAL_PENDIENTE = 24
+
+// Tope de lo que se guarda en ig_diag de cada mensaje. NO es cosmético: 'recibido' y
+// 'pensado' son de donde getHistorial() reconstruye la conversación para el modelo, y
+// textosDeLaRafaga() relee de ahí el mensaje del cliente cuando manda varios seguidos. Con
+// 300 el bot razonaba sobre mensajes cortados a mitad de palabra —propios y ajenos— y el
+// panel mostraba lo mismo. WhatsApp permite 4096 por mensaje; 2000 cubre todo lo real
+// (el más largo en 30 días no llegó a 500) sin guardar novelas.
+const MAX_TEXTO_DIAG = 2000
 
 const MODELO = 'claude-haiku-4-5-20251001'
 
@@ -633,7 +646,7 @@ async function manejarArchivo(
     ? '¡Recibimos tu comprobante! 🙌 El equipo verifica el pago y te confirma a la brevedad. Apenas quede confirmado, despachamos 👌'
     : '¡Recibimos tu archivo! 🙌 Si es el comprobante de pago, el equipo lo verifica y te confirma. Si es una consulta, contame en un texto así te ayudo 👌'
   await enviarMensajeWA(from, ack)
-  await wdiag('pensado', from, { derivar: false, accion: 'archivo_recibido', respuesta: ack.slice(0, 300) })
+  await wdiag('pensado', from, { derivar: false, accion: 'archivo_recibido', respuesta: ack.slice(0, MAX_TEXTO_DIAG) })
 }
 
 // Detecta respuestas AUTOMÁTICAS de otros negocios/bots (ej. el auto-responder de APIDAN)
@@ -785,7 +798,7 @@ export async function POST(req: NextRequest) {
         tareas.push(async () => {
         try {
           // 'recibido'/'pensado' son los kinds que getHistorial() consulta para reconstruir el hilo
-          await wdiag('recibido', from, { texto: texto.slice(0, 300), wamid: msg.id, nombre })
+          await wdiag('recibido', from, { texto: texto.slice(0, MAX_TEXTO_DIAG), wamid: msg.id, nombre })
 
           // Auto-responder de otro negocio/bot (ej. APIDAN) → no responder, cortar el loop.
           if (esAutoRespuesta(texto)) {
@@ -829,6 +842,20 @@ export async function POST(req: NextRequest) {
           let didDerivar = derivar
           let accion: string | undefined
 
+          // ─── Intención efectiva ───
+          // El modelo etiqueta, pero no siempre: cuando no lo hace, el sistema no verifica
+          // nada y el bot improvisa. Estas dos redes de seguridad lo cubren.
+          //
+          // `reanudaManual` es el caso que rompió el 27/07: le pedimos un dato para MANDARLE
+          // EL MATERIAL, contestó con el número pelado, y el preámbulo ordena marcar
+          // [SEGUIMIENTO] ante cualquier número → le llegó el estado del envío en vez del
+          // manual. Ese número es la respuesta a lo que preguntamos, no una consulta nueva.
+          const reanudaManual = esSoloIdentificador(mensajeUsuario) &&
+            await huboAvisoReciente(from, 'manual_pendiente', HORAS_MANUAL_PENDIENTE)
+          const quiereManual = manual !== null || pideManual(mensajeUsuario) || reanudaManual
+          // Si viene a completar el pedido del manual, el número no es una consulta de envío.
+          const quiereSeguimiento = seguimiento && !reanudaManual
+
           if (noReconoce) {
             // El cliente niega la compra. Va PRIMERO, antes de cualquier búsqueda de pedido:
             // acá no se busca nada, no se pide ningún dato y no se nombra ningún pedido. Si
@@ -849,7 +876,11 @@ export async function POST(req: NextRequest) {
             didDerivar = true
             accion = 'consulta_intervencion'
             await derivarAlEquipo(from, outText)
-          } else if (seguimiento) {
+          } else if (quiereSeguimiento && !quiereManual) {
+            // El manual tiene prioridad cuando se piden las dos cosas: la rama de abajo
+            // resuelve el envío también (busca el pedido igual) y suma el material. Al
+            // revés se perdía, porque el material no se puede mandar desde acá.
+            //
             // Estado REAL del envío (Tiendanube + Andreani). Nunca inventa: si no hay dato
             // certero, deriva al equipo.
             const pedido = await buscarPedido(from, mensajeUsuario, nombre)
@@ -915,7 +946,7 @@ export async function POST(req: NextRequest) {
               await wdiag('pidio_dato_pedido', from, { accion })
             }
             }
-          } else if (manual) {
+          } else if (quiereManual) {
             // Comprador pidió material → verificar compra por teléfono o dato numérico.
             const pedido = await buscarPedido(from, mensajeUsuario, nombre)
             if (pedido.dudoso) {
@@ -946,7 +977,13 @@ export async function POST(req: NextRequest) {
                   ? [manual]
                   : pedido.manuales.length ? pedido.manuales : ['inc101']
               const links = targets.map(linkDeManual).join('\n')
-              outText = `${respuesta ? respuesta + '\n\n' : '📚 Acá tenés tu material 👇\n\n'}${links}\n\nCualquier duda del cultivo, escribime 🍄`
+              // Pidió el material Y el envío en el mismo mensaje: van los dos. El estado
+              // primero, que es lo que se responde con datos frescos.
+              const envio = quiereSeguimiento ? await mensajeSeguimiento(pedido) : null
+              const encabezado = envio
+                ? envio + '\n\n📚 Y acá tenés tu material 👇\n\n'
+                : (respuesta ? respuesta + '\n\n' : '📚 Acá tenés tu material 👇\n\n')
+              outText = `${encabezado}${links}\n\nCualquier duda del cultivo, escribime 🍄`
               didDerivar = false
               accion = 'manual_enviado'
               await enviarMensajeWA(from, outText)
@@ -969,6 +1006,9 @@ export async function POST(req: NextRequest) {
               accion = 'manual_pide_orden'
               await enviarMensajeWA(from, outText)
               await wdiag('pidio_dato_pedido', from, { accion })
+              // Marca lo que quedó pendiente: cuando conteste con el número pelado, ese dato
+              // es para MANDARLE EL MATERIAL, no una consulta de envío (ver `reanudaManual`).
+              await wdiag('manual_pendiente', from, {})
             }
           } else if (derivar) {
             outText = respuesta || 'Te paso con una persona del equipo 👇'
@@ -984,7 +1024,7 @@ export async function POST(req: NextRequest) {
           }
 
           await wdiag('pensado', from, {
-            derivar: didDerivar, motivo, accion, feedback, respuesta: outText.slice(0, 300),
+            derivar: didDerivar, motivo, accion, feedback, respuesta: outText.slice(0, MAX_TEXTO_DIAG),
           })
 
           if (feedback) {
