@@ -4,7 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { SidebarNav } from '@/components/SidebarNav'
 import { FondoHolografico } from '@/components/FondoHolografico'
 
-type Mensaje = { ts: string; role: 'user' | 'bot'; text: string; derivar?: boolean; accion?: string }
+type Mensaje = {
+  ts: string; role: 'user' | 'bot'; text: string; derivar?: boolean; accion?: string
+  archivo?: boolean   // imagen/documento que mandó el cliente
+  auto?: boolean      // salió de una automatización, no del bot conversando
+}
 type Conversacion = {
   sender: string
   nombre: string | null
@@ -214,10 +218,16 @@ export default function ConversacionesPage() {
                         <div
                           className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${
                             m.role === 'user'
-                              ? 'bg-[#191922] text-white/90'
-                              : m.derivar
-                                ? 'bg-amber-500/15 text-amber-100'
-                                : 'bg-emerald-500/15 text-emerald-50'
+                              ? m.archivo
+                                ? 'border border-white/10 bg-[#191922] italic text-white/60'
+                                : 'bg-[#191922] text-white/90'
+                              : m.auto
+                                // Automatización: no es el bot conversando, es un envío
+                                // programado. Se distingue para no leerlo como respuesta.
+                                ? 'border border-white/10 bg-white/[0.04] italic text-white/55'
+                                : m.derivar
+                                  ? 'bg-amber-500/15 text-amber-100'
+                                  : 'bg-emerald-500/15 text-emerald-50'
                           }`}
                         >
                           <p className="whitespace-pre-wrap break-words">{m.text}</p>

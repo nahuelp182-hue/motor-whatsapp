@@ -1,26 +1,11 @@
 // Log de diagnóstico persistente (tabla ig_diag en Supabase). Best-effort: nunca rompe el flujo.
-import pg from 'pg'
 
-let pool: pg.Pool | null = null
-
-// Exportado para que otros módulos (ratelimit) reusen el MISMO pool con el pooler de Supabase
-// (DB_HOST/PORT/USER/PASSWORD). Es la conexión que funciona en este proyecto; el cliente
-// Prisma con DATABASE_URL directo no conecta igual en el runtime de producción.
-export function getPool(): pg.Pool | null {
-  if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD) return null
-  if (!pool) {
-    pool = new pg.Pool({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT ?? 6543),
-      database: 'postgres',
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: { rejectUnauthorized: false },
-      max: 1,
-    })
-  }
-  return pool
-}
+// El pool vive en lib/db.ts — había seis copias de esta misma función repartidas por el
+// proyecto, cada una abriendo su propia conexión. Se re-exporta desde acá porque varios
+// módulos (ratelimit, entre otros) ya importaban `getPool` de este archivo y no hay motivo
+// para tocarlos.
+export { getPool } from '@/lib/db'
+import { getPool } from '@/lib/db'
 
 /** Registra un evento de diagnóstico. Nunca lanza. */
 export async function diag(kind: string, sender: string, detail: unknown): Promise<void> {
@@ -69,6 +54,41 @@ export async function logClaudeUsage(channel: string, model: string, usage: Usag
     )
   } catch (e) {
     console.error('logClaudeUsage error:', e)
+  }
+}
+
+/**
+ * Gasto de Claude en las últimas 24 h, en USD, por canal.
+ *
+ * Los topes de `/api/asistente` cuentan REQUESTS, no dólares, y eso no es lo mismo: una
+ * conversación larga con mucho contexto cuesta varias veces lo que una pregunta suelta. El
+ * tope de requests evita el abuso; esto avisa cuando el costo real se dispara aunque el
+ * volumen parezca normal.
+ *
+ * Devuelve null si no se puede calcular: quien llama decide, pero no debería alertar por
+ * un error de base (ya hay un aviso para eso).
+ */
+export async function gastoClaude24h(): Promise<{ total: number; porCanal: Record<string, number> } | null> {
+  try {
+    const p = getPool()
+    if (!p) return null
+    const r = await p.query(
+      `SELECT channel, COALESCE(sum(cost_usd), 0) AS costo
+         FROM claude_usage
+        WHERE ts > now() - interval '24 hours'
+        GROUP BY channel`,
+    )
+    const porCanal: Record<string, number> = {}
+    let total = 0
+    for (const row of r.rows) {
+      const costo = Number(row.costo ?? 0)
+      porCanal[String(row.channel)] = costo
+      total += costo
+    }
+    return { total, porCanal }
+  } catch (e) {
+    console.error('gastoClaude24h error:', e)
+    return null
   }
 }
 
@@ -217,7 +237,7 @@ export async function getHistorial(sender: string, sinceHours = 6, maxTurnos = 1
     if (!p) return []
     const r = await p.query(
       `SELECT kind, detail FROM ig_diag
-       WHERE sender = $1 AND kind IN ('recibido','pensado')
+       WHERE sender = $1 AND kind IN ('recibido','recibido_archivo','pensado')
          AND ts > now() - ($2 || ' hours')::interval
        ORDER BY id ASC`,
       [sender, String(sinceHours)],
@@ -226,6 +246,16 @@ export async function getHistorial(sender: string, sinceHours = 6, maxTurnos = 1
     for (const row of r.rows) {
       const d = typeof row.detail === 'string' ? JSON.parse(row.detail) : row.detail
       if (row.kind === 'recibido' && d?.texto) turnos.push({ role: 'user', content: d.texto })
+      else if (row.kind === 'recibido_archivo') {
+        // Un archivo no pasa por el cerebro (lo atiende manejarArchivo con un acuse fijo),
+        // pero SÍ es un turno del cliente. Sin esto el modelo veía su propio acuse
+        // ("recibimos tu archivo") sin nada del otro lado y perdía el hilo: el 27/07/26 un
+        // cliente mandó el comprobante, escribió "realicé un pedido por la web" y le
+        // contestó el menú de bienvenida.
+        const cap = typeof d?.caption === 'string' && d.caption ? `: "${d.caption}"` : ''
+        const que = d?.kind === 'document' ? 'un archivo' : 'una imagen'
+        turnos.push({ role: 'user', content: `[el cliente envió ${que}${cap} — probablemente el comprobante de pago]` })
+      }
       else if (row.kind === 'pensado' && d?.respuesta) turnos.push({ role: 'assistant', content: d.respuesta })
     }
     // El último evento es el 'recibido' actual (aún sin 'pensado'): lo quitamos, el caller pasa el mensaje actual aparte.
