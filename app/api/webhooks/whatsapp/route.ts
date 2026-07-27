@@ -7,9 +7,11 @@ import {
   wamidEsNuevo, ultimaDerivacion, huboAvisoReciente, type Turno,
 } from '@/lib/diag'
 import { getEstadoAndreani } from '@/lib/andreani'
+import { esConsultaIntervencion, RESPUESTA_INTERVENCION } from '@/lib/intervencion'
 import { notifyNahuelAdjunto } from '@/lib/notify'
 import { prisma } from '@/lib/prisma'
 import { verificarFirmaMeta } from '@/lib/meta-signature'
+import { log, traceId } from '@/lib/log'
 
 // Ventana de "debounce": si el cliente manda varios mensajes seguidos, esperamos este
 // tiempo y solo la última invocación responde (a toda la ráfaga junta). Evita respuestas
@@ -399,6 +401,8 @@ COMPRA QUE EL CLIENTE NO RECONOCE (esta regla gana sobre TODAS las demás): si d
 
 FEEDBACK / QUEJA SOBRE EL PRODUCTO: si el cliente comenta una falla, defecto, crítica o problema de calidad del equipo (algo que llegó torcido/roto/mal, o una observación de mejora), marcá [FEEDBACK]. Respondé breve, agradecido y empático, pero NO des instrucciones de reparación ni le pidas que lo arregle/desarme él mismo (nada de "despegá y volvé a pegar", "ajustá", "cambiá vos"). Para cualquier arreglo o reposición lo ve el equipo. El sistema le avisa a Nahuel.
 REGLA DURA ANTI-DIY (aplica en CUALQUIER turno, no solo el primero): NUNCA le confirmes, apruebes ni le sugieras al cliente desarmar, despegar, pegar, forzar, ajustar tornillos ni intervenir físicamente el equipo — AUNQUE sea ÉL quien lo proponga ("voy a despegarla y pegarla de nuevo"). En ese caso NO respondas "perfecto, hacelo": pedile que NO lo manipule, que lo dejamos que lo vea el equipo para no arriesgar el equipo ni su garantía, y marcá [FEEDBACK].
+SI PREGUNTA POR SACAR, CAMBIAR O MODIFICAR UNA PARTE DEL EQUIPO (la tapa, el burlete, un tornillo, el panel, la silicona, un cable…), NO ASEGURES NADA: ni que se puede ni que no se puede, ni de qué está hecho, ni para qué está puesto. No sabés cómo está armado ese equipo y la KB no lo dice. Respondé UNA línea diciendo que no querés arriesgar una respuesta, que deje esa parte como está, y DERIVÁ. Inventar acá le cuesta el equipo al cliente.
+TAMPOCO describas de qué material es una pieza, cómo está sellada, pegada o sujeta, ni por qué está puesta: nada de eso está en la KB. Si no está escrito abajo, no lo sabés.
 
 ACÁ NO TENÉS HERRAMIENTAS PARA RESOLVER. Por eso DERIVÁ (no lo resuelvas solo, no inventes datos) cuando el cliente pida: roturas/garantía/fallas que hay que gestionar, plata/reintegros/reembolsos, cambios de pedido (cuotas, dirección, cancelación), reclamos que escalan, temas legales/salud, o mayoristas/prensa.
 PSILOCIBE / "MÁGICOS" / GOLDEN TEACHER: NO derivés por esto. Respondé SIEMPRE con esta única línea neutral y cerrá el tema: "La incubadora sirve para cualquier tipo de cultivo de hongos; controla temperatura y humedad de forma automática. Sobre especies puntuales no asesoramos, pero el equipo funciona igual para lo que quieras cultivar 🙌". No des instrucciones ni recomendaciones de cepas/dosis. Solo si el cliente INSISTE reiteradamente, ahí sí marcá DERIVAR.
@@ -670,9 +674,17 @@ export async function POST(req: NextRequest) {
   // URL puede inyectar un mensaje falso: el bot lo procesa, gasta tokens de Claude y ENVÍA
   // un WhatsApp desde el número oficial al destinatario que elija el atacante (riesgo de
   // baneo del WABA). La firma es sobre los bytes crudos, así que no se puede usar req.json().
+  const trace = traceId(req)
   const firma = await verificarFirmaMeta(req, process.env.WHATSAPP_APP_SECRET)
   if (!firma.ok) {
-    console.error('[wa] webhook rechazado:', firma.motivo)
+    // Estructurado porque esto SÍ hay que poder contar después: un pico de rechazos es o
+    // un secreto rotado a medias, o alguien probando la URL del webhook.
+    log.error('webhook rechazado', {
+      ambito: 'wa',
+      trace_id: trace,
+      motivo: firma.motivo,
+      status: firma.status,
+    })
     return NextResponse.json({ error: firma.motivo }, { status: firma.status })
   }
 
@@ -811,6 +823,15 @@ export async function POST(req: NextRequest) {
               'Se lo paso al equipo ahora para que lo revise y te confirme 👇'
             didDerivar = true
             accion = 'no_reconoce_compra'
+            await derivarAlEquipo(from, outText)
+          } else if (esConsultaIntervencion(mensajeUsuario)) {
+            // Pregunta por sacar / cambiar / modificar una parte del equipo. Se DESCARTA la
+            // respuesta del modelo a propósito: es justo el texto que afirmaría algo ("se
+            // saca sin problema", "eso es silicona"). Acá no se afirma nada, ni que sí ni
+            // que no, y lo contesta una persona.
+            outText = RESPUESTA_INTERVENCION
+            didDerivar = true
+            accion = 'consulta_intervencion'
             await derivarAlEquipo(from, outText)
           } else if (seguimiento) {
             // Estado REAL del envío (Tiendanube + Andreani). Nunca inventa: si no hay dato
