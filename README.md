@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# motor-whatsapp
 
-## Getting Started
+Plataforma interna de Micelium Argentina. Next.js 16 (App Router) + Prisma + Postgres
+(Supabase), desplegada en Vercel como **`mw-micelium`**.
 
-First, run the development server:
+Contiene el bot de WhatsApp, el portal de guías (`guias.infomicelium.com.ar`), el motor de
+widgets del storefront, el tracking de visitantes, el radar de tendencias, el calendario
+comercial y la atribución de campañas.
+
+- **Trampas y convenciones del proyecto**: [`CLAUDE.md`](./CLAUDE.md) — leer antes de tocar nada.
+- **Cuando algo se rompe**: [`RUNBOOK.md`](./RUNBOOK.md) — incluye cómo frenar los envíos.
+- **Estado técnico y plan de correcciones**: [`PLAN_ARQUITECTURA.md`](./PLAN_ARQUITECTURA.md).
+
+---
+
+## Levantarlo
 
 ```bash
+npm install
+npx prisma generate     # obligatorio: sin esto el cliente de Prisma no existe
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**El dashboard no levanta bien en local** (Prisma no conecta con la configuración de
+desarrollo). Para mirarlo, usar producción: `mw-micelium.vercel.app/dashboard`. La capa
+pública de guías y los widgets sí funcionan en local.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Verificar antes de pushear
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npx tsc --noEmit
+npm test
+```
 
-## Learn More
+El CI (`.github/workflows/ci.yml`) corre lo mismo y bloquea el merge si falla. El lint corre
+pero todavía no bloquea: hay errores preexistentes en código de la app.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Variables de entorno
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Se cargan en Vercel. Las críticas, sin las cuales el proyecto no arranca o falla cerrado:
 
-## Deploy on Vercel
+| Variable | Para qué |
+|---|---|
+| `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` | Conexión de runtime (pooler de Supabase) |
+| `DATABASE_URL` | Conexión de **migraciones** (Prisma CLI). Ver la trampa en `CLAUDE.md`: no es el mismo camino que el runtime |
+| `DASHBOARD_PASSWORD` | Sesión del panel. Sin esto, en producción el panel devuelve 503 (falla cerrado, a propósito) |
+| `CRON_SECRET` | Autoriza todo `/api/cron/*`. Sin esto, los crons devuelven 503 |
+| `WHATSAPP_TOKEN` `WHATSAPP_PHONE_NUMBER_ID` `WHATSAPP_APP_SECRET` `WHATSAPP_VERIFY_TOKEN` | Bot de WhatsApp. El `APP_SECRET` valida la firma de los webhooks: sin él, en producción se rechaza todo |
+| `TN_STORE_ID` `TN_ACCESS_TOKEN` `TN_APP_ID` `TN_CLIENT_SECRET` | Tiendanube |
+| `ANTHROPIC_API_KEY` | Cerebro del bot y del asistente web |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Opcionales según la función: `META_ADS_TOKEN`, `META_APP_SECRET`, `IG_ACCOUNT_ID`,
+`FB_PAGE_TOKEN` (Meta/Instagram) · `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `ALERT_EMAIL`,
+`MAIL_REMITENTE` (mails y alertas) · `GOOGLE_*`, `GADS_*` (Google Ads) · `GA4_PROPERTY_ID`,
+`CLARITY_*` (analítica) · `GCAL_ECOMMERCE_ID`, `GOOGLE_SA_JSON_B64` (calendario) ·
+`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (avisos) · `YOUTUBE_API_KEY` (radar) ·
+`BLOB_READ_WRITE_TOKEN` (fotos de reseñas) · `LEADS_NURTURE_ENABLED` (interruptor de la
+secuencia de leads) · `DB_SSL_STRICT` (ver abajo).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`DB_SSL_STRICT=1` activa la validación del certificado de la base. Está apagado por
+defecto porque encenderlo sin probarlo primero contra la base real rompería toda consulta
+en producción — es un paso pendiente del Bloque C.
+
+`CLAUDE_TOPE_USD_DIA` (default `5`) es el umbral de gasto diario de Claude que dispara el
+aviso por mail. El default está puesto a ojo: ajustarlo con el primer dato real de
+`claude_usage`.
+
+---
+
+## Base de datos
+
+Migraciones **siempre** por Prisma:
+
+```bash
+npx prisma migrate deploy    # aplicar las pendientes (producción)
+npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma
+```
+
+**Nunca** `prisma migrate dev` contra la base real: resetea el tracking de visitantes.
+`scripts/aplicar-sql.js` es deuda técnica, no una herramienta — se retira en el Bloque C.
+
+## Crons
+
+Cinco están declarados en `vercel.json` (diarios). Otros cuatro —`carrito-abandonado`,
+`resena-post-entrega`, `andreani`, `instalar-widgets-tn`— los dispara un cron del VPS,
+porque Vercel Hobby no permite frecuencias menores a un día.
+
+Todos los periódicos reportan a la tabla `CronHeartbeat`; el cron `resumen-bot` avisa por
+mail si alguno dejó de llegar. **Un cron nuevo tiene que llamar a `marcarHeartbeat()`** o
+podrá morir en silencio.
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://mw-micelium.vercel.app/api/cron/<nombre>
+```

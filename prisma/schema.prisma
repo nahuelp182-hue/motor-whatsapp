@@ -59,7 +59,7 @@ model Campaign {
 model Coupon {
   id          String   @id @default(cuid())
   store_id    String
-  codigo      String   @unique
+  codigo      String
   customer_id String
   campaign_id String
   is_used     Boolean  @default(false)
@@ -68,6 +68,10 @@ model Coupon {
   store    Store    @relation(fields: [store_id], references: [id])
   customer Customer @relation(fields: [customer_id], references: [id])
   campaign Campaign @relation(fields: [campaign_id], references: [id])
+
+  // Único POR TIENDA, no global: con dos tiendas, la primera en emitir "BIENVENIDA10" le
+  // bloqueaba ese código a la otra. Ver la migración 20260727140000_integridad_esquema.
+  @@unique([store_id, codigo], map: "Coupon_store_codigo_key")
 }
 
 model MessageLog {
@@ -77,9 +81,22 @@ model MessageLog {
   campaign_id   String
   estado        MessageState @default(PENDING)
   tipo_evento   String
+  // OJO: error_details carga dos significados todavía — el mensaje de error real, y una
+  // marca de idempotencia ('order:<id>') que CampaignService consulta con `contains`.
+  // El payload de la cola SALIÓ de acá a `payload` (migración 20260727150000_cola_envios);
+  // separar la marca es un cambio aparte.
   error_details String?
   scheduled_for DateTime?
   createdAt     DateTime     @default(now())
+
+  // ── Andamiaje de la cola (solo lo usan las filas de trabajo pendiente) ──
+  /// Lo que hay que enviar: { message, phone }. Antes viajaba serializado en error_details.
+  payload         Json?
+  /// Intentos de envío. Con tope, para que un fallo permanente no reintente para siempre.
+  intentos        Int       @default(0)
+  /// Fila tomada por una corrida hasta esta hora. Es lo que impide el doble envío cuando
+  /// dos ejecuciones del cron se solapan, y hace de backoff tras un fallo.
+  bloqueado_hasta DateTime?
 
   store    Store    @relation(fields: [store_id], references: [id])
   customer Customer @relation(fields: [customer_id], references: [id])
@@ -92,6 +109,8 @@ model MessageLog {
   @@index([estado, scheduled_for], map: "MessageLog_estado_scheduled_idx")
   @@index([store_id, estado, createdAt], map: "MessageLog_store_estado_creado_idx")
   @@index([store_id, tipo_evento, createdAt], map: "MessageLog_store_tipo_creado_idx")
+  // El acceso del consumidor de la cola: estado + programación + bloqueo.
+  @@index([estado, scheduled_for, bloqueado_hasta], map: "MessageLog_cola_idx")
 }
 
 // Respuesta de un cliente tras la plantilla resena_post_entrega — capturada
@@ -135,6 +154,9 @@ enum MessageState {
 
 model GadsCache {
   id              String   @id @default(cuid())
+  // Nullable a propósito: las filas anteriores a la migración
+  // 20260727140000_integridad_esquema no tienen tienda asignada salvo que hubiera una sola.
+  store_id        String?
   date            String
   campaign_id     String
   campaign_name   String
@@ -150,6 +172,7 @@ model GadsCache {
   synced_at       DateTime @default(now())
 
   @@unique([date, campaign_id])
+  @@index([store_id, date], map: "gads_cache_store_date_idx")
   @@map("gads_cache")
 }
 
@@ -202,6 +225,9 @@ model Visitor {
   @@unique([store_id, vid])
   @@index([store_id, ft_channel])
   @@index([store_id, ft_at])
+  // El cosido de compras busca por email en cada corrida del cron: sin este índice es un
+  // scan de la tabla que más rápido crece del proyecto.
+  @@index([store_id, email], map: "Visitor_store_email_idx")
 }
 
 model Visit {
@@ -260,6 +286,7 @@ model Widget {
 
   store  Store         @relation(fields: [store_id], references: [id])
   events WidgetEvent[]
+  leads  WidgetLead[]
 
   @@index([store_id, contexto, activo])
 }
@@ -284,6 +311,22 @@ model WidgetLead {
   dato      Json?    // lo que pidiera el widget además del email
   createdAt DateTime @default(now())
 
+  // Sin esta relación no había clave foránea: borrar un widget dejaba sus leads —emails de
+  // gente real— colgando de un id inexistente, invisibles desde el panel.
+  // Ver la migración 20260727140000_integridad_esquema.
+  widget Widget @relation(fields: [widget_id], references: [id], onDelete: Cascade)
+
   @@unique([widget_id, email])
   @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Última corrida conocida de cada cron (VPS o Vercel). Ver lib/cron-heartbeat.ts: es la
+// mitad barata del arreglo al agujero de "el VPS se cae y nada lo nota" (Bloque A del
+// plan de arquitectura). La otra mitad, el aviso, se dispara desde el cron resumen-bot.
+model CronHeartbeat {
+  nombre   String   @id
+  last_run DateTime @default(now())
+  last_ok  Boolean  @default(true)
+  detalle  String?
 }

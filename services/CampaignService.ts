@@ -1,6 +1,6 @@
 import { Store, CampaignType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { tokenWhatsApp, tokenTiendanube } from '@/lib/credenciales'
+import { tokenWhatsApp, tokenTiendanube, phoneNumberIdWhatsApp } from '@/lib/credenciales'
 import { uploadClickConversion } from './GoogleAdsConversionService'
 
 // ── Tipos Tiendanube ──────────────────────────────────────────────────────────
@@ -233,7 +233,7 @@ export class CampaignService {
       },
     })
     const result = await sendWhatsAppTemplate(
-      config.wa_phone_number_id,
+      phoneNumberIdWhatsApp(this.store, config.wa_phone_number_id),
       tokenWhatsApp(this.store),
       customer.telefono,
       TEMPLATE_TRANSFER,
@@ -278,7 +278,7 @@ export class CampaignService {
       },
     })
     const result = await sendWhatsAppTemplate(
-      config.wa_phone_number_id,
+      phoneNumberIdWhatsApp(this.store, config.wa_phone_number_id),
       tokenWhatsApp(this.store),
       customer.telefono,
       TEMPLATE_TRANSFER_REMINDER,
@@ -337,9 +337,10 @@ export class CampaignService {
         campaign_id: campaign.id,
         estado: 'PENDING',
         tipo_evento: 'checkout/abandoned',
-        // el mensaje serializado se guarda en error_details (reutilizamos el campo)
-        // para que el cron lo tenga disponible sin recalcular
-        error_details: JSON.stringify({ message, phone: customer.telefono }),
+        // Lo que hay que enviar, en su propia columna. Antes iba serializado dentro de
+        // error_details —la columna de errores hacía de cola— con el resultado de que el
+        // mismo campo significaba tres cosas distintas según la fila.
+        payload: { message, phone: customer.telefono },
         scheduled_for: new Date(Date.now() + 30 * 60 * 1000),
       },
     })
@@ -454,7 +455,7 @@ export class CampaignService {
       })
 
       const result = await sendWhatsAppTemplate(
-        config.wa_phone_number_id,
+        phoneNumberIdWhatsApp(this.store, config.wa_phone_number_id),
         tokenWhatsApp(this.store),
         customer.telefono,
         config.template_name,
@@ -594,7 +595,7 @@ export class CampaignService {
       })
 
       const result = await sendWhatsAppTemplate(
-        config.wa_phone_number_id,
+        phoneNumberIdWhatsApp(this.store, config.wa_phone_number_id),
         tokenWhatsApp(this.store),
         customer.telefono,
         config.template_name,
@@ -679,7 +680,7 @@ export class CampaignService {
     await this.dispatchMessage({
       phone: customer.telefono,
       message,
-      waPhoneNumberId: config.wa_phone_number_id,
+      waPhoneNumberId: phoneNumberIdWhatsApp(this.store, config.wa_phone_number_id),
       customerId: customer.id,
       campaignId: campaign.id,
       tipoEvento: 'order/paid',

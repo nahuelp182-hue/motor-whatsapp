@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { construirEventosCalendario } from '@/lib/calendario'
 import { getAccessToken, listarEventosSync, upsertEvento } from '@/lib/gcal'
 import { chequearCron } from '@/lib/cron-auth'
+import { marcarHeartbeat } from '@/lib/cron-heartbeat'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -31,11 +32,13 @@ export async function GET(req: NextRequest) {
       detalle.push(`${r === 'created' ? '＋' : '↻'} ${e.fecha} ${e.summary}`)
     }
 
+    await marcarHeartbeat('sync-calendario', true)
     return NextResponse.json({
       ok: true, horizonte, total: eventos.length, created, updated,
       yaEnCalendario: existentes.size, detalle,
     })
   } catch (err) {
+    await marcarHeartbeat('sync-calendario', false, String(err).slice(0, 300))
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
   }
 }

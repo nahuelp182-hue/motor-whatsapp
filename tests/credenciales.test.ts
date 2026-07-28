@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { tokenWhatsApp, tokenTiendanube } from '@/lib/credenciales'
+import { tokenWhatsApp, tokenTiendanube, phoneNumberIdWhatsApp } from '@/lib/credenciales'
 
 const tienda = (id: string) => ({
   tiendanube_store_id: id,
@@ -12,6 +12,7 @@ beforeEach(() => {
   process.env.TN_STORE_ID = '1957278'
   process.env.WHATSAPP_TOKEN = 'wa-del-entorno'
   process.env.TN_ACCESS_TOKEN = 'tn-del-entorno'
+  process.env.WHATSAPP_PHONE_NUMBER_ID = 'numero-del-entorno'
 })
 afterEach(() => {
   process.env = { ...env }
@@ -40,5 +41,31 @@ describe('credenciales de la tienda', () => {
   it('sin TN_STORE_ID ninguna tienda es la propia', () => {
     delete process.env.TN_STORE_ID
     expect(tokenWhatsApp(tienda('1957278'))).toBe('wa-de-la-base')
+  })
+})
+
+// El número emisor tenía dos fuentes de verdad —el entorno en el webhook, la config de la
+// campaña en CampaignService— y podían discrepar sin que nada avisara. Estos tests fijan
+// cuál gana.
+describe('número emisor de WhatsApp', () => {
+  it('la tienda propia usa el entorno, no la config de la campaña', () => {
+    expect(phoneNumberIdWhatsApp(tienda('1957278'), 'numero-de-la-campana'))
+      .toBe('numero-del-entorno')
+  })
+
+  it('una tienda de terceros usa la config de su campaña: tiene su propio WABA', () => {
+    expect(phoneNumberIdWhatsApp(tienda('999999'), 'numero-de-la-campana'))
+      .toBe('numero-de-la-campana')
+  })
+
+  it('sin el env var cae a la config: no rompe lo que hoy anda', () => {
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID
+    expect(phoneNumberIdWhatsApp(tienda('1957278'), 'numero-de-la-campana'))
+      .toBe('numero-de-la-campana')
+  })
+
+  it('sin ninguna de las dos devuelve vacío, no undefined', () => {
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID
+    expect(phoneNumberIdWhatsApp(tienda('1957278'), null)).toBe('')
   })
 })

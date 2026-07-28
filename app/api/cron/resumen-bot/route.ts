@@ -1,27 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pg from 'pg'
+import { getPool } from '@/lib/db'
 import { notifyNahuel } from '@/lib/notify'
 import { chequearCron } from '@/lib/cron-auth'
+import { marcarHeartbeat, chequearHeartbeats } from '@/lib/cron-heartbeat'
+import { resumenCola, MAX_INTENTOS } from '@/lib/cola-envios'
+import { gastoClaude24h } from '@/lib/diag'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-let pool: pg.Pool | null = null
-function getPool(): pg.Pool | null {
-  if (!process.env.DB_HOST) return null
-  if (!pool) {
-    pool = new pg.Pool({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT ?? 6543),
-      database: 'postgres',
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: { rejectUnauthorized: false },
-      max: 1,
-    })
-  }
-  return pool
-}
 
 // Buckets de tema por palabras clave (sobre los mensajes del cliente).
 const TEMAS: Array<{ nombre: string; re: RegExp }> = [
@@ -101,12 +87,91 @@ export async function GET(req: NextRequest) {
       await notifyNahuel('🍄 Resumen diario del bot (WhatsApp)', body)
     }
 
+    // ── Heartbeat de los otros crons (VPS + Vercel) ──────────────────────────────────
+    // Va acá y no en un cron propio: mientras no esté confirmado el plan de Vercel, un
+    // cron nuevo podría no correr nunca. Este SÍ corre (es el que acaba de mandar este
+    // mismo mail), así que es el lugar más confiable para avisar. Dispara SIEMPRE que
+    // haya algo vencido, actividad del bot o no — un cron caído importa más que un día
+    // sin mensajes.
+    // ── Estado de la cola de envíos ──────────────────────────────────────────────────
+    // Un mensaje que agotó sus intentos queda FAILED y no vuelve a salir. El dashboard no
+    // los dibuja en ninguna parte, así que sin este aviso nadie se entera de que el
+    // recupero de carrito dejó de llegarle a alguien.
+    try {
+      const cola = await resumenCola()
+      const atrasada = cola.masViejoHoras !== null && cola.masViejoHoras > 3
+      if (cola.agotados24h > 0 || atrasada) {
+        const lineas = [
+          `Pendientes en cola: ${cola.pendientes}`,
+          `Agotados (últimas 24 h): ${cola.agotados24h}`,
+          cola.masViejoHoras !== null
+            ? `El más viejo espera hace ${cola.masViejoHoras} h`
+            : null,
+        ].filter(Boolean).join('\n')
+        await notifyNahuel(
+          '⚠️ Cola de envíos con problemas',
+          `${lineas}\n\n` +
+          `"Agotados" son mensajes que se intentaron ${MAX_INTENTOS} veces y ya no se reintentan más: ` +
+          `a esos clientes no les llegó el recupero de carrito.`,
+        )
+      }
+    } catch (e) {
+      console.error('[resumen-bot] resumen de cola falló:', e)
+    }
+
+    // ── Gasto de Claude ──────────────────────────────────────────────────────────────
+    // Los topes de /api/asistente cuentan requests, no dólares: una conversación larga
+    // cuesta varias veces lo que una pregunta suelta, así que el volumen puede parecer
+    // normal mientras el costo se dispara.
+    //
+    // El default está puesto a ojo a propósito y hay que ajustarlo con el primer dato real
+    // (ver PLAN_ARQUITECTURA.md): un umbral inventado que nunca dispara es tan inútil como
+    // no tenerlo, y uno que dispara todos los días se vuelve ruido y se ignora.
+    try {
+      const tope = Number(process.env.CLAUDE_TOPE_USD_DIA ?? 5)
+      const gasto = await gastoClaude24h()
+      if (gasto && gasto.total > tope) {
+        const detalle = Object.entries(gasto.porCanal)
+          .sort((a, b) => b[1] - a[1])
+          .map(([canal, usd]) => `  • ${canal}: USD ${usd.toFixed(2)}`)
+          .join('\n')
+        await notifyNahuel(
+          '💸 Gasto de Claude por encima del tope',
+          `Últimas 24 h: USD ${gasto.total.toFixed(2)} (tope: USD ${tope.toFixed(2)})\n\n` +
+          `${detalle}\n\n` +
+          `El tope se ajusta con la variable CLAUDE_TOPE_USD_DIA.`,
+        )
+      }
+    } catch (e) {
+      console.error('[resumen-bot] chequeo de gasto falló:', e)
+    }
+
+    try {
+      const vencidos = await chequearHeartbeats()
+      if (vencidos.length > 0) {
+        const detalle = vencidos
+          .map((v) => v.horasSinCorrer === null
+            ? `  • ${v.nombre}: nunca reportó`
+            : `  • ${v.nombre}: sin correr hace ${v.horasSinCorrer} h${v.last_ok ? '' : ' (última corrida falló)'}`)
+          .join('\n')
+        await notifyNahuel(
+          '⚠️ Crons sin reportar',
+          `Estos crons no marcaron su corrida a tiempo — el VPS puede estar caído, o algo ` +
+          `está rompiendo el bloque intermedio:\n\n${detalle}`,
+        )
+      }
+    } catch (e) {
+      console.error('[resumen-bot] chequeo de heartbeats falló:', e)
+    }
+
+    await marcarHeartbeat('resumen-bot', true)
     return NextResponse.json({
       ok: true,
       enviado: hayActividad,
       totales: { chats: senders.size, entrantes, respuestas, derivadas, manuales, errores },
     })
   } catch (e) {
+    await marcarHeartbeat('resumen-bot', false, String(e).slice(0, 300))
     return NextResponse.json({ ok: false, error: String(e).slice(0, 300) })
   }
 }

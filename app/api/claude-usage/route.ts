@@ -1,25 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pg from 'pg'
+import { getPool } from '@/lib/db'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-let pool: pg.Pool | null = null
-function getPool(): pg.Pool | null {
-  if (!process.env.DB_HOST) return null
-  if (!pool) {
-    pool = new pg.Pool({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT ?? 6543),
-      database: 'postgres',
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: { rejectUnauthorized: false },
-      max: 1,
-    })
-  }
-  return pool
-}
 
 export async function GET(req: NextRequest) {
   const days = Math.min(Math.max(Number(req.nextUrl.searchParams.get('days') ?? 30), 1), 90)

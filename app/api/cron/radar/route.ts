@@ -1,32 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pg from 'pg'
+import { getPool } from '@/lib/db'
 import { notifyNahuel } from '@/lib/notify'
 import {
   minarCategoria, ensureTabla, guardarSnapshot, ultimosDos, analizar,
   youtubeNicho, ensureTablaYT, guardarYT,
 } from '@/lib/radar'
 import { chequearCron } from '@/lib/cron-auth'
+import { marcarHeartbeat } from '@/lib/cron-heartbeat'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // minado ~250 sugerencias en paralelo
-
-let pool: pg.Pool | null = null
-function getPool(): pg.Pool | null {
-  if (!process.env.DB_HOST) return null
-  if (!pool) {
-    pool = new pg.Pool({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT ?? 6543),
-      database: 'postgres',
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: { rejectUnauthorized: false },
-      max: 1,
-    })
-  }
-  return pool
-}
 
 export async function GET(req: NextRequest) {
   const noAuth = chequearCron(req)
@@ -44,6 +28,7 @@ export async function GET(req: NextRequest) {
 
     const hoy = await minarCategoria()
     if (Object.keys(hoy).length === 0) {
+      await marcarHeartbeat('radar', false, 'minado vacío')
       return NextResponse.json({ ok: false, error: 'minado vacío' })
     }
     await guardarSnapshot(p, hoy)
@@ -74,6 +59,7 @@ export async function GET(req: NextRequest) {
       enviado = true
     }
 
+    await marcarHeartbeat('radar', true)
     return NextResponse.json({
       ok: true, enviado,
       totales: {
@@ -86,6 +72,7 @@ export async function GET(req: NextRequest) {
       },
     })
   } catch (e) {
+    await marcarHeartbeat('radar', false, String(e).slice(0, 300))
     return NextResponse.json({ ok: false, error: String(e).slice(0, 300) })
   }
 }

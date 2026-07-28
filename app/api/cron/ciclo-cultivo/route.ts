@@ -29,6 +29,7 @@ import {
 } from '@/lib/mails-cliente'
 import { mailLead1, mailLead2, mailLead3 } from '@/lib/mails-lead'
 import { tomarLatch } from '@/lib/ratelimit'
+import { marcarHeartbeat } from '@/lib/cron-heartbeat'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -87,7 +88,10 @@ export async function GET(req: NextRequest) {
   if (noAuth) return noAuth
 
   const secreto = process.env.DASHBOARD_PASSWORD
-  if (!secreto) return NextResponse.json({ error: 'sin secreto' }, { status: 503 })
+  if (!secreto) {
+    await marcarHeartbeat('ciclo-cultivo', false, 'sin DASHBOARD_PASSWORD')
+    return NextResponse.json({ error: 'sin secreto' }, { status: 503 })
+  }
 
   // Franja horaria humana: un mail a las 4 de la mañana se lee como spam automático.
   const horaAr = (new Date().getUTCHours() + 24 - 3) % 24
@@ -144,6 +148,7 @@ export async function GET(req: NextRequest) {
     console.error('[ciclo-cultivo] falló la secuencia de leads:', e)
   }
 
+  await marcarHeartbeat('ciclo-cultivo', true, fallidos ? `${fallidos} fallidos` : undefined)
   return NextResponse.json({
     revisadas: compras.length,
     enviados,

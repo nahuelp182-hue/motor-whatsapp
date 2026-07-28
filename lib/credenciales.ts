@@ -50,3 +50,31 @@ export function tokenTiendanube(
   if (esTiendaPropia(store) && process.env.TN_ACCESS_TOKEN) return process.env.TN_ACCESS_TOKEN
   return store.tiendanube_access_token ?? ''
 }
+
+/**
+ * Número emisor de WhatsApp (phone_number_id) para esta tienda.
+ *
+ * Es el TERCER dato que tenía dos fuentes de verdad, igual que los tokens de arriba:
+ *
+ *   - `CampaignService` lo leía de `campaign.configuracion.wa_phone_number_id` (una fila
+ *     de la base, distinta por campaña).
+ *   - El webhook de WhatsApp y `/api/conversaciones/responder` lo leían de
+ *     `process.env.WHATSAPP_PHONE_NUMBER_ID`.
+ *
+ * O sea que el bot podía contestar desde un número y el carrito abandonado escribir desde
+ * otro, sin que nada avisara. Peor: al rotar el número había que acordarse de los dos
+ * lugares, y el que quedaba viejo fallaba en silencio con los mensajes en FAILED.
+ *
+ * Mismo criterio que los tokens: para la tienda propia manda el entorno; la configuración
+ * de la campaña queda como respaldo y como la forma correcta el día que haya tiendas de
+ * terceros (ahí cada una tiene su WABA y el env var no alcanza).
+ */
+export function phoneNumberIdWhatsApp(
+  store: Pick<Store, 'tiendanube_store_id'>,
+  desdeConfig?: string | null,
+): string {
+  if (esTiendaPropia(store) && process.env.WHATSAPP_PHONE_NUMBER_ID) {
+    return process.env.WHATSAPP_PHONE_NUMBER_ID
+  }
+  return desdeConfig ?? ''
+}

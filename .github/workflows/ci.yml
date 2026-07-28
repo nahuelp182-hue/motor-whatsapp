@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  typecheck-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npx vitest run
+
+      # No bloquea todavía: hay errores preexistentes (setState en efectos, <a> en vez de
+      # next/link) en código que no forma parte de este arreglo. Bloquear el merge por ellos
+      # ahora frenaría CADA PR, no solo los que tocan esos archivos. Sacar `continue-on-error`
+      # cuando se limpien — hasta entonces esto solo avisa.
+      - name: Lint
+        run: npx eslint .
+        continue-on-error: true
+
+      - name: Drift de migraciones
+        # Compara el schema declarado contra las migraciones aplicadas en producción. Si
+        # DATABASE_URL no está configurado como secret del repo, este paso se salta en vez
+        # de fallar en rojo por un problema de configuración de CI, no del código.
+        # Cargar el secret en: Settings → Secrets and variables → Actions → New repository secret.
+        if: ${{ secrets.DATABASE_URL != '' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code

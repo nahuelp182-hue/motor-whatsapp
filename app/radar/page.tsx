@@ -1,27 +1,10 @@
-import pg from 'pg'
+import { getPool } from '@/lib/db'
 import { ultimosDos, analizar, leerYT, type Fila, type Analisis, type YTVideo } from '@/lib/radar'
 import { SidebarNav } from '@/components/SidebarNav'
 import { FondoHolografico } from '@/components/FondoHolografico'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-let pool: pg.Pool | null = null
-function getPool(): pg.Pool | null {
-  if (!process.env.DB_HOST) return null
-  if (!pool) {
-    pool = new pg.Pool({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT ?? 6543),
-      database: 'postgres',
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: { rejectUnauthorized: false },
-      max: 1,
-    })
-  }
-  return pool
-}
 
 async function cargar(): Promise<{ a: Analisis; fecha: string | null; yt: YTVideo[] }> {
   const p = getPool()
