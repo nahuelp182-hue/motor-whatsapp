@@ -18,6 +18,7 @@ type Envio = {
   unidades: number
   estado: string
   entregado: boolean
+  leido: boolean
   intentos: number
   detalle: string | null
   enviadoAt: string | null
@@ -29,7 +30,7 @@ type Envio = {
 }
 type MensajeTio = { ts: string; texto: string }
 type Resumen = {
-  total: number; entregados: number; despachados: number
+  total: number; entregados: number; leidos: number; despachados: number
   problemas: number; atencion: number; unidades: number
 }
 type Data = { resumen: Resumen; envios: Envio[]; mensajes: MensajeTio[] }
@@ -103,10 +104,11 @@ export function PanelApicultura() {
       </div>
 
       {r && (
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
           <Tarjeta label="Ventas" valor={r.total} />
           <Tarjeta label="Unidades" valor={r.unidades} />
           <Tarjeta label="Le llegaron al tío" valor={`${r.entregados}/${r.total}`} color={r.entregados === r.total ? '#34d399' : '#f59e0b'} />
+          <Tarjeta label="Los abrió" valor={`${r.leidos}/${r.total}`} color={r.leidos === r.total && r.total > 0 ? '#34d399' : undefined} />
           <Tarjeta label="Despachados" valor={`${r.despachados}/${r.total}`} color={r.despachados === r.total ? '#34d399' : undefined} />
           <Tarjeta label="Requieren atención" valor={r.atencion} color={r.atencion ? '#f59e0b' : undefined} />
           <Tarjeta label="Problemas" valor={r.problemas} color={r.problemas ? '#f87171' : undefined} />
@@ -147,6 +149,7 @@ export function PanelApicultura() {
               <div className="mt-2.5 flex flex-wrap gap-1.5">
                 <Chip ok={Boolean(e.enviadoAt)} texto={e.enviadoAt ? 'Aviso enviado' : 'Sin enviar'} />
                 <Chip ok={e.entregado} texto={e.entregado ? 'Le llegó al tío' : 'Sin confirmar entrega'} />
+                {e.entregado && <Chip ok={e.leido} neutro={!e.leido} texto={e.leido ? 'Lo abrió' : 'Sin abrir'} />}
                 <Chip ok={e.despachado} texto={e.despachado ? 'Despachado en ML' : 'Sin despachar'} />
                 {e.avisosTio > 0 && <Chip neutro texto={`${e.avisosTio} recordatorio${e.avisosTio > 1 ? 's' : ''}`} />}
                 {e.escalados > 0 && <Chip alerta texto={`${e.escalados} escalado${e.escalados > 1 ? 's' : ''} a vos`} />}

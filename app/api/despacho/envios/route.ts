@@ -21,6 +21,7 @@ type EnvioEntrada = {
   estado: string
   wamid?: string | null
   wa_entregado?: boolean
+  wa_leido?: boolean
   wa_intentos?: number
   wa_detalle?: string | null
   enviado_at?: string | null
@@ -68,6 +69,7 @@ export async function POST(req: Request) {
       estado: String(e.estado ?? 'pendiente'),
       wamid: e.wamid ?? null,
       wa_entregado: Boolean(e.wa_entregado),
+      wa_leido: Boolean(e.wa_leido),
       wa_intentos: Number(e.wa_intentos ?? 0),
       wa_detalle: e.wa_detalle ? String(e.wa_detalle).slice(0, 500) : null,
       enviado_at: fecha(e.enviado_at),

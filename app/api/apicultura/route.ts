@@ -21,6 +21,7 @@ export type EnvioPanel = {
   unidades: number
   estado: string
   entregado: boolean
+  leido: boolean
   intentos: number
   detalle: string | null
   enviadoAt: string | null
@@ -36,7 +37,7 @@ export type MensajeTio = { ts: string; texto: string }
 
 // Reglas del semáforo, en un solo lugar.
 function evaluar(e: {
-  estado: string; wa_entregado: boolean; despachado: boolean; escalados: number
+  estado: string; wa_entregado: boolean; wa_leido: boolean; despachado: boolean; escalados: number
   fecha_compra: Date; enviado_at: Date | null
 }): { salud: EnvioPanel['salud']; motivo: string } {
   const horas = (Date.now() - e.fecha_compra.getTime()) / 3_600_000
@@ -46,8 +47,9 @@ function evaluar(e: {
   if (e.despachado) return { salud: 'ok', motivo: 'Despachado' }
   if (!e.wa_entregado && e.enviado_at) return { salud: 'atencion', motivo: 'Enviado, sin confirmación de entrega' }
   if (!e.enviado_at) return { salud: 'atencion', motivo: 'Todavía sin enviar (esperando etiqueta)' }
-  if (horas >= 6) return { salud: 'atencion', motivo: `Entregado al tío, sin despachar hace ${Math.round(horas)} h` }
-  return { salud: 'ok', motivo: 'Entregado al tío, esperando despacho' }
+  const visto = e.wa_leido ? 'Leído por el tío' : 'Entregado al tío'
+  if (horas >= 6) return { salud: 'atencion', motivo: `${visto}, sin despachar hace ${Math.round(horas)} h` }
+  return { salud: 'ok', motivo: `${visto}, esperando despacho` }
 }
 
 export async function GET(req: NextRequest) {
@@ -70,6 +72,7 @@ export async function GET(req: NextRequest) {
       unidades: e.unidades,
       estado: e.estado,
       entregado: e.wa_entregado,
+      leido: e.wa_leido,
       intentos: e.wa_intentos,
       detalle: e.wa_detalle,
       enviadoAt: e.enviado_at ? e.enviado_at.toISOString() : null,
@@ -106,6 +109,7 @@ export async function GET(req: NextRequest) {
   const resumen = {
     total: envios.length,
     entregados: envios.filter((e) => e.entregado).length,
+    leidos: envios.filter((e) => e.leido).length,
     despachados: envios.filter((e) => e.despachado).length,
     problemas: envios.filter((e) => e.salud === 'problema').length,
     atencion: envios.filter((e) => e.salud === 'atencion').length,
