@@ -1,0 +1,1 @@
+ALTER TABLE "EnvioApicola" ADD COLUMN IF NOT EXISTS "mensaje" TEXT;

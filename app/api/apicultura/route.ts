@@ -22,6 +22,7 @@ export type EnvioPanel = {
   estado: string
   entregado: boolean
   leido: boolean
+  mensaje: string | null
   intentos: number
   detalle: string | null
   enviadoAt: string | null
@@ -33,7 +34,7 @@ export type EnvioPanel = {
   motivo: string
 }
 
-export type MensajeTio = { ts: string; texto: string }
+export type MensajeHilo = { ts: string; texto: string; propio: boolean }
 
 // Reglas del semáforo, en un solo lugar.
 function evaluar(e: {
@@ -53,11 +54,27 @@ function evaluar(e: {
 }
 
 export async function GET(req: NextRequest) {
-  const days = Math.min(Math.max(Number(req.nextUrl.searchParams.get('days') ?? 1), 1), 90)
-  const desde = new Date(Date.now() - days * 86_400_000)
+  // Acepta un rango explícito (?desde=&hasta=, ISO o YYYY-MM-DD) o el atajo ?days=N.
+  // El rango gana: con volumen, "los últimos N días" deja de alcanzar.
+  const qs = req.nextUrl.searchParams
+  const pDesde = qs.get('desde')
+  const pHasta = qs.get('hasta')
+  const days = Math.min(Math.max(Number(qs.get('days') ?? 1), 1), 3650)
+
+  const valida = (v: string | null): Date | null => {
+    if (!v) return null
+    const d = new Date(v.length === 10 ? `${v}T00:00:00` : v)
+    return isNaN(d.getTime()) ? null : d
+  }
+  const desde = valida(pDesde) ?? new Date(Date.now() - days * 86_400_000)
+  const hastaCrudo = valida(pHasta)
+  // Una fecha suelta (YYYY-MM-DD) significa "todo ese día", no "hasta las 00:00".
+  const hasta = hastaCrudo && pHasta && pHasta.length === 10
+    ? new Date(hastaCrudo.getTime() + 86_400_000 - 1)
+    : hastaCrudo
 
   const filas = await prisma.envioApicola.findMany({
-    where: { fecha_compra: { gte: desde } },
+    where: { fecha_compra: { gte: desde, ...(hasta ? { lte: hasta } : {}) } },
     orderBy: { interno: 'desc' },
   })
 
@@ -73,6 +90,7 @@ export async function GET(req: NextRequest) {
       estado: e.estado,
       entregado: e.wa_entregado,
       leido: e.wa_leido,
+      mensaje: e.mensaje,
       intentos: e.wa_intentos,
       detalle: e.wa_detalle,
       enviadoAt: e.enviado_at ? e.enviado_at.toISOString() : null,
@@ -85,22 +103,26 @@ export async function GET(req: NextRequest) {
   })
 
   // Lo que contestó el tío. Vive en ig_diag, no en Prisma (lo escribe el webhook).
-  let mensajes: MensajeTio[] = []
+  let mensajes: MensajeHilo[] = []
   const p = getPool()
   if (p) {
     try {
       const r = await p.query(
-        `SELECT ts, detail->>'texto' AS texto
+        `SELECT ts, kind, detail->>'texto' AS texto
            FROM ig_diag
-          WHERE kind = 'reenvio_tio'
-            AND ts > now() - ($1 || ' days')::interval
+          WHERE kind IN ('reenvio_tio', 'mensaje_a_tio')
+            AND ts >= $1 AND ($2::timestamptz IS NULL OR ts <= $2)
           ORDER BY ts DESC
-          LIMIT 200`,
-        [String(days)],
+          LIMIT 300`,
+        [desde.toISOString(), hasta ? hasta.toISOString() : null],
       )
       mensajes = r.rows
         .filter((x: { texto: string | null }) => x.texto)
-        .map((x: { ts: string; texto: string }) => ({ ts: new Date(x.ts).toISOString(), texto: x.texto }))
+        .map((x: { ts: string; kind: string; texto: string }) => ({
+          ts: new Date(x.ts).toISOString(),
+          texto: x.texto,
+          propio: x.kind === 'mensaje_a_tio',
+        }))
     } catch (e) {
       console.error('apicultura: no se pudieron leer los mensajes del tío:', e)
     }
@@ -116,5 +138,9 @@ export async function GET(req: NextRequest) {
     unidades: envios.reduce((s, e) => s + e.unidades, 0),
   }
 
-  return NextResponse.json({ ok: true, days, resumen, envios, mensajes })
+  return NextResponse.json({
+    ok: true,
+    rango: { desde: desde.toISOString(), hasta: hasta ? hasta.toISOString() : null },
+    resumen, envios, mensajes,
+  })
 }

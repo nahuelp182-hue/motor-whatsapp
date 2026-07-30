@@ -328,6 +328,7 @@ model EnvioApicola {
   wamid           String?
   wa_entregado    Boolean   @default(false)
   wa_leido        Boolean   @default(false)   // el tío además lo abrió (si tiene los acuses de lectura activos)
+  mensaje         String?                     // el texto tal cual le llegó al tío (sin el PDF)
   wa_intentos     Int       @default(0)
   wa_detalle      String?   // motivo cuando no se entregó
   enviado_at      DateTime?
