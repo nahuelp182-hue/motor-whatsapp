@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { SidebarNav } from '@/components/SidebarNav'
 import { FondoHolografico } from '@/components/FondoHolografico'
+import { PanelApicultura } from '@/components/PanelApicultura'
 
 type Mensaje = {
   ts: string; role: 'user' | 'bot'; text: string; derivar?: boolean; accion?: string
@@ -53,6 +54,10 @@ function telLindo(s: string): string {
 }
 
 export default function ConversacionesPage() {
+  // Dos vistas distintas conviven acá: los clientes que atiende el bot y los despachos
+  // apícolas al tío. No se mezclan en la misma lista porque no se miran por lo mismo:
+  // en una interesa la charla, en la otra si el aviso llegó y si el paquete salió.
+  const [vista, setVista] = useState<'bot' | 'apicultura'>('bot')
   const [days, setDays] = useState(1)
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
@@ -75,7 +80,7 @@ export default function ConversacionesPage() {
     }
   }, [days])
 
-  useEffect(() => { cargar() }, [cargar])
+  useEffect(() => { if (vista === 'bot') cargar() }, [cargar, vista])
 
   const todas = data?.conversaciones ?? []
   const t = data?.totales
@@ -99,10 +104,12 @@ export default function ConversacionesPage() {
         {/* Header */}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold">Conversaciones del bot · WhatsApp</h1>
+            <h1 className="text-xl font-semibold">
+              {vista === 'bot' ? 'Conversaciones del bot · WhatsApp' : 'Despachos apícolas · WhatsApp al tío'}
+            </h1>
             <a href="/dashboard" className="text-xs text-white/40 hover:text-white/70">← Volver al dashboard</a>
           </div>
-          <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-2 ${vista === 'bot' ? '' : 'hidden'}`}>
             <div className="flex rounded-xl border border-white/[0.08] bg-[#0e0e16] p-1">
               {RANGOS.map((r) => (
                 <button
@@ -123,8 +130,27 @@ export default function ConversacionesPage() {
           </div>
         </div>
 
+        {/* Pestañas */}
+        <div className="mb-4 flex gap-1 border-b border-white/[0.06]">
+          {([['bot', 'Clientes (bot)'], ['apicultura', 'Apicultura']] as const).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setVista(id)}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm transition ${
+                vista === id
+                  ? 'border-white/60 text-white'
+                  : 'border-transparent text-white/45 hover:text-white/75'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {vista === 'apicultura' && <PanelApicultura />}
+
         {/* Filtros por categoría (clickeables) + búsqueda */}
-        {t && (
+        {vista === 'bot' && t && (
           <div className="mb-4 space-y-3">
             <div className="flex flex-wrap gap-2">
               {FILTROS.map((f) => {
@@ -154,14 +180,14 @@ export default function ConversacionesPage() {
           </div>
         )}
 
-        {loading && <p className="text-sm text-white/40">Cargando…</p>}
-        {!loading && convs.length === 0 && (
+        {vista === 'bot' && loading && <p className="text-sm text-white/40">Cargando…</p>}
+        {vista === 'bot' && !loading && convs.length === 0 && (
           <p className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 text-sm text-white/40">
             No hay conversaciones en este período.
           </p>
         )}
 
-        {!loading && convs.length > 0 && (
+        {vista === 'bot' && !loading && convs.length > 0 && (
           <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
             {/* Lista */}
             <div className={`space-y-1.5 ${actual ? 'hidden lg:block' : ''}`}>

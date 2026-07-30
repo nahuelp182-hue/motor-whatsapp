@@ -312,3 +312,28 @@ model WaStatus {
 
   @@index([estado, ts])
 }
+
+/// Espejo en Postgres de los envíos apícolas que el VPS lleva en SQLite. Existe para
+/// que el panel pueda mostrarlos: el VPS no es alcanzable desde Vercel (vive detrás de
+/// Tailscale), así que empuja su estado en cada ciclo.
+model EnvioApicola {
+  interno         Int       @id
+  shipment_id     String
+  ml_order_id     String
+  fecha_compra    DateTime
+  cliente         String
+  items           String
+  unidades        Int       @default(1)
+  estado          String    // label_ok | sent | wa_fallido | label_timeout | pendiente
+  wamid           String?
+  wa_entregado    Boolean   @default(false)
+  wa_intentos     Int       @default(0)
+  wa_detalle      String?   // motivo cuando no se entregó
+  enviado_at      DateTime?
+  despachado      Boolean   @default(false)
+  avisos_tio      Int       @default(0)
+  escalados       Int       @default(0)
+  actualizado     DateTime  @updatedAt
+
+  @@index([fecha_compra])
+}
