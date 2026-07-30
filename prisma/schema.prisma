@@ -287,3 +287,28 @@ model WidgetLead {
   @@unique([widget_id, email])
   @@index([createdAt])
 }
+
+/// Latido de procesos externos (el VPS de ventas apícola). Si deja de latir,
+/// el cron de Vercel avisa: la ausencia de avisos deja de ser indistinguible
+/// de "no hubo ventas".
+model Heartbeat {
+  nombre    String   @id
+  ts        DateTime @default(now())
+  meta      Json?
+  alertado  DateTime?
+}
+
+/// Estado de entrega REAL de los mensajes de WhatsApp (webhook `statuses`).
+/// La Cloud API devuelve wamid aunque después el mensaje falle (131047 fuera
+/// de ventana): sin esto, "enviado" no significa "llegó".
+model WaStatus {
+  wamid       String   @id
+  estado      String   // sent | delivered | read | failed
+  destino     String?
+  error_code  Int?
+  error_desc  String?
+  ts          DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([estado, ts])
+}

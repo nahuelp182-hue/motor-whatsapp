@@ -60,6 +60,7 @@ const EMAIL_EMPRESA = process.env.EMAIL_EMPRESA ?? 'info.micelium@gmail.com'
 const TIO_WA    = process.env.WA_TIO    ?? '5493563413104'
 const NAHUEL_WA = process.env.WA_NAHUEL ?? '5493522412228'
 const last10 = (s: string): string => (s || '').replace(/\D/g, '').slice(-10)
+
 // Texto que le llega a la empresa cuando el cliente toca el botón (para identificarlo en métricas)
 const WA_LINK = `https://wa.me/${EMPRESA_WA}?text=${encodeURIComponent('Hola, vengo del asistente virtual')}`
 const WA_BTN_TEXT = 'Chatear con equipo' // ≤20 chars (límite de botón cta_url)
@@ -674,6 +675,74 @@ export async function GET(req: NextRequest) {
 }
 
 // POST — mensajes entrantes de WhatsApp Cloud API
+// ─── Acuses de entrega de WhatsApp ───
+type EstadoWa = {
+  id?: string
+  status?: string
+  recipient_id?: string
+  timestamp?: string
+  errors?: Array<{ code?: number; title?: string; message?: string }>
+}
+
+/**
+ * Guarda el destino final de cada mensaje que mandamos. Es la única fuente de verdad
+ * sobre si un mensaje LLEGÓ: la Cloud API contesta 200 + wamid aun cuando después no
+ * entrega (131047 = fuera de la ventana de 24 h), y así se perdieron avisos de despacho
+ * sin que nadie se enterara.
+ *
+ * Un `failed` a un número interno (el tío, Nahuel) se avisa al toque: ahí no llega el
+ * aviso de una venta y hay reputación de ML en juego. Los fallos a clientes no alertan
+ * (serían ruido: números mal cargados, gente que bloqueó, etc.).
+ */
+async function registrarStatuses(statuses: EstadoWa[]): Promise<void> {
+  for (const st of statuses) {
+    const wamid = st.id
+    const estado = st.status
+    if (!wamid || !estado) continue
+
+    const err = st.errors?.[0]
+    const destino = st.recipient_id ?? null
+    const datos = {
+      estado,
+      destino,
+      error_code: err?.code ?? null,
+      error_desc: [err?.title, err?.message].filter(Boolean).join(' — ') || null,
+      ts: st.timestamp ? new Date(Number(st.timestamp) * 1000) : new Date(),
+    }
+
+    try {
+      await prisma.waStatus.upsert({
+        where: { wamid },
+        update: datos,
+        create: { wamid, ...datos },
+      })
+    } catch (e) {
+      console.error('registrarStatuses upsert falló:', wamid, e)
+      continue
+    }
+
+    if (estado !== 'failed') continue
+
+    const d10 = last10(destino ?? '')
+    const interno = d10 === last10(TIO_WA) || d10 === last10(NAHUEL_WA)
+    console.error(`[wa] mensaje FALLIDO a ${destino}:`, datos.error_code, datos.error_desc)
+    if (!interno) continue
+
+    const quien = d10 === last10(TIO_WA) ? 'el tío' : 'vos'
+    await notifyNahuel(
+      `🔴 WhatsApp NO entregado a ${quien}`,
+      `Un mensaje quedó sin entregar.\n\n` +
+        `Destino: ${destino}\nError: ${datos.error_code ?? '?'} — ${datos.error_desc ?? 'sin detalle'}\n` +
+        `wamid: ${wamid}\n\n` +
+        (datos.error_code === 131047
+          ? 'Código 131047 = se mandó como mensaje libre fuera de la ventana de 24 h. ' +
+            'Fuera de esa ventana SOLO entregan las plantillas aprobadas.\n\n'
+          : '') +
+        'Si era el aviso de una venta, esa etiqueta no llegó: revisá el despacho a mano.',
+    )
+  }
+}
+
 export async function POST(req: NextRequest) {
   let body: {
     object?: string
@@ -694,7 +763,7 @@ export async function POST(req: NextRequest) {
             image?: { id?: string; caption?: string; mime_type?: string }
             document?: { id?: string; caption?: string; filename?: string; mime_type?: string }
           }>
-          statuses?: Array<unknown>
+          statuses?: EstadoWa[]
         }
       }>
     }>
@@ -731,6 +800,15 @@ export async function POST(req: NextRequest) {
       if (change.field !== 'messages') continue
       const value = change.value
       if (!value) continue
+
+      // ─── Acuses de entrega (sent/delivered/read/failed) ───
+      // Se ignoraban. Ese era el agujero: la Cloud API devuelve wamid con HTTP 200
+      // aunque el mensaje después falle (131047 = mensaje libre fuera de la ventana
+      // de 24 h), así que el emisor creía haber avisado y al tío no le llegaba nada.
+      // Acá queda registrado el destino final de cada mensaje.
+      if (value.statuses?.length) {
+        tareas.push(() => registrarStatuses(value.statuses as EstadoWa[]))
+      }
 
       for (const msg of value.messages ?? []) {
         const from = msg.from ?? ''
