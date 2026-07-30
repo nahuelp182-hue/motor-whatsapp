@@ -1,0 +1,49 @@
+# Dead-man's switch del sistema de ventas apícola del VPS.
+#
+# Vive acá y no en vercel.json porque el plan Hobby de Vercel solo admite crons
+# diarios, y enterarse un día después de que el despacho dejó de funcionar no
+# sirve: una venta sin despachar pega en la reputación de Mercado Libre.
+#
+# GitHub Actions es además una tercera infraestructura, independiente tanto del
+# VPS (Hetzner) como de Vercel: si cualquiera de los dos se cae, este corre igual.
+name: Watchdog de despacho
+
+on:
+  schedule:
+    - cron: '17 * * * *' # cada hora (minuto 17 para esquivar el pico en punto)
+  workflow_dispatch: # permite dispararlo a mano desde la pestaña Actions
+
+jobs:
+  latido:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar el watchdog
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta el secret CRON_SECRET en el repositorio"
+            exit 1
+          fi
+
+          respuesta=$(curl -sS --max-time 30 -w '\n%{http_code}' \
+            https://mw-micelium.vercel.app/api/cron/despacho-watchdog \
+            -H "Authorization: Bearer $CRON_SECRET")
+
+          codigo=$(echo "$respuesta" | tail -n1)
+          cuerpo=$(echo "$respuesta" | sed '$d')
+          echo "HTTP $codigo"
+          echo "$cuerpo"
+
+          # Un fallo acá NO es una falsa alarma que se pueda ignorar: significa que
+          # el vigilante mismo no está vigilando. Se marca en rojo para que se vea.
+          if [ "$codigo" != "200" ]; then
+            echo "::error::El watchdog no respondió 200 (respondió $codigo)"
+            exit 1
+          fi
+
+          # El endpoint ya avisa por mail/Telegram/WhatsApp si el VPS está caído;
+          # esto solo lo deja visible en el historial de Actions.
+          if echo "$cuerpo" | grep -q '"caido":true'; then
+            echo "::warning::El VPS de ventas apícola figura CAÍDO (la alerta ya salió)"
+          fi
