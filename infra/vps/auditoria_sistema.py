@@ -114,18 +114,23 @@ def cred_fb_page():
 
 
 def fb_paginas():
-    """El token de usuario, ¿puede LISTAR las paginas?
+    """El token de usuario, ¿puede LISTAR las paginas? Es INFORMATIVO, no una falla.
 
-    Chequeo aparte del token en si, porque son dos fallas distintas que se veian igual:
-    el 31/07/2026 los dos tokens de Meta respondian 200 y sin embargo el sync del CRM
-    reportaba "No hay paginas FB" en cada corrida. La causa es que me/accounts devuelve
-    vacio (falta el permiso pages_show_list, o la pagina quedo fuera del alcance del
-    usuario), aunque el fb_page_token guardado funciona perfecto cuando se usa directo.
+    Historia, porque explica por que quedo en aviso y no en rojo. El 31/07/2026 los dos
+    tokens de Meta respondian 200 y sin embargo el sync del CRM cortaba con "No hay
+    paginas FB" en cada corrida: me/accounts devuelve vacio (falta pages_show_list, o la
+    pagina quedo fuera del alcance del usuario). Ese mismo dia se cambio crm_sync para que
+    use el fb_page_token guardado en vez de enumerar paginas, y el problema desaparecio.
+
+    O sea: hoy NADA depende de este endpoint. Dejarlo en rojo seria un rojo encendido para
+    siempre que no significa nada, y un rojo permanente entrena a ignorar los rojos. Queda
+    como aviso para que se vea si algun dia se arregla el permiso o si algo vuelve a
+    apoyarse en el.
     """
     k = cfg('meta-config.json')['long_lived_token']
     st, cuerpo = http(f'https://graph.facebook.com/v21.0/me/accounts?access_token={k}')
     n = len(json.loads(cuerpo).get('data', [])) if st == 200 else 0
-    return n > 0, f'{n} paginas visibles (HTTP {st})'
+    return n, f'{n} paginas visibles (HTTP {st})'
 
 
 def cred_wa():
@@ -251,6 +256,24 @@ def negocio():
           'resuelve' if r.returncode == 0 else 'NO resuelve', 'resuelve',
           'SSH: tailscale dns status (debe decir disabled) / resolvectl status')
 
+    # Litis se apago el 31/07 con borrado fisico acordado para el 15/08. Un pendiente
+    # anotado en un .txt del VPS es un pendiente que nadie vuelve a leer: se pone aca para
+    # que el panel lo saque a la superficie solo cuando llegue la fecha, y siga insistiendo
+    # hasta que el directorio no exista. Se apaga solo al borrarlo.
+    litis = Path('/opt/litis')
+    if litis.exists():
+        limite = datetime(2026, 8, 15, tzinfo=timezone.utc)
+        vencido = datetime.now(timezone.utc) >= limite
+        dias = (datetime.now(timezone.utc) - limite).days
+        check('litis_pendiente', 'negocio', 'Baja definitiva de litis',
+              'warn' if vencido else 'ok',
+              f'{dias} dias pasada la fecha' if vencido else 'la ventana vence el 15/08',
+              'borrado el 15/08/2026',
+              'Confirmado por Nahuel el 31/07. Backup en '
+              '/root/backup/litis-baja-20260731.tar.gz. Para cerrarlo: rm -rf /opt/litis && '
+              'rm /etc/systemd/system/litis.service && borrar el registro DNS litis en '
+              'Cloudflare.' if vencido else None)
+
 
 def main():
     inicio = time.time()
@@ -267,12 +290,18 @@ def main():
     cred('cred_fb_page', 'Token de la pagina de Facebook', cred_fb_page,
          'Regenerar el token de pagina en Meta for Developers (Graph API Explorer) y '
          'actualizar fb_page_token en /root/.claude/meta-config.json')
-    cred('fb_paginas', 'El token de usuario puede listar las paginas', fb_paginas,
-         'me/accounts devuelve vacio: falta el permiso pages_show_list en el token de '
-         'usuario, o la pagina quedo fuera de su alcance. Es lo que hace que crm_sync.py '
-         'reporte "No hay paginas FB" en cada corrida. El fb_page_token guardado SI '
-         'funciona, asi que la salida corta es que crm_sync use ese token directo en vez '
-         'de enumerar paginas.')
+    # Este NO pasa por cred(): no es una credencial rota, es informacion. Va como aviso.
+    try:
+        n, detalle = fb_paginas()
+        check('fb_paginas', 'credenciales', 'El token de usuario puede listar las paginas',
+              'ok' if n else 'warn', detalle, '> 0',
+              None if n else
+              'Falta pages_show_list en el token de usuario, o la pagina quedo fuera de su '
+              'alcance. NO rompe nada: crm_sync usa el fb_page_token directo desde el '
+              '31/07. Queda a la vista por si algo vuelve a apoyarse en me/accounts.')
+    except Exception as e:
+        check('fb_paginas', 'credenciales', 'El token de usuario puede listar las paginas',
+              'warn', f'{type(e).__name__}: {e}'[:150])
     cred('cred_wa', 'Token de WhatsApp Cloud', cred_wa,
          'Regenerar en Meta for Developers y actualizar /root/.claude/wa-cloud-config.json')
     cred('cred_tn', 'Token de Tiendanube', cred_tn,
