@@ -116,19 +116,19 @@ model MessageLog {
 // Respuesta de un cliente tras la plantilla resena_post_entrega — capturada
 // por el webhook de WhatsApp cuando contesta dentro de la ventana de espera.
 model Review {
-  id          String    @id @default(cuid())
-  store_id    String
-  customer_id String?
-  autor       String?
-  rating      Int?
-  texto       String
+  id             String    @id @default(cuid())
+  store_id       String
+  customer_id    String?
+  autor          String?
+  rating         Int?
+  texto          String
   source         String    @default("whatsapp") // whatsapp | google | form
   approved       Boolean   @default(true)
   fecha          DateTime? // fecha real de la reseña (Google la trae; WhatsApp usa createdAt)
-  external_id    String?   // id de la reseña en su fuente (Google) para no duplicar en cada sync
-  product_id     String?   // id de producto de Tiendanube al que apunta la reseña
-  product_nombre String?   // nombre del producto guardado al momento, para el panel
-  foto_url       String?   // foto que sube el cliente con la reseña (Vercel Blob)
+  external_id    String? // id de la reseña en su fuente (Google) para no duplicar en cada sync
+  product_id     String? // id de producto de Tiendanube al que apunta la reseña
+  product_nombre String? // nombre del producto guardado al momento, para el panel
+  foto_url       String? // foto que sube el cliente con la reseña (Vercel Blob)
   createdAt      DateTime  @default(now())
 
   store    Store     @relation(fields: [store_id], references: [id])
@@ -272,11 +272,11 @@ model Widget {
   id       String @id @default(cuid())
   store_id String
 
-  tipo     String  // slug del tipo, ver lib/widgets/tipos.ts
-  nombre   String  // etiqueta interna, para reconocerlo en la lista del panel
-  contexto String  // guias | tienda | producto
-  config   Json    // valores de los campos declarados por el tipo
-  reglas   Json?   // dónde/cuándo aparece: rutas, dispositivo, ventana de fechas
+  tipo     String // slug del tipo, ver lib/widgets/tipos.ts
+  nombre   String // etiqueta interna, para reconocerlo en la lista del panel
+  contexto String // guias | tienda | producto
+  config   Json // valores de los campos declarados por el tipo
+  reglas   Json? // dónde/cuándo aparece: rutas, dispositivo, ventana de fechas
 
   activo Boolean @default(false) // nace apagado: nada sale a producción sin un clic explícito
   orden  Int     @default(0)
@@ -294,8 +294,8 @@ model Widget {
 model WidgetEvent {
   id        String   @id @default(cuid())
   widget_id String
-  tipo      String   // impresion | interaccion | conversion
-  vid       String?  // visitante de primera parte, para cruzar con Visitor
+  tipo      String // impresion | interaccion | conversion
+  vid       String? // visitante de primera parte, para cruzar con Visitor
   meta      Json?
   createdAt DateTime @default(now())
 
@@ -308,7 +308,7 @@ model WidgetLead {
   id        String   @id @default(cuid())
   widget_id String
   email     String
-  dato      Json?    // lo que pidiera el widget además del email
+  dato      Json? // lo que pidiera el widget además del email
   createdAt DateTime @default(now())
 
   // Sin esta relación no había clave foránea: borrar un widget dejaba sus leads —emails de
@@ -358,23 +358,23 @@ model JobRun {
 /// el cron de Vercel avisa: la ausencia de avisos deja de ser indistinguible
 /// de "no hubo ventas".
 model Heartbeat {
-  nombre    String   @id
-  ts        DateTime @default(now())
-  meta      Json?
-  alertado  DateTime?
+  nombre   String    @id
+  ts       DateTime  @default(now())
+  meta     Json?
+  alertado DateTime?
 }
 
 /// Estado de entrega REAL de los mensajes de WhatsApp (webhook `statuses`).
 /// La Cloud API devuelve wamid aunque después el mensaje falle (131047 fuera
 /// de ventana): sin esto, "enviado" no significa "llegó".
 model WaStatus {
-  wamid       String   @id
-  estado      String   // sent | delivered | read | failed
-  destino     String?
-  error_code  Int?
-  error_desc  String?
-  ts          DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  wamid      String   @id
+  estado     String // sent | delivered | read | failed
+  destino    String?
+  error_code Int?
+  error_desc String?
+  ts         DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([estado, ts])
 }
@@ -383,25 +383,70 @@ model WaStatus {
 /// que el panel pueda mostrarlos: el VPS no es alcanzable desde Vercel (vive detrás de
 /// Tailscale), así que empuja su estado en cada ciclo.
 model EnvioApicola {
-  interno         Int       @id
-  shipment_id     String
-  ml_order_id     String
-  fecha_compra    DateTime
-  cliente         String
-  items           String
-  unidades        Int       @default(1)
-  estado          String    // label_ok | sent | wa_fallido | label_timeout | pendiente
-  wamid           String?
-  wa_entregado    Boolean   @default(false)
-  wa_leido        Boolean   @default(false)   // el tío además lo abrió (si tiene los acuses de lectura activos)
-  mensaje         String?                     // el texto tal cual le llegó al tío (sin el PDF)
-  wa_intentos     Int       @default(0)
-  wa_detalle      String?   // motivo cuando no se entregó
-  enviado_at      DateTime?
-  despachado      Boolean   @default(false)
-  avisos_tio      Int       @default(0)
-  escalados       Int       @default(0)
-  actualizado     DateTime  @updatedAt
+  interno      Int       @id
+  shipment_id  String
+  ml_order_id  String
+  fecha_compra DateTime
+  cliente      String
+  items        String
+  unidades     Int       @default(1)
+  estado       String // label_ok | sent | wa_fallido | label_timeout | pendiente
+  wamid        String?
+  wa_entregado Boolean   @default(false)
+  wa_leido     Boolean   @default(false) // el tío además lo abrió (si tiene los acuses de lectura activos)
+  mensaje      String? // el texto tal cual le llegó al tío (sin el PDF)
+  wa_intentos  Int       @default(0)
+  wa_detalle   String? // motivo cuando no se entregó
+  enviado_at   DateTime?
+  despachado   Boolean   @default(false)
+  avisos_tio   Int       @default(0)
+  escalados    Int       @default(0)
+  actualizado  DateTime  @updatedAt
 
   @@index([fecha_compra])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auditoría del sistema: una corrida completa de chequeos, disparada a mano desde el panel
+// o sola una vez por día.
+//
+// POR QUÉ SE GUARDA EL HISTORIAL Y NO SOLO EL ÚLTIMO RESULTADO
+//
+// Un chequeo que falla una vez y uno que falla todos los días desde hace un mes piden
+// reacciones opuestas, y con solo el estado actual son indistinguibles. El historial
+// permite además el diff contra la corrida anterior: "esto empeoró desde ayer" es la
+// pregunta que se hace cuando algo se rompió y no se sabe cuándo.
+model AuditoriaRun {
+  id          String           @id @default(cuid())
+  ts          DateTime         @default(now())
+  origen      String // manual | programada
+  duracion_ms Int?
+  total       Int              @default(0)
+  ok          Int              @default(0)
+  warn        Int              @default(0)
+  fail        Int              @default(0)
+  checks      AuditoriaCheck[]
+
+  @@index([ts])
+}
+
+// Un chequeo dentro de una corrida.
+//
+// `hint` no es opcional por capricho de diseño: un panel que dice "esto está roto" sin
+// decir qué hacer obliga a reconstruir el diagnóstico desde cero cada vez. El patrón viene
+// de crm_watchdog.py, que ya guardaba el comando exacto para investigar cada falla.
+model AuditoriaCheck {
+  id     String       @id @default(cuid())
+  run_id String
+  run    AuditoriaRun @relation(fields: [run_id], references: [id], onDelete: Cascade)
+  clave  String // identificador estable: sirve para seguir un chequeo entre corridas
+  grupo  String // automatizaciones | credenciales | negocio | infra
+  titulo String
+  estado String // ok | warn | fail
+  valor  String? // lo que se midió
+  umbral String? // contra qué se comparó
+  hint   String? // cómo se arregla
+
+  @@index([run_id])
+  @@index([clave, id])
 }
