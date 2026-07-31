@@ -220,6 +220,36 @@ export const CATALOGO: Record<string, EntradaCatalogo> = {
     origen: 'vps', maxHoras: 200,
     que: 'Vigila que el backup de rescate no se quede viejo',
   },
+
+  // ── Tareas programadas de Windows ───────────────────────────────────────────────────
+  // Corren en una PC de escritorio que se apaga y se suspende, así que los márgenes son
+  // MÁS ANCHOS que la cadencia real: una tarea diaria que no corrió porque la máquina
+  // estaba dormida no es una falla del sistema. `heartbeat_tareas.ps1` además distingue
+  // "no llegó a correr" (0x800710E0) de "corrió y falló", y solo lo segundo es rojo.
+  micelium_crm_pull: {
+    origen: 'windows', maxHoras: 50,
+    que: 'Baja el crm.db del VPS a la PC',
+  },
+  miceliumbotwaalerta: {
+    origen: 'windows', maxHoras: 50,
+    que: 'Avisa si el bot de WhatsApp dejó de responder',
+  },
+  micelium_redditradar_pull: {
+    origen: 'windows', maxHoras: 200,
+    que: 'Baja los verbatims de Reddit y el espejo de su base',
+  },
+  micelium_prediccion_semanal: {
+    origen: 'windows', maxHoras: 200,
+    que: 'Predicción de ventas con AutoARIMA',
+  },
+  micelium_ig_reels_semanal: {
+    origen: 'windows', maxHoras: 200,
+    que: 'Renderiza los reels de Instagram de la semana',
+  },
+  miceliumabtestcheck: {
+    origen: 'windows', maxHoras: 200,
+    que: 'Revisa el A/B test activo de Meta Ads',
+  },
 }
 
 /**
