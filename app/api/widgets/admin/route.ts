@@ -16,6 +16,10 @@ const CONTEXTOS: Contexto[] = ['guias', 'tienda', 'producto']
 const PAGINAS = [
   { ruta: '/guia', titulo: 'Índice de guías' },
   ...GUIAS_PUBLICAS.map(g => ({ ruta: `/guia/${g.slug}`, titulo: g.titulo })),
+  // El blog de Tiendanube (/blog/posts/...) corre como contexto "tienda" (LS.template =
+  // "blog-post"). Prefijo /blog = todos los posts. Es el tráfico orgánico de alta intención
+  // (51% de las impresiones del sitio) que hoy no se deriva al producto.
+  { ruta: '/blog', titulo: 'Blog (todos los posts)' },
   { ruta: '/contacto', titulo: 'Contacto' },
 ]
 
