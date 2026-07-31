@@ -17,7 +17,7 @@
 // igual deja su excepción en el log y actualiza el mtime. El exit code no se puede fingir.
 import { NextRequest, NextResponse } from 'next/server'
 import { chequearCron } from '@/lib/cron-auth'
-import { marcarHeartbeat, type Origen } from '@/lib/cron-heartbeat'
+import { marcarHeartbeat, noLlegoACorrer, type Origen } from '@/lib/cron-heartbeat'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -45,16 +45,25 @@ export async function POST(req: NextRequest) {
     ? undefined
     : Number(body.exit_code)
 
+  // Un intento que no llegó a arrancar NO ES UNA CORRIDA, así que no se guarda. Guardarlo
+  // le renovaría la frescura a un job que no hizo nada y lo dejaría en verde para siempre;
+  // el razonamiento completo está en CODIGOS_NO_ARRANCO. Se responde 200 a propósito: el
+  // reportero hizo bien su trabajo al contarlo, no hay nada que reintentar.
+  if (noLlegoACorrer(exitCode)) {
+    return NextResponse.json({ ok: true, slug, registrado: false, ignorado: 'no_arranco' })
+  }
+
   // Reglas, en orden:
   //
-  //  1. Un `ok` booleano EXPLÍCITO manda sobre el exit code. Existe para el caso de las
-  //     tareas de Windows que no llegaron a correr porque la PC estaba suspendida
-  //     (0x800710E0): traen un código distinto de cero pero no son una falla, y contarlas
-  //     como tal pinta de rojo permanente una PC de escritorio que simplemente se apaga.
-  //     Un rojo que está siempre encendido deja de querer decir algo.
+  //  1. Un `ok` booleano EXPLÍCITO manda sobre el exit code. Queda para el reportero que
+  //     sabe algo que el código no dice — por ejemplo un script que sale distinto de cero
+  //     por una advertencia esperada.
   //  2. Si no hay `ok` explícito, manda el exit code.
   //  3. Si no hay ninguno de los dos, es falla. Un reporte sin código —un job matado por
   //     el OOM killer, por ejemplo— no puede contarse como éxito silenciosamente.
+  //
+  // Ojo: `ok` NO sirve para blanquear un intento que no arrancó. Ese caso se cortó arriba,
+  // antes de esta regla, justamente porque antes se lo colaba por acá con ok=true.
   const ok = typeof body.ok === 'boolean'
     ? body.ok
     : exitCode !== undefined && exitCode === 0

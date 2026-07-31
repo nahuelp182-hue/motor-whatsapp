@@ -22,6 +22,35 @@ import { prisma } from '@/lib/prisma'
 export type Origen = 'vercel' | 'vps' | 'github' | 'windows'
 export type Estado = 'ok' | 'atrasado' | 'falla' | 'nunca'
 
+/**
+ * Códigos del Programador de tareas de Windows que significan "no llegó a arrancar", no
+ * "arrancó y falló". Vienen con signo, como los guarda `JobRun.exit_code`.
+ *
+ *   -2147020576 (0x800710E0) el operador rechazó la solicitud: PC suspendida o a batería
+ *        267011 (0x00041303) la tarea nunca corrió
+ *        267045 (0x00041325) la tarea está en cola, todavía no arrancó
+ *
+ * Una corrida así NO SE GUARDA. El estado del panel se deriva de la frescura del último
+ * `JobRun`, y el Programador actualiza su LastRunTime aunque la tarea no haya arrancado:
+ * guardar el intento —con cualquier valor de `ok`— le renueva el reloj a un job que no
+ * hizo nada. Una tarea cuya PC duerme siempre a su hora se quedaba así en verde para
+ * siempre, sin poder llegar nunca a 'atrasado' (visto el 31/07/2026 con
+ * micelium_ig_reels_semanal, parado desde el 26/07 sin que el panel lo marcara).
+ *
+ * Es el mismo principio del encabezado de este archivo: la ausencia tiene que ser la
+ * señal. `heartbeat_tareas.ps1` ya se calla del otro lado; esto es la red de abajo, para
+ * que ningún reportero futuro pueda reabrir el agujero.
+ *
+ * No hay riesgo de colisión con un exit code real: en POSIX van de 0 a 255.
+ */
+export const CODIGOS_NO_ARRANCO = [-2147020576, 267011, 267045] as const
+
+/** ¿Este código dice que el trabajo no llegó a ejecutarse? */
+export function noLlegoACorrer(exitCode: number | undefined | null): boolean {
+  if (exitCode === undefined || exitCode === null) return false
+  return (CODIGOS_NO_ARRANCO as readonly number[]).includes(exitCode)
+}
+
 export type EntradaCatalogo = {
   origen: Origen
   /** Antigüedad máxima tolerada antes de considerarlo caído. */
