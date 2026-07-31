@@ -176,8 +176,16 @@ def infra():
 
     # Backup: el watchdog semanal ya avisa por mail, pero el panel tiene que poder
     # contestar "¿hay backup reciente?" sin ir a buscar un correo viejo.
-    backups = sorted(Path('/root/backup').glob('*'), key=lambda p: p.stat().st_mtime, reverse=True) \
-        if Path('/root/backup').exists() else []
+    # Solo archivos que SON un respaldo. La primera version miraba el archivo mas nuevo del
+    # directorio cualquiera fuera, y un .txt de notas dejado ahi al pasar alcanzaba para que
+    # el chequeo diera verde con el backup real viejo. Un chequeo que se conforma con
+    # cualquier cosa es peor que no tenerlo: da tranquilidad sin respaldarla.
+    exts = ('*.tar.gz', '*.tgz', '*.zip', '*.sql', '*.sql.gz', '*.db', '*.dump')
+    dir_backup = Path('/root/backup')
+    backups = sorted(
+        (f for patron in exts for f in dir_backup.glob(patron)),
+        key=lambda p: p.stat().st_mtime, reverse=True,
+    ) if dir_backup.exists() else []
     if backups:
         h = (time.time() - backups[0].stat().st_mtime) / 3600
         check('backup', 'infra', 'Antiguedad del ultimo backup',

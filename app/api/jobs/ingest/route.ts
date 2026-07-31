@@ -41,12 +41,23 @@ export async function POST(req: NextRequest) {
   const origenCrudo = String(body.origen ?? 'vps')
   const origen = (ORIGENES as string[]).includes(origenCrudo) ? (origenCrudo as Origen) : 'vps'
 
-  // `exit_code` ausente no es lo mismo que 0. Un reporte sin código —un job matado por el
-  // OOM killer, por ejemplo— no puede contarse como éxito silenciosamente.
   const exitCode = body.exit_code === undefined || body.exit_code === null
     ? undefined
     : Number(body.exit_code)
-  const ok = exitCode === undefined ? Boolean(body.ok) : exitCode === 0
+
+  // Reglas, en orden:
+  //
+  //  1. Un `ok` booleano EXPLÍCITO manda sobre el exit code. Existe para el caso de las
+  //     tareas de Windows que no llegaron a correr porque la PC estaba suspendida
+  //     (0x800710E0): traen un código distinto de cero pero no son una falla, y contarlas
+  //     como tal pinta de rojo permanente una PC de escritorio que simplemente se apaga.
+  //     Un rojo que está siempre encendido deja de querer decir algo.
+  //  2. Si no hay `ok` explícito, manda el exit code.
+  //  3. Si no hay ninguno de los dos, es falla. Un reporte sin código —un job matado por
+  //     el OOM killer, por ejemplo— no puede contarse como éxito silenciosamente.
+  const ok = typeof body.ok === 'boolean'
+    ? body.ok
+    : exitCode !== undefined && exitCode === 0
 
   const duracionMs = body.duracion_ms === undefined || body.duracion_ms === null
     ? undefined

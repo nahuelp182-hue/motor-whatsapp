@@ -82,10 +82,17 @@ Get-ScheduledTask | Where-Object { $_.TaskName -match $Patron } | ForEach-Object
         }
     }
 
+    # `ok` va EXPLÍCITO y manda sobre el código. Una tarea que no llegó a correr porque la
+    # PC estaba suspendida trae un código distinto de cero, pero no es una falla: contarla
+    # como tal deja en rojo permanente a una máquina que simplemente se apaga de noche, y
+    # un rojo que está siempre encendido deja de querer decir algo. El código se manda
+    # igual, para no perder el diagnóstico.
+    $noCorrio = ($NoCorrio -contains $hex)
     $cuerpo = @{
         slug      = $slug
         origen    = 'windows'
         exit_code = $code
+        ok        = ($ok -or $noCorrio)
         detalle   = $detalle
     } | ConvertTo-Json -Compress
 
