@@ -11,7 +11,7 @@
 // Los RESULTADOS no vuelven por esta puerta. El script del VPS los manda por su cuenta a
 // /api/auditoria/ingest. Devolverlos también acá sería una segunda fuente de la misma
 // verdad, con la garantía de que algún día dirían cosas distintas.
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
@@ -34,8 +34,8 @@ export async function GET() {
 
   // Diff contra la corrida anterior: "esto empeoró desde ayer" es lo que se quiere saber
   // cuando algo se rompió y no se sabe cuándo. Sin esto hay que comparar dos pantallas a ojo.
-  let empeoraron: string[] = []
-  let mejoraron: string[] = []
+  const empeoraron: string[] = []
+  const mejoraron: string[] = []
   if (ultima && historial.length > 1) {
     const previa = await prisma.auditoriaRun.findUnique({
       where: { id: historial[1].id },
@@ -57,7 +57,7 @@ export async function GET() {
 }
 
 /** Dispara una auditoría en el VPS. Los resultados llegan por /api/auditoria/ingest. */
-export async function POST(req: NextRequest) {
+export async function POST() {
   const token = process.env.AUDIT_VPS_TOKEN
   if (!token) {
     return NextResponse.json(

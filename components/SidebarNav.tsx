@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Sprout,
+  Activity,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -31,6 +32,7 @@ const ITEMS = [
   { href: '/radar', label: 'Radar', icon: Radar },
   { href: '/dashboard/widgets', label: 'Widgets', icon: LayoutGrid },
   { href: '/dashboard/resenas', label: 'Reseñas', icon: Star },
+  { href: '/sistema', label: 'Sistema', icon: Activity },
 ] as const
 
 export function SidebarNav() {
