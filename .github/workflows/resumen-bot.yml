@@ -1,0 +1,49 @@
+# Resumen diario del bot + chequeo de crons caídos + alerta de gasto de Claude.
+#
+# POR QUÉ NO VIVE NI EN VERCEL NI EN EL VPS
+#
+# Esta ruta es la que AVISA cuando algo dejó de correr. Un vigilante alojado en la
+# misma infraestructura que vigila no sirve: si el VPS se cae, el aviso de que el VPS
+# se cayó se cae con él. Misma regla que despacho-watchdog.yml.
+#
+# Vercel tampoco: el plan es Hobby y solo admite 2 crons. El 31/07/2026 había SEIS
+# declarados en vercel.json — o sea que cuatro no corrían, y nadie lo sabía porque el
+# único que podía avisarlo era justamente uno de los que no corría. La tabla
+# CronHeartbeat estaba vacía desde siempre.
+#
+# GitHub Actions es una tercera infraestructura, independiente de Hetzner y de Vercel.
+name: Resumen del bot
+
+on:
+  schedule:
+    - cron: '0 1 * * *' # 22:00 ART del día anterior (el VPS y GH corren en UTC)
+  workflow_dispatch: # se puede disparar a mano desde la pestaña Actions
+
+jobs:
+  resumen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar el resumen
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta el secret CRON_SECRET en el repositorio"
+            exit 1
+          fi
+
+          respuesta=$(curl -sS --max-time 60 -w '\n%{http_code}' \
+            https://mw-micelium.vercel.app/api/cron/resumen-bot \
+            -H "Authorization: Bearer $CRON_SECRET")
+
+          codigo=$(echo "$respuesta" | tail -n1)
+          cuerpo=$(echo "$respuesta" | sed '$d')
+          echo "HTTP $codigo"
+          echo "$cuerpo"
+
+          # Si esto falla, el sistema se queda sin su único chequeo de crons caídos.
+          # Rojo, no warning.
+          if [ "$codigo" != "200" ]; then
+            echo "::error::El resumen no respondió 200 (respondió $codigo)"
+            exit 1
+          fi

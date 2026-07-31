@@ -124,11 +124,15 @@ export async function GET(req: NextRequest) {
     // cuesta varias veces lo que una pregunta suelta, así que el volumen puede parecer
     // normal mientras el costo se dispara.
     //
-    // El default está puesto a ojo a propósito y hay que ajustarlo con el primer dato real
-    // (ver PLAN_ARQUITECTURA.md): un umbral inventado que nunca dispara es tan inútil como
-    // no tenerlo, y uno que dispara todos los días se vuelve ruido y se ignora.
+    // El tope está calibrado contra el gasto REAL medido el 27/07/2026: USD 2,02 en 30 días
+    // (~0,07/día) sobre 199 llamadas. Un tope de 1 USD/día deja margen de ~15× sobre lo
+    // normal: no dispara por un día movido, sí dispara ante una fuga.
+    //
+    // El valor anterior (5) estaba puesto a ojo y era ~75× el gasto real: no habría avisado
+    // nunca. Un umbral que nunca dispara es tan inútil como no tenerlo, y uno que dispara
+    // todos los días se vuelve ruido y arrastra a las otras alertas.
     try {
-      const tope = Number(process.env.CLAUDE_TOPE_USD_DIA ?? 5)
+      const tope = Number(process.env.CLAUDE_TOPE_USD_DIA ?? 1)
       const gasto = await gastoClaude24h()
       if (gasto && gasto.total > tope) {
         const detalle = Object.entries(gasto.porCanal)

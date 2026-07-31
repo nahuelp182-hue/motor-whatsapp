@@ -8,6 +8,11 @@ on:
 jobs:
   typecheck-and-test:
     runs-on: ubuntu-latest
+    # El secreto se expone como env del job porque el contexto `secrets` NO se puede usar en
+    # un `if:` de step: GitHub lo rechaza al parsear y el workflow entero deja de correr.
+    # Vía `env` sí funciona, y de paso el paso que lo usa no necesita declararlo de nuevo.
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,12 +37,24 @@ jobs:
         run: npx eslint .
         continue-on-error: true
 
-      - name: Drift de migraciones
-        # Compara el schema declarado contra las migraciones aplicadas en producción. Si
-        # DATABASE_URL no está configurado como secret del repo, este paso se salta en vez
-        # de fallar en rojo por un problema de configuración de CI, no del código.
-        # Cargar el secret en: Settings → Secrets and variables → Actions → New repository secret.
-        if: ${{ secrets.DATABASE_URL != '' }}
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+      # Compara la base real contra el schema declarado y REPORTA la diferencia.
+      #
+      # NO bloquea todavía, y el motivo importa: al 27/07/2026 hay drift preexistente que
+      # este trabajo no introdujo y que no se puede cerrar sin el Bloque C —
+      #   · 5 tablas que viven solo en producción (ig_diag, wa_procesado, claude_usage,
+      #     radar_snapshot, radar_youtube), creadas a mano fuera de Prisma;
+      #   · gads_cache, también creada a mano: columnas nullable y default de uuid;
+      #   · Widget.updatedAt y una FK de Review con defaults distintos.
+      # Con eso, un check bloqueante quedaría rojo SIEMPRE, y un CI que siempre está rojo se
+      # ignora entero: arrastraría a los checks de typecheck y tests, que sí sirven.
+      #
+      # Cuando el Bloque C adopte esas tablas, sacar `continue-on-error` y esto pasa a ser la
+      # red que impide que vuelva a aparecer una tabla fuera del schema.
+      #
+      # Si DATABASE_URL no está cargado como secret, el paso se saltea en vez de fallar por un
+      # problema de configuración del CI y no del código.
+      # Cargarlo en: Settings → Secrets and variables → Actions → New repository secret.
+      - name: Drift de migraciones (informativo)
+        if: env.DATABASE_URL != ''
+        continue-on-error: true
+        run: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma

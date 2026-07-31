@@ -47,10 +47,23 @@ la cola. El payload ya salió a su propia columna (`payload`, migración
 mirar si esa fila la usa como marca**. La cola vive en `lib/cola-envios.ts`, no en la ruta
 del cron.
 
-**No todos los crons corren en Vercel.** `vercel.json` declara 5 (todos diarios), pero
-`carrito-abandonado`, `resena-post-entrega`, `andreani` e `instalar-widgets-tn` los dispara
-un cron del VPS. Si el VPS se cae, esas automatizaciones dejan de correr **sin ningún error
-visible**. *(Se cierra en los bloques A y B.)*
+**Ningún cron corre en Vercel — `vercel.json` tiene `"crons": []` a propósito.** El plan es
+**Hobby**: tope de 2 crons, solo diarios. El 31/07/2026 había SEIS declarados, o sea que
+cuatro nunca corrieron; y no se detectó porque el único que podía avisarlo (`resumen-bot`)
+era uno de los que no corría. `CronHeartbeat` estaba vacía desde el día uno.
+
+Dónde vive cada cosa ahora, y la regla para decidirlo:
+
+- **GitHub Actions** → todo lo que VIGILA al sistema: `despacho-watchdog.yml`,
+  `resumen-bot.yml`. Un vigilante no puede vivir en la infraestructura que vigila. GH es
+  una tercera infra, independiente de Hetzner y de Vercel.
+- **Cron del VPS** (`curl` con `CRON_SECRET`) → el trabajo de negocio: `carrito-abandonado`,
+  `resena-post-entrega`, `send-pending`, `radar`, `sync-calendario`, `ciclo-cultivo`.
+- **Vercel** → nada. Si alguien vuelve a agregar un cron acá, con el plan Hobby entra en la
+  ruleta de cuáles dos sobreviven.
+
+Al agregar un cron nuevo: elegí GH Actions o VPS según la regla de arriba, y hacelo llamar a
+`marcarHeartbeat()` o no vas a enterarte cuando muera.
 
 **Los previews SÍ escriben en la base de producción — confirmado, no es un supuesto.**
 `vercel env ls` muestra `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DATABASE_URL` y

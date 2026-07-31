@@ -397,6 +397,35 @@ que nada.
 
 ---
 
+## MEDICIONES REALES (27/07/2026)
+
+Por fin números, no estimaciones. Cambian dos decisiones del plan.
+
+| Tabla | Filas | Tamaño |
+|---|---|---|
+| `Visitor` | 5.182 | 4,5 MB |
+| `Visit` | 6.194 | 3,8 MB |
+| `Customer` | 1.150 | 480 kB |
+| `ig_diag` | **592** | **208 kB** |
+| `MessageLog` | 51 | 128 kB |
+
+**`ig_diag` tiene 592 filas y 25 días de historia (02/07 → 27/07).** Eso reordena el plan:
+el "techo de escala" del Bloque F es real como diseño, pero **no es urgente ni de lejos** —
+a este volumen los escaneos sin índice no se notan, y no se van a notar por muchos meses.
+El Bloque F baja de prioridad: la exposición legal (retención de datos personales) pasa a
+ser su motivo principal, no la performance.
+
+**Gasto de Claude, últimos 30 días: USD 2,02 total** (whatsapp 1,58 / instagram 0,23 /
+web 0,19 / web-cliente 0,02; 199 llamadas). El tope `CLAUDE_TOPE_USD_DIA` está en 5 **por
+día**, o sea ~75× el gasto real diario: nunca va a disparar. Bajarlo a **1** deja margen
+de 15× sobre lo normal y sigue avisando ante una fuga.
+
+**Cola de envíos**: 15 `transfer_instructions` en FAILED contra 8 en SENT — **casi dos de
+cada tres fallan**. Vale la pena mirar el `error_details` de esas filas: puede ser una
+plantilla de Meta desaprobada. Es dinero que no se está cobrando.
+
+---
+
 ## Despliegue — la secuencia, en este orden
 
 Se verificó a mano que **cada cambio de `schema.prisma` tiene su migración** (Coupon,

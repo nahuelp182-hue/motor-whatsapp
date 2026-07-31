@@ -1,0 +1,21 @@
+-- Corrección de la migración 20260727140000_integridad_esquema.
+--
+-- QUÉ SALIÓ MAL
+--
+-- Esa migración intentaba sacar la unicidad GLOBAL de Coupon.codigo con:
+--
+--     ALTER TABLE "Coupon" DROP CONSTRAINT IF EXISTS "Coupon_codigo_key";
+--
+-- y reportó éxito. Pero no hizo nada: Prisma implementa `@unique` como un **índice único**,
+-- no como un constraint. `DROP CONSTRAINT` no encuentra un índice, y el `IF EXISTS` —puesto
+-- para que la migración fuera reejecutable— convirtió el fallo en un no-op silencioso.
+--
+-- Resultado: la migración pasó en verde, `schema.prisma` decía que la unicidad era por
+-- tienda, y la base seguía teniendo la unicidad global. Drift invisible, del peor tipo: el
+-- que aparece cuando entra la segunda tienda y su cupón "BIENVENIDA10" choca con el de la
+-- primera.
+--
+-- LA LECCIÓN, que vale más que el arreglo: `IF EXISTS` sobre el objeto equivocado no falla,
+-- miente. Cuando una migración usa IF EXISTS, hay que verificar el estado resultante contra
+-- la base, no confiar en que "aplicó sin errores".
+DROP INDEX IF EXISTS "Coupon_codigo_key";
