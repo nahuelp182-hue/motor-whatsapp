@@ -324,9 +324,67 @@ model WidgetLead {
 // Última corrida conocida de cada cron (VPS o Vercel). Ver lib/cron-heartbeat.ts: es la
 // mitad barata del arreglo al agujero de "el VPS se cae y nada lo nota" (Bloque A del
 // plan de arquitectura). La otra mitad, el aviso, se dispara desde el cron resumen-bot.
+//
+// OJO — HAY DOS MODELOS DE LATIDO EN ESTE ARCHIVO. `CronHeartbeat` (este) nació para los
+// crons; `Heartbeat` (abajo) nació para los procesos del VPS apícola. Hacen lo mismo con
+// nombres distintos, y eso es una fuente de verdad duplicada esperando a divergir. Ambos
+// se unifican en `JobRun` (append-only, con exit code e historial). Hasta que eso salga,
+// NO agregar un tercer modelo de latido: sumar al que corresponda.
 model CronHeartbeat {
   nombre   String   @id
   last_run DateTime @default(now())
   last_ok  Boolean  @default(true)
   detalle  String?
+}
+
+/// Latido de procesos externos (el VPS de ventas apícola). Si deja de latir,
+/// el cron de Vercel avisa: la ausencia de avisos deja de ser indistinguible
+/// de "no hubo ventas".
+model Heartbeat {
+  nombre    String   @id
+  ts        DateTime @default(now())
+  meta      Json?
+  alertado  DateTime?
+}
+
+/// Estado de entrega REAL de los mensajes de WhatsApp (webhook `statuses`).
+/// La Cloud API devuelve wamid aunque después el mensaje falle (131047 fuera
+/// de ventana): sin esto, "enviado" no significa "llegó".
+model WaStatus {
+  wamid       String   @id
+  estado      String   // sent | delivered | read | failed
+  destino     String?
+  error_code  Int?
+  error_desc  String?
+  ts          DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([estado, ts])
+}
+
+/// Espejo en Postgres de los envíos apícolas que el VPS lleva en SQLite. Existe para
+/// que el panel pueda mostrarlos: el VPS no es alcanzable desde Vercel (vive detrás de
+/// Tailscale), así que empuja su estado en cada ciclo.
+model EnvioApicola {
+  interno         Int       @id
+  shipment_id     String
+  ml_order_id     String
+  fecha_compra    DateTime
+  cliente         String
+  items           String
+  unidades        Int       @default(1)
+  estado          String    // label_ok | sent | wa_fallido | label_timeout | pendiente
+  wamid           String?
+  wa_entregado    Boolean   @default(false)
+  wa_leido        Boolean   @default(false)   // el tío además lo abrió (si tiene los acuses de lectura activos)
+  mensaje         String?                     // el texto tal cual le llegó al tío (sin el PDF)
+  wa_intentos     Int       @default(0)
+  wa_detalle      String?   // motivo cuando no se entregó
+  enviado_at      DateTime?
+  despachado      Boolean   @default(false)
+  avisos_tio      Int       @default(0)
+  escalados       Int       @default(0)
+  actualizado     DateTime  @updatedAt
+
+  @@index([fecha_compra])
 }
