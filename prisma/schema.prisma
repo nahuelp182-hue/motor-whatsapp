@@ -321,20 +321,37 @@ model WidgetLead {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Última corrida conocida de cada cron (VPS o Vercel). Ver lib/cron-heartbeat.ts: es la
-// mitad barata del arreglo al agujero de "el VPS se cae y nada lo nota" (Bloque A del
-// plan de arquitectura). La otra mitad, el aviso, se dispara desde el cron resumen-bot.
+// Una fila por CORRIDA de una automatización. Reemplaza a `CronHeartbeat`, que guardaba
+// una sola fila por job (un upsert): servía para "¿corrió?" y para nada más.
 //
-// OJO — HAY DOS MODELOS DE LATIDO EN ESTE ARCHIVO. `CronHeartbeat` (este) nació para los
-// crons; `Heartbeat` (abajo) nació para los procesos del VPS apícola. Hacen lo mismo con
-// nombres distintos, y eso es una fuente de verdad duplicada esperando a divergir. Ambos
-// se unifican en `JobRun` (append-only, con exit code e historial). Hasta que eso salga,
-// NO agregar un tercer modelo de latido: sumar al que corresponda.
-model CronHeartbeat {
-  nombre   String   @id
-  last_run DateTime @default(now())
-  last_ok  Boolean  @default(true)
-  detalle  String?
+// POR QUÉ APPEND-ONLY Y NO UN UPSERT
+//
+// Con una fila por job no se puede responder ninguna de las preguntas que importan cuando
+// algo se rompe: ¿falla siempre o fue una vez?, ¿desde cuándo?, ¿está tardando más que
+// antes? El upsert pisa justamente la evidencia que hace falta para diagnosticar. El costo
+// es que la tabla crece — se poda a los 90 días desde la auditoría diaria.
+//
+// `ok` es redundante con `exit_code` a propósito: los jobs de Vercel y GitHub no tienen
+// exit code (son HTTP), y los del VPS sí. Una sola columna booleana permite preguntar por
+// el estado sin ramificar por origen en cada consulta.
+//
+// NOTA: sigue existiendo `Heartbeat` (abajo), del VPS apícola. Hace lo mismo con otro
+// nombre. No se migró junto con este porque su panel es código recién salido y romperlo
+// no vale el ahorro. Cuando se migre, `Heartbeat` desaparece y este queda como el único.
+// Mientras tanto: NO agregar un tercer modelo de latido.
+model JobRun {
+  id          String    @id @default(cuid())
+  slug        String // identificador del job: 'send-pending', 'crm_cron', ...
+  origen      String // vercel | vps | github | windows
+  inicio      DateTime  @default(now())
+  fin         DateTime?
+  duracion_ms Int?
+  exit_code   Int? // solo los del VPS/Windows; null en los HTTP
+  ok          Boolean   @default(true)
+  detalle     String? // últimas líneas de salida, o el error
+
+  @@index([slug, inicio])
+  @@index([inicio])
 }
 
 /// Latido de procesos externos (el VPS de ventas apícola). Si deja de latir,
