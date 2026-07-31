@@ -31,7 +31,7 @@ const PUBLICOS = new Set([
 // cómo les fue. Va la ruta COMPLETA y no '/api/jobs' por la misma razón que los widgets:
 // el prefijo dejaría abierta cualquier ruta futura bajo /api/jobs, incluida una de lectura
 // que expondría el estado entero del sistema. La ruta valida con chequearCron.
-const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks', '/api/asistente', '/api/acceso', '/api/contacto', '/api/widgets/config', '/api/widgets/evento', '/api/widgets/resena', '/api/presencia', '/api/despacho', '/api/jobs/ingest', '/api/auditoria/ingest']
+const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks', '/api/asistente', '/api/acceso', '/api/contacto', '/api/widgets/config', '/api/widgets/evento', '/api/widgets/resena', '/api/presencia', '/api/despacho', '/api/jobs/ingest', '/api/auditoria/ingest', '/api/ia/uso']
 
 // Capa pública de contenido: indexable y sin login a propósito. El conocimiento general es
 // lo que construye confianza antes de la compra; lo privado (manuales del equipo, pedidos)

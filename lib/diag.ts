@@ -6,6 +6,7 @@
 // para tocarlos.
 export { getPool } from '@/lib/db'
 import { getPool } from '@/lib/db'
+import { costoDe } from '@/lib/precios-ia'
 
 /** Registra un evento de diagnóstico. Nunca lanza. */
 export async function diag(kind: string, sender: string, detail: unknown): Promise<void> {
@@ -22,19 +23,19 @@ export async function diag(kind: string, sender: string, detail: unknown): Promi
   }
 }
 
-// Precios Claude Haiku 4.5 (USD por token). Ajustar si cambia el modelo.
-const PRICE = {
-  input: 1.0 / 1_000_000,
-  output: 5.0 / 1_000_000,
-  cache_read: 0.1 / 1_000_000,
-  cache_write: 1.25 / 1_000_000,
-}
-
+// Los precios salían de una constante local fija a Haiku 4.5. Ahora viven en
+// lib/precios-ia.ts, junto con los de los otros modelos y proveedores que entraron al
+// medir los scripts del VPS: una tabla de precios repetida en cinco archivos se
+// desactualiza en cuatro de ellos.
 type Usage = {
   input_tokens?: number | null
   output_tokens?: number | null
   cache_read_input_tokens?: number | null
   cache_creation_input_tokens?: number | null
+  // Las búsquedas web se facturan aparte (USD 10 cada 1.000). El bot no las usa hoy, pero
+  // el campo se lee igual: si mañana se le habilita la herramienta, el costo aparece solo
+  // en vez de quedar invisible hasta que alguien mire la factura.
+  server_tool_use?: { web_search_requests?: number | null } | null
 }
 
 /** Registra el consumo de tokens/costo de una llamada a Claude. Nunca lanza. */
@@ -46,11 +47,18 @@ export async function logClaudeUsage(channel: string, model: string, usage: Usag
     const out = usage.output_tokens ?? 0
     const cread = usage.cache_read_input_tokens ?? 0
     const cwrite = usage.cache_creation_input_tokens ?? 0
-    const cost = inp * PRICE.input + out * PRICE.output + cread * PRICE.cache_read + cwrite * PRICE.cache_write
+    const web = usage.server_tool_use?.web_search_requests ?? 0
+    const { usd, modeloDesconocido } = costoDe(model, {
+      input: inp, output: out, cacheLectura: cread, cacheEscritura: cwrite, busquedasWeb: web,
+    })
+    if (modeloDesconocido) {
+      console.error(`[uso-ia] modelo sin precio en la tabla: ${model} — el costo es un piso, no un valor confiable`)
+    }
     await p.query(
-      `INSERT INTO claude_usage (channel, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [channel, model, inp, out, cread, cwrite, cost],
+      `INSERT INTO claude_usage (channel, model, provider, input_tokens, output_tokens,
+         cache_read_tokens, cache_write_tokens, web_search_requests, cost_usd)
+       VALUES ($1,$2,'anthropic',$3,$4,$5,$6,$7,$8)`,
+      [channel, model, inp, out, cread, cwrite, web, usd],
     )
   } catch (e) {
     console.error('logClaudeUsage error:', e)
