@@ -41,6 +41,7 @@ export type EntradaCatalogo = {
  * cadencia, así que su ausencia no significa nada.
  */
 export const CATALOGO: Record<string, EntradaCatalogo> = {
+  // ── Rutas de la app, disparadas por curl desde el cron del VPS ──────────────────────
   'carrito-abandonado': {
     origen: 'vps', maxHoras: 2,
     que: 'Detecta carritos abandonados con teléfono y encola el mensaje',
@@ -72,6 +73,152 @@ export const CATALOGO: Record<string, EntradaCatalogo> = {
   'despacho-watchdog': {
     origen: 'github', maxHoras: 3,
     que: "Dead-man's switch del despacho apícola del VPS",
+  },
+
+  // ── Scripts del VPS, envueltos por run_job.sh ───────────────────────────────────────
+  // Los slugs los deriva `envolver_crontab.py` del comando, no de una lista escrita a
+  // mano: una lista a mano se desincroniza el primer día que alguien agrega un job, y un
+  // catálogo que miente es peor que no tenerlo. Si acá falta un slug que el VPS reporta,
+  // la corrida se guarda igual pero NO se vigila — por eso el test de cobertura.
+
+  // Ventas y clientes
+  ml_autoresponder_vps: {
+    origen: 'vps', maxHoras: 2,
+    que: 'Contesta preguntas de MercadoLibre; lo dudoso queda en borrador',
+  },
+  ml_ventas_apicola: {
+    origen: 'vps', maxHoras: 1,
+    que: 'Venta apícola nueva → etiqueta PDF + WhatsApp al tío + mail',
+  },
+  ml_ventas_apicola_reporte_semana: {
+    origen: 'vps', maxHoras: 200,
+    que: 'Resumen semanal de ventas apícolas',
+  },
+  ml_ventas_apicola_reporte_mes: {
+    origen: 'vps', maxHoras: 800,
+    que: 'Resumen mensual de ventas apícolas',
+  },
+  envio_manuales_sku: {
+    origen: 'vps', maxHoras: 7,
+    que: 'Manda el manual del producto según SKU a quien compró',
+  },
+  envio_manuales_sku_reporte: {
+    origen: 'vps', maxHoras: 200,
+    que: 'Resumen semanal de manuales enviados',
+  },
+  recordatorio_sucursal: {
+    origen: 'vps', maxHoras: 26,
+    que: 'Avisa a quien no retiró el paquete, antes de que el correo lo devuelva',
+  },
+  crm_cron: {
+    origen: 'vps', maxHoras: 2,
+    que: 'Sincroniza el CRM (TN + WhatsApp + IG/FB) y lo espeja a Notion',
+  },
+
+  // Dinero
+  precios_guardian: {
+    origen: 'vps', maxHoras: 26,
+    que: 'Sube precios de Tiendanube por inflación, con aviso previo para vetar',
+  },
+  mp_ventas_split_email: {
+    origen: 'vps', maxHoras: 400,
+    que: 'Corte de MercadoPago separado en apícola / incubadora / otros',
+  },
+
+  // Publicidad y atribución
+  meta_capi_backfill_live: {
+    origen: 'vps', maxHoras: 13,
+    que: 'Reenvía a Meta las compras que el píxel no registró',
+  },
+  meta_organic_attribution: {
+    origen: 'vps', maxHoras: 26,
+    que: 'Separa cada venta pagada en Meta real vs orgánica',
+  },
+  meta_sync_suscriptores_push: {
+    origen: 'vps', maxHoras: 26,
+    que: 'Sube los emails opt-in de Tiendanube a las audiencias de Meta',
+  },
+  curiosos_cosido_live: {
+    origen: 'vps', maxHoras: 13,
+    que: 'Cose cada orden de Tiendanube con el visitante que la originó',
+  },
+
+  // Contenido
+  ig_auto_proponer: {
+    origen: 'vps', maxHoras: 26,
+    que: 'Arma el lote de stories de mañana y lo manda por mail para vetar',
+  },
+  ig_auto_confirmar: {
+    origen: 'vps', maxHoras: 26,
+    que: 'Confirma el lote de stories leyendo los vetos del mail',
+  },
+  ig_auto_publicar: {
+    origen: 'vps', maxHoras: 14,
+    que: 'Publica la story de Instagram del turno (3 por día)',
+  },
+  ig_auto_reel: {
+    origen: 'vps', maxHoras: 26,
+    que: 'Publica el reel del día',
+  },
+  ig_auto_insights: {
+    origen: 'vps', maxHoras: 7,
+    que: 'Guarda las métricas de las stories antes de que expiren a las 24 h',
+  },
+  ig_moderation_email: {
+    origen: 'vps', maxHoras: 200,
+    que: 'Modera comentarios de Instagram; avisa solo si hubo acciones',
+  },
+  fb_mensajes_email: {
+    origen: 'vps', maxHoras: 200,
+    que: 'Lista las consultas de Messenger sin responder',
+  },
+
+  // Inteligencia y reportes
+  daily_report_email: {
+    origen: 'vps', maxHoras: 26,
+    que: 'El reporte de las 9: Meta + Google Ads + Tiendanube + CRM',
+  },
+  vanguardia_diaria: {
+    origen: 'vps', maxHoras: 26,
+    que: 'Digest de las 7 con novedades de ecommerce e IA. Gasta Claude',
+  },
+  radar_saas: {
+    origen: 'vps', maxHoras: 60,
+    que: 'Dos casos de micro-SaaS por mail, 4 veces por semana. Gasta Claude',
+  },
+  reddit_radar_ingest: {
+    origen: 'vps', maxHoras: 26,
+    que: 'Ingesta diaria de Reddit: dolores de clientes y qué se construye',
+  },
+  reddit_radar_semanal: {
+    origen: 'vps', maxHoras: 200,
+    que: 'Destila la semana de Reddit y manda el digest. Gasta Claude',
+  },
+  reddit_radar_descubrir: {
+    origen: 'vps', maxHoras: 800,
+    que: 'Busca subreddits nuevos que valga la pena escuchar',
+  },
+  blog_seo_report_email: {
+    origen: 'vps', maxHoras: 800,
+    que: 'Scorecard mensual del blog: posiciones y cuánta gente capta',
+  },
+  geo_report_email: {
+    origen: 'vps', maxHoras: 800,
+    que: 'Cuánta gente mandan ChatGPT, Perplexity y Gemini a la web',
+  },
+
+  // Vigilantes del propio VPS
+  crm_watchdog: {
+    origen: 'vps', maxHoras: 3,
+    que: 'Vigila el VPS: sync, Notion, DNS, reporte diario y disco',
+  },
+  vanguardia_watchdog: {
+    origen: 'vps', maxHoras: 26,
+    que: 'Avisa si la Vanguardia no salió',
+  },
+  backup_watchdog: {
+    origen: 'vps', maxHoras: 200,
+    que: 'Vigila que el backup de rescate no se quede viejo',
   },
 }
 
