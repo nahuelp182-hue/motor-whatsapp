@@ -23,6 +23,13 @@ jobs:
 
       - run: npm ci
 
+      # Sin esto, @prisma/client queda sin tipos generados y `tsc` falla en cascada: primero
+      # TS2305 (no exporta PrismaClient/Store) y después ~40 TS7006 derivados, porque todo lo
+      # que sale de Prisma pasa a ser implícitamente `any`. En local no se nota: `prisma
+      # generate` vive dentro del script `build`, y el CI nunca buildea.
+      - name: Generar cliente de Prisma
+        run: npx prisma generate
+
       - name: Typecheck
         run: npx tsc --noEmit
 
