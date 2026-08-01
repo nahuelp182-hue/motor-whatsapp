@@ -119,6 +119,45 @@ export async function gastoClaude24h(): Promise<{ total: number; porCanal: Recor
   }
 }
 
+/**
+ * Ventana durante la cual una conversación se sigue considerando originada en el anuncio
+ * que la abrió. El objeto `referral` llega SOLO con el primer mensaje, así que sin esta
+ * ventana el segundo mensaje del mismo cliente ya no sabría de dónde vino.
+ *
+ * Siete días y no las 72 h de la ventana gratuita de Meta: son cosas distintas. Aquella
+ * decide si el mensaje se cobra; esta decide a quién se le atribuye la venta, y una compra
+ * de $288.000 no se decide en tres días.
+ */
+const DIAS_ATRIBUCION_CTWA = 7
+
+/**
+ * Si esta conversación nació de un anuncio click-to-WhatsApp, devuelve el id del anuncio.
+ * Null cuando llegó por su cuenta (Instagram orgánico, la web, ML, el número de siempre).
+ *
+ * Es lo que permite que una venta cerrada por chat deje de contarse como orgánica.
+ * Nunca lanza: ante cualquier problema devuelve null y la conversación se trata como
+ * orgánica, que es el error conservador (subestima Meta, no lo infla).
+ */
+export async function origenCtwa(sender: string): Promise<{ sourceId: string | null; clid: string | null } | null> {
+  try {
+    const p = getPool()
+    if (!p) return null
+    const r = await p.query(
+      `SELECT detail->>'source_id' AS source_id, detail->>'ctwa_clid' AS clid
+         FROM ig_diag
+        WHERE sender = $1 AND kind = 'ctwa_origen'
+          AND ts > now() - ($2 || ' days')::interval
+        ORDER BY ts DESC LIMIT 1`,
+      [sender, String(DIAS_ATRIBUCION_CTWA)],
+    )
+    if (!r.rowCount) return null
+    return { sourceId: r.rows[0].source_id ?? null, clid: r.rows[0].clid ?? null }
+  } catch (e) {
+    console.error('origenCtwa error:', e)
+    return null
+  }
+}
+
 /** Evita responder dos veces el mismo comentario (Meta puede reenviar el webhook). Nunca lanza. */
 export async function comentarioYaRespondido(commentId: string): Promise<boolean> {
   try {

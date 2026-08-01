@@ -114,6 +114,52 @@ describe('la cola no se lee sin tomarla', () => {
   })
 })
 
+describe('el webhook de WhatsApp tiene techo de gasto', () => {
+  // EL ERROR QUE ESTO PREVIENE
+  //
+  // Hasta el 01/08/2026 el webhook de WhatsApp no tenía NINGÚN tope. Dieciséis rutas del
+  // proyecto usaban consumirLimite —asistente, lead, acceso, contacto, track, resena— y
+  // justo la única que llama a Claude por cada mensaje ajeno, no.
+  //
+  // Es la ruta que recibe el tráfico de los anuncios click-to-WhatsApp: el gasto lo dispara
+  // un tercero, no nosotros. Un número que insiste, un auto-responder ajeno que entra en
+  // loop o alguien jugando con el bot consumían la API de Anthropic sin techo, y el aviso
+  // llegaba al día siguiente por el mail de resumen — después de gastado.
+  //
+  // El modo `rechazar` es la otra mitad y por eso se verifica aparte: con el default
+  // (`permitir`), una caída de la base desactiva los dos topes en silencio, que es
+  // exactamente cuando menos mirando estás.
+  const RUTA_WA = join(RAIZ, 'app', 'api', 'webhooks', 'whatsapp', 'route.ts')
+
+  it('consume cupo antes de llamar al modelo', () => {
+    const codigo = codigoSinComentarios(RUTA_WA)
+    expect(codigo, 'El webhook de WhatsApp tiene que consumir cupo antes de pensar')
+      .toContain('consumirLimite(')
+  })
+
+  it('los topes fallan cerrados', () => {
+    const codigo = codigoSinComentarios(RUTA_WA)
+    // Se mira la ventana que sigue a cada llamada en vez de intentar cerrar el paréntesis
+    // con una regex: los argumentos traen paréntesis propios (`${hoyISO()}`) y cualquier
+    // match no-greedy corta antes de tiempo. Falló así al escribirlo.
+    const trozos = codigo.split('consumirLimite(').slice(1)
+    expect(trozos.length).toBeGreaterThan(0)
+    const abiertas = trozos.filter((t) => !t.slice(0, 220).includes("'rechazar'"))
+    expect(
+      abiertas.map((t) => t.slice(0, 60).replace(/\s+/g, ' ')),
+      "Los topes de esta ruta protegen plata: van en modo 'rechazar'. Ver lib/ratelimit.ts",
+    ).toEqual([])
+  })
+
+  it('hay un tope por número y otro global', () => {
+    const codigo = codigoSinComentarios(RUTA_WA)
+    expect(codigo, 'Falta el tope por número: un solo cliente no puede consumir la cuenta')
+      .toMatch(/wa:num:/)
+    expect(codigo, 'Falta el tope global: muchos números chicos suman igual')
+      .toMatch(/wa:global:/)
+  })
+})
+
 describe('el canal de un evento vive en la columna, no en el detalle', () => {
   // EL ERROR QUE ESTO PREVIENE
   //

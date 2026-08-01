@@ -4,7 +4,7 @@ import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
 import {
   diag, getHistorial, logClaudeUsage, hayMensajePosterior, textosDeLaRafaga,
-  wamidEsNuevo, ultimaDerivacion, huboAvisoReciente, type Turno,
+  wamidEsNuevo, ultimaDerivacion, huboAvisoReciente, origenCtwa, type Turno,
 } from '@/lib/diag'
 import { getEstadoAndreani, pareceTrackingAndreani } from '@/lib/andreani'
 import { mensajeSeguimientoGenerico, esEnvioViejo } from '@/lib/seguimiento'
@@ -13,6 +13,7 @@ import { esConsultaIntervencion, RESPUESTA_INTERVENCION } from '@/lib/intervenci
 import { notifyNahuelAdjunto } from '@/lib/notify'
 import { prisma } from '@/lib/prisma'
 import { verificarFirmaMeta } from '@/lib/meta-signature'
+import { consumirLimite } from '@/lib/ratelimit'
 import { log, traceId } from '@/lib/log'
 
 // Ventana de "debounce": si el cliente manda varios mensajes seguidos, esperamos este
@@ -37,6 +38,35 @@ const HORAS_MANUAL_PENDIENTE = 24
 const MAX_TEXTO_DIAG = 2000
 
 const MODELO = 'claude-haiku-4-5-20251001'
+
+// ─── Topes de gasto ───
+// Esta ruta es la única que llama a Claude por cada mensaje entrante, y es la que va a
+// recibir el tráfico de los anuncios click-to-WhatsApp. Hasta el 01/08/2026 no tenía
+// ningún tope: 16 rutas del proyecto usan consumirLimite y justo la que gasta plata por
+// mensaje ajeno, no. Un número que insiste —o alguien jugando con el bot— consumía la API
+// de Anthropic sin techo.
+//
+// Ambos van en modo `rechazar` por la razón que explica lib/ratelimit.ts: si la base no
+// responde no se puede contar, y un control de gasto que falla abierto no es un control.
+// El cliente no queda a la deriva —se lo deriva al equipo—, así que rechazar no le cuesta
+// la atención, solo le cambia el canal.
+
+// Por número y día. Medido sobre 30 días reales (scripts/medir-consumo-wa.js, 01/08/2026):
+// 46 conversaciones, mediana 3 mensajes, percentil 90 = 7, MÁXIMO 22. El tope está en ~3x
+// el máximo observado: un cliente exigente de verdad no lo toca, y el que lo toca no es un
+// cliente. Ojo con bajarlo mirando la mediana: la cola es larga y cortar una charla de 22
+// mensajes es cortarla justo cuando estaba por cerrar.
+const LIM_NUMERO = { n: 60, ventana: 24 * 60 * 60 }
+// Techo de la cuenta entera por día. Es un tope de catástrofe, no de operación: el día más
+// cargado de los últimos 30 tuvo 18 mensajes salientes, así que esto es ~33x. Corta una
+// fuga antes de que llegue a la factura sin rozar la operación normal.
+const LIM_GLOBAL = { n: 600, ventana: 24 * 60 * 60 }
+// Cada cuántas horas se le repite al cliente el aviso de que siga por el canal humano.
+// Repetirlo en cada mensaje gasta WhatsApps —que desde el 01/10/2026 se cobran— y no
+// aporta nada.
+const HORAS_AVISO_LIMITE = 6
+
+const hoyISO = (): string => new Date().toISOString().slice(0, 10)
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -134,11 +164,34 @@ function tnName(name: unknown): string {
 
 // Catálogo en vivo desde Tiendanube: nombre + link a la ficha (SIN precios).
 // La escalera de precios/promos/cuotas se ve en la tienda, no la cotiza el bot.
-async function bloqueCatalogo(): Promise<string> {
+/**
+ * Query string de atribución para los links que el bot le manda al cliente.
+ *
+ * Sin esto, una venta cerrada por chat llega a Tiendanube sin UTM y `lib/attribution.ts` la
+ * clasifica como "Orgánico/Directo". Ese es el mecanismo por el cual el canal de WhatsApp
+ * venía fabricando orgánico falso: la charla la pagó un anuncio, la venta figuraba gratis.
+ *
+ * Los valores están elegidos para que las DOS implementaciones de la regla —esta y
+ * `~/.claude/meta_organic_attribution.py`— ya los entiendan sin tocarlas:
+ *   - `ig`       → cae en meta_ads en ambas (la lista es fb/ig/facebook/instagram)
+ *   - `whatsapp` → cae en otro_utm en ambas; NO en orgánico, que es lo que importa
+ *
+ * Se evita `utm_medium=cpc` a propósito: en las dos implementaciones dispara google_ads.
+ * Acá gana igual el chequeo de source, que corre antes, pero es una trampa para el próximo
+ * que lea esto.
+ */
+function utmDeConversacion(sourceId: string | null | undefined): string {
+  if (sourceId) {
+    return `?utm_source=ig&utm_medium=wa&utm_campaign=ctwa&utm_content=${encodeURIComponent(sourceId)}`
+  }
+  return '?utm_source=whatsapp&utm_medium=bot'
+}
+
+async function bloqueCatalogo(utm: string): Promise<string> {
   const guia =
-    'Cuando el cliente quiera precio/info de un producto, NO cotices números: mandá el LINK de su ficha (ahí ve precio, promos y cuotas). Usá EXACTAMENTE estos links, no los inventes.'
+    'Cuando el cliente quiera precio/info de un producto, NO cotices números: mandá el LINK de su ficha (ahí ve precio, promos y cuotas). Usá EXACTAMENTE estos links, no los inventes ni les saques nada de la parte final (después del ?): sin eso la venta no se puede atribuir.'
   if (!TN_TOKEN) {
-    return `=== CATÁLOGO CON LINKS ===\n(No disponible ahora.) Si preguntan por un producto, remití a la tienda: https://infomicelium.com.ar`
+    return `=== CATÁLOGO CON LINKS ===\n(No disponible ahora.) Si preguntan por un producto, remití a la tienda: https://infomicelium.com.ar${utm}`
   }
   try {
     const res = await fetch(`${TN_BASE}/${TN_STORE}/products?per_page=15&published=true`, {
@@ -152,13 +205,13 @@ async function bloqueCatalogo(): Promise<string> {
       const nombre = tnName(p.name)
       const handle = tnName(p.handle)
       if (!nombre || !handle) continue
-      lines.push(`${i}. ${nombre} → ${TIENDA_BASE}/${handle}/`)
+      lines.push(`${i}. ${nombre} → ${TIENDA_BASE}/${handle}/${utm}`)
       i++
     }
     return `=== CATÁLOGO CON LINKS (Tiendanube, en vivo) ===\n${guia}\n${lines.join('\n')}`
   } catch (e) {
     console.error('TN catálogo error:', e)
-    return `=== CATÁLOGO CON LINKS ===\n(Error al cargar.) Remití a la tienda: https://infomicelium.com.ar`
+    return `=== CATÁLOGO CON LINKS ===\n(Error al cargar.) Remití a la tienda: https://infomicelium.com.ar${utm}`
   }
 }
 
@@ -685,6 +738,22 @@ type EstadoWa = {
 }
 
 /**
+ * Objeto `referral` de la Cloud API: viene adjunto al PRIMER mensaje de una conversación
+ * que nació de un anuncio click-to-WhatsApp (y solo en ese).
+ *
+ * `source_id` es el id del anuncio o del post. `ctwa_clid` es el identificador de click,
+ * que es lo que después permite cerrar el lazo con la venta.
+ */
+type ReferralWa = {
+  source_url?: string
+  source_id?: string
+  source_type?: string
+  headline?: string
+  body?: string
+  ctwa_clid?: string
+}
+
+/**
  * Guarda el destino final de cada mensaje que mandamos. Es la única fuente de verdad
  * sobre si un mensaje LLEGÓ: la Cloud API contesta 200 + wamid aun cuando después no
  * entrega (131047 = fuera de la ventana de 24 h), y así se perdieron avisos de despacho
@@ -762,6 +831,11 @@ export async function POST(req: NextRequest) {
             text?: { body?: string }
             image?: { id?: string; caption?: string; mime_type?: string }
             document?: { id?: string; caption?: string; filename?: string; mime_type?: string }
+            // Presente SOLO cuando la conversación nace de un anuncio click-to-WhatsApp.
+            // Es la única señal que distingue una charla que costó plata de una que llegó
+            // sola: sin esto, una venta cerrada por chat cae en "Orgánico/Directo" en
+            // lib/attribution.ts y el CAC de la campaña queda sin poder calcularse.
+            referral?: ReferralWa
           }>
           statuses?: EstadoWa[]
         }
@@ -825,6 +899,26 @@ export async function POST(req: NextRequest) {
           continue
         }
 
+        // ─── Origen publicitario (click-to-WhatsApp) ───
+        // Se registra ANTES de cualquier filtro por tipo de mensaje: el referral viene
+        // pegado al primer mensaje de la conversación y ese primero puede ser una imagen,
+        // un audio o cualquier cosa que más abajo se descarta con `continue`. Si esto
+        // viviera después de esos filtros, perderíamos justo el dato que hace medible la
+        // campaña.
+        //
+        // Queda en su propio kind y no adentro de 'recibido' para poder contar
+        // conversaciones originadas en ads sin leer el historial entero de nadie.
+        if (msg.referral?.source_id || msg.referral?.ctwa_clid) {
+          await wdiag('ctwa_origen', from, {
+            source_id: msg.referral.source_id ?? null,
+            source_type: msg.referral.source_type ?? null,
+            source_url: msg.referral.source_url ?? null,
+            headline: (msg.referral.headline ?? '').slice(0, 200),
+            ctwa_clid: msg.referral.ctwa_clid ?? null,
+            wamid: msg.id ?? null,
+          })
+        }
+
         // ─── Imágenes / documentos (típicamente comprobante de pago) ───
         // No pasan por el cerebro: se acusan y se reenvían a Mateo para verificar.
         // (Se excluyen los números internos: no mandan comprobantes.)
@@ -874,6 +968,62 @@ export async function POST(req: NextRequest) {
           continue
         }
 
+        // ─── Topes de gasto, ANTES de que el mensaje llegue al cerebro ───
+        // Va acá y no adentro de la tarea: si el cupo se agotó no queremos ni el debounce
+        // de 20 s ni la llamada a Claude. Los números internos ya salieron arriba, así que
+        // esto solo cuenta tráfico de clientes.
+        const cupoNumero = await consumirLimite(
+          `wa:num:${desde10}`, LIM_NUMERO.n, LIM_NUMERO.ventana, 'rechazar',
+        )
+        const cupoGlobal = cupoNumero.permitido
+          ? await consumirLimite(`wa:global:${hoyISO()}`, LIM_GLOBAL.n, LIM_GLOBAL.ventana, 'rechazar')
+          : null
+        if (!cupoNumero.permitido || (cupoGlobal && !cupoGlobal.permitido)) {
+          const agotado = !cupoNumero.permitido ? cupoNumero : cupoGlobal!
+          const cual = !cupoNumero.permitido ? 'numero' : 'global'
+          await wdiag('limite_ia', from, {
+            cual,
+            contador: agotado.contador,
+            limite: agotado.limite,
+            resetEn: agotado.resetEn,
+            // `degradado` = el veredicto no se pudo calcular y salió del modo de falla.
+            // Distinguirlo importa: un pico de degradados es la base caída, no abuso.
+            degradado: agotado.degradado ?? false,
+            texto: texto.slice(0, 200),
+          })
+
+          // Un solo aviso por ventana. El kind es distinto del log de arriba a propósito:
+          // huboAvisoReciente busca por kind, y si compartieran nombre este chequeo se
+          // encontraría a sí mismo y no avisaría nunca.
+          const yaAvisado = await huboAvisoReciente(from, 'limite_ia_aviso', HORAS_AVISO_LIMITE)
+          if (!yaAvisado) {
+            tareas.push(async () => {
+              try {
+                await derivarAlEquipo(from,
+                  'Perdón, se me complicó seguir la conversación por acá 🙈 Escribile directo al equipo así te atienden bien 👇')
+                await wdiag('limite_ia_aviso', from, { cual })
+              } catch (e) { console.error('aviso límite error:', e) }
+            })
+          }
+
+          // El tope global es un evento de cuenta, no de un cliente: si se alcanzó, todos
+          // los que escriban hoy quedan sin bot. Eso hay que enterarse el mismo día.
+          if (cual === 'global' && !(await huboAvisoReciente('sistema', 'limite_ia_global_aviso', 12))) {
+            tareas.push(async () => {
+              try {
+                await wdiag('limite_ia_global_aviso', 'sistema', { contador: agotado.contador, limite: agotado.limite })
+                await notifyNahuel(
+                  '🚧 Tope diario de IA alcanzado en WhatsApp',
+                  `El bot llegó al tope de ${agotado.limite} mensajes del día y dejó de pensar.\n\n` +
+                  `A partir de ahora los clientes que escriban se derivan al equipo hasta mañana.\n\n` +
+                  `Si esto no es un pico real, revisá ig_diag (kind = limite_ia) para ver de qué números viene.`,
+                )
+              } catch (e) { console.error('aviso límite global error:', e) }
+            })
+          }
+          continue
+        }
+
         tareas.push(async () => {
         try {
           // 'recibido'/'pensado' son los kinds que getHistorial() consulta para reconstruir el hilo
@@ -912,7 +1062,14 @@ export async function POST(req: NextRequest) {
           const rafaga = await textosDeLaRafaga(from)
           const mensajeUsuario = rafaga.length > 1 ? rafaga.join('\n') : texto
 
-          const [catalogo, historial] = await Promise.all([bloqueCatalogo(), getHistorial(from)])
+          // Si la charla nació de un anuncio, los links del catálogo salen etiquetados con
+          // ese anuncio; si no, salen etiquetados como WhatsApp. En los dos casos dejan de
+          // llegar a Tiendanube sin UTM, que es lo que las hacía figurar como orgánicas.
+          const origen = await origenCtwa(from)
+          const [catalogo, historial] = await Promise.all([
+            bloqueCatalogo(utmDeConversacion(origen?.sourceId)),
+            getHistorial(from),
+          ])
           const { respuesta, derivar, motivo, manual, seguimiento, feedback, noReconoce } =
             await pensar(mensajeUsuario, catalogo, historial)
 
