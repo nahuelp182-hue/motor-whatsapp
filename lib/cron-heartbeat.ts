@@ -146,6 +146,10 @@ export const CATALOGO: Record<string, EntradaCatalogo> = {
     origen: 'github', maxHoras: 3,
     que: "Dead-man's switch del despacho apícola del VPS",
   },
+  'canales-watchdog': {
+    origen: 'github', maxHoras: 26,
+    que: 'Avisa cuando un canal que venía recibiendo mensajes se queda mudo, y cuando los WhatsApp a clientes no se entregan',
+  },
 
   // ── Scripts del VPS, envueltos por run_job.sh ───────────────────────────────────────
   // Los slugs los deriva `envolver_crontab.py` del comando, no de una lista escrita a

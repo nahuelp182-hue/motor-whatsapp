@@ -88,6 +88,12 @@ model MessageLog {
   error_details String?
   scheduled_for DateTime?
   createdAt     DateTime     @default(now())
+  /// Identificador del mensaje que devuelve la Cloud API al aceptarlo. Es la llave contra
+  /// WaStatus, la única forma de saber si el mensaje LLEGÓ y no solo si Meta lo aceptó: el
+  /// error 131047 (fuera de la ventana de 24 h) responde 200 y no entrega.
+  /// Va en columna propia y NO adentro de `payload`: ese campo ya significa "lo que hay que
+  /// enviar" para la cola, y meterle un segundo sentido repite el problema de `error_details`.
+  wamid         String?
 
   // ── Andamiaje de la cola (solo lo usan las filas de trabajo pendiente) ──
   /// Lo que hay que enviar: { message, phone }. Antes viajaba serializado en error_details.

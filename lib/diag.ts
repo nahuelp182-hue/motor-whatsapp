@@ -8,15 +8,34 @@ export { getPool } from '@/lib/db'
 import { getPool } from '@/lib/db'
 import { costoDe } from '@/lib/precios-ia'
 
+/**
+ * Canal por el que entró o salió el evento. Va en COLUMNA y no adentro del JSON de detalle
+ * por un motivo concreto: hasta el 01/08/2026 la única marca era `detail->>'ch'`, que solo
+ * ponía WhatsApp, así que Instagram y Messenger quedaban indistinguibles entre sí y del
+ * WhatsApp anterior al 11/07. Consecuencia real: **el webhook de Instagram dejó de recibir
+ * mensajes el 11/07 y nadie se enteró durante tres semanas**, porque en la tabla se veía un
+ * total sano que en realidad era todo WhatsApp.
+ *
+ * `null` = fila vieja, anterior a esta columna. No se adivina: no había forma de saber si
+ * era IG o Messenger.
+ */
+export type Canal = 'wa' | 'ig' | 'messenger' | 'web'
+
 /** Registra un evento de diagnóstico. Nunca lanza. */
-export async function diag(kind: string, sender: string, detail: unknown): Promise<void> {
+export async function diag(
+  kind: string,
+  sender: string,
+  detail: unknown,
+  canal?: Canal,
+): Promise<void> {
   try {
     const p = getPool()
     if (!p) return
-    await p.query('INSERT INTO ig_diag (kind, sender, detail) VALUES ($1, $2, $3)', [
+    await p.query('INSERT INTO ig_diag (kind, sender, detail, canal) VALUES ($1, $2, $3, $4)', [
       kind,
       sender,
       JSON.stringify(detail ?? {}).slice(0, 8000),
+      canal ?? null,
     ])
   } catch (e) {
     console.error('diag error:', e)

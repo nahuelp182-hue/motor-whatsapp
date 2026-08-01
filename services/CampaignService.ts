@@ -67,7 +67,8 @@ async function sendWhatsAppCloud(
   token: string,
   to: string,
   message: string
-): Promise<{ ok: boolean; error?: string }> {
+  // Mismo motivo que en sendWhatsAppTemplate: el wamid es la llave contra WaStatus.
+): Promise<{ ok: boolean; error?: string; wamid?: string }> {
   try {
     const res = await fetch(`${WA_API_URL}/${phoneNumberId}/messages`, {
       method: 'POST',
@@ -87,7 +88,8 @@ async function sendWhatsAppCloud(
       const err = await res.json() as { error?: { message: string } }
       return { ok: false, error: err.error?.message ?? `HTTP ${res.status}` }
     }
-    return { ok: true }
+    const data = (await res.json().catch(() => null)) as { messages?: Array<{ id?: string }> } | null
+    return { ok: true, wamid: data?.messages?.[0]?.id }
   } catch (err) {
     return { ok: false, error: String(err) }
   }
@@ -104,7 +106,11 @@ async function sendWhatsAppTemplate(
   // plantilla de reseña, que tiene un botón "Dejar mi reseña" con URL base
   // https://infomicelium.com.ar/{{1}}. Si la plantilla no tiene botón, se omite.
   buttonUrlSuffix?: string
-): Promise<{ ok: boolean; error?: string }> {
+  // Devuelve el `wamid` además del ok. Sin él, un envío de campaña quedaba huérfano: la tabla
+  // WaStatus guarda el acuse de entrega indexado por wamid, así que no había forma de saber si
+  // los 31 pedidos de reseña de un mes habían llegado o rebotado. `ok` solo prueba que Meta
+  // aceptó el pedido — ver el 131047 (fuera de la ventana de 24 h), que devuelve 200 y no entrega.
+): Promise<{ ok: boolean; error?: string; wamid?: string }> {
   try {
     const components: unknown[] = [
       { type: 'body', parameters: bodyParams.map((text) => ({ type: 'text', text })) },
@@ -139,7 +145,8 @@ async function sendWhatsAppTemplate(
       const err = (await res.json()) as { error?: { message: string } }
       return { ok: false, error: err.error?.message ?? `HTTP ${res.status}` }
     }
-    return { ok: true }
+    const data = (await res.json().catch(() => null)) as { messages?: Array<{ id?: string }> } | null
+    return { ok: true, wamid: data?.messages?.[0]?.id }
   } catch (err) {
     return { ok: false, error: String(err) }
   }
@@ -245,6 +252,7 @@ export class CampaignService {
       data: {
         estado: result.ok ? 'SENT' : 'FAILED',
         error_details: result.ok ? marca : `${marca} ${result.error}`,
+        wamid: result.wamid,
       },
     })
     return result.ok
@@ -290,6 +298,7 @@ export class CampaignService {
       data: {
         estado: result.ok ? 'SENT' : 'FAILED',
         error_details: result.ok ? marca : `${marca} ${result.error}`,
+        wamid: result.wamid,
       },
     })
     return result.ok
@@ -465,7 +474,11 @@ export class CampaignService {
 
       await prisma.messageLog.update({
         where: { id: log.id },
-        data: { estado: result.ok ? 'SENT' : 'FAILED', error_details: result.ok ? null : result.error },
+        data: {
+          estado: result.ok ? 'SENT' : 'FAILED',
+          error_details: result.ok ? null : result.error,
+          wamid: result.wamid,
+        },
       })
       if (result.ok) sent++
     }
@@ -606,7 +619,11 @@ export class CampaignService {
 
       await prisma.messageLog.update({
         where: { id: log.id },
-        data: { estado: result.ok ? 'SENT' : 'FAILED', error_details: result.ok ? null : result.error },
+        data: {
+          estado: result.ok ? 'SENT' : 'FAILED',
+          error_details: result.ok ? null : result.error,
+          wamid: result.wamid,
+        },
       })
       if (result.ok) sent++
     }
@@ -781,6 +798,7 @@ export class CampaignService {
       data: {
         estado: result.ok ? 'SENT' : 'FAILED',
         error_details: result.ok ? null : result.error,
+        wamid: result.wamid,
       },
     })
   }

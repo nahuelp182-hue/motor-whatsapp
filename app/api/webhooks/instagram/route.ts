@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
-import { diag, getHistorial, logClaudeUsage, comentarioYaRespondido, type Turno } from '@/lib/diag'
+import { diag, getHistorial, logClaudeUsage, comentarioYaRespondido, type Turno, type Canal } from '@/lib/diag'
 import { verificarFirmaMeta } from '@/lib/meta-signature'
 import { DESCUENTO_TRANSFERENCIA } from '@/lib/tienda'
 
@@ -175,8 +175,16 @@ function sanitizeIGText(t: string): string {
 }
 
 // ─────────── IG send ───────────
-async function enviarMensajeIG(recipientId: string, texto: string) {
-  texto = sanitizeIGText(texto)
+/**
+ * Manda un DM. Sirve para Instagram y para Messenger: la Send API es la misma y en los dos
+ * casos se envía por el ID de la PÁGINA.
+ *
+ * La diferencia está en los links: la restricción del error 508 es de INSTAGRAM. Messenger
+ * los acepta sin problema, así que sanitizar ahí le rompía al cliente el link de la tienda
+ * y el de seguimiento sin ninguna razón.
+ */
+async function enviarMensajeIG(recipientId: string, texto: string, canal: Canal = 'ig') {
+  if (canal === 'ig') texto = sanitizeIGText(texto)
   // OJO: el envío va por el ID de la PÁGINA de Facebook (no el del usuario IG) — con IG_ID Meta devuelve "(#3) no capability"
   const res = await fetch(`https://graph.facebook.com/v21.0/${PAGE_ID}/messages`, {
     method: 'POST',
@@ -186,9 +194,9 @@ async function enviarMensajeIG(recipientId: string, texto: string) {
   const bodyText = await res.text().catch(() => '')
   if (!res.ok) {
     console.error(`IG send FALLO ${res.status}:`, bodyText)
-    await diag('send_fail', recipientId, { status: res.status, body: bodyText.slice(0, 1500), texto: texto.slice(0, 200) })
+    await diag('send_fail', recipientId, { status: res.status, body: bodyText.slice(0, 1500), texto: texto.slice(0, 200) }, canal)
   } else {
-    await diag('send_ok', recipientId, { status: res.status })
+    await diag('send_ok', recipientId, { status: res.status }, canal)
   }
   return res.ok
 }
@@ -324,12 +332,18 @@ export async function POST(req: NextRequest) {
   try { body = JSON.parse(firma.body) } catch { return NextResponse.json({ ok: true }) }
   if (body.object !== 'instagram' && body.object !== 'page') return NextResponse.json({ ok: true })
 
+  // De qué plataforma vino. Meta manda `instagram` para DMs y comentarios de IG, y `page`
+  // para Messenger. Se registra en columna porque sin esto los dos canales quedan mezclados
+  // en ig_diag y un canal mudo es indistinguible de un canal sin demanda — que es
+  // exactamente cómo Instagram estuvo tres semanas sin recibir un mensaje sin que saltara nada.
+  const canal: Canal = body.object === 'page' ? 'messenger' : 'ig'
+
   for (const entry of body.entry ?? []) {
     // Comentarios en publicaciones (reemplaza la automatización nativa de Meta)
     for (const change of entry.changes ?? []) {
       if (change.field !== 'comments' || !change.value) continue
       try { await manejarComentario(change.value) }
-      catch (err) { console.error('IG comment error:', err); await diag('coment_error', 'sys', { error: String(err).slice(0, 500) }) }
+      catch (err) { console.error('IG comment error:', err); await diag('coment_error', 'sys', { error: String(err).slice(0, 500) }, canal) }
     }
 
     for (const event of entry.messaging ?? []) {
@@ -342,24 +356,24 @@ export async function POST(req: NextRequest) {
         const payload = event.postback?.payload
         if (payload) {
           const respuesta = POSTBACK_RESPONSES[payload]
-          if (respuesta) await enviarMensajeIG(senderId, respuesta)
+          if (respuesta) await enviarMensajeIG(senderId, respuesta, canal)
           continue
         }
 
         const texto = event.message?.text?.trim()
         if (!texto) continue
 
-        await diag('recibido', senderId, { texto: texto.slice(0, 300) })
+        await diag('recibido', senderId, { texto: texto.slice(0, 300) }, canal)
 
         // Cerebro de Ariel: precios en vivo + KB + derivación, con memoria del hilo (evita re-presentarse)
         const [precios, historial] = await Promise.all([bloquePreciosEnVivo(), getHistorial(senderId)])
         const { respuesta, derivar, motivo } = await pensar(texto, precios, historial)
-        await diag('pensado', senderId, { derivar, motivo, respuesta: respuesta.slice(0, 300) })
+        await diag('pensado', senderId, { derivar, motivo, respuesta: respuesta.slice(0, 300) }, canal)
 
         // Al derivar, mandamos al cliente a WhatsApp de la empresa (link agregado por código, no por la IA)
         let salidaCliente = respuesta
         if (derivar) salidaCliente += (respuesta ? '\n\n' : '') + `👉 ${WA_PLAIN}`
-        if (salidaCliente) await enviarMensajeIG(senderId, salidaCliente)
+        if (salidaCliente) await enviarMensajeIG(senderId, salidaCliente, canal)
 
         if (derivar) {
           await notifyNahuel(
@@ -373,9 +387,9 @@ export async function POST(req: NextRequest) {
         }
       } catch (err) {
         console.error('IG webhook error:', err)
-        await diag('error', senderId, { error: String(err).slice(0, 1000) })
+        await diag('error', senderId, { error: String(err).slice(0, 1000) }, canal)
         // fallback humano para no dejar al cliente en visto
-        try { await enviarMensajeIG(event.sender.id, '¡Hola! 👋 Gracias por escribirnos, en un ratito te respondemos 🍄') } catch {}
+        try { await enviarMensajeIG(event.sender.id, '¡Hola! 👋 Gracias por escribirnos, en un ratito te respondemos 🍄', canal) } catch {}
       }
     }
   }

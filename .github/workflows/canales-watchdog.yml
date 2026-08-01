@@ -1,0 +1,48 @@
+# Vigilante de canales mudos.
+#
+# El webhook de Instagram dejó de recibir DMs el 08/07/2026 y nadie se enteró hasta el
+# 01/08: tres semanas. No falló nada ruidoso — los comentarios seguían entrando por el
+# mismo endpoint, el token era válido y las suscripciones estaban bien. Simplemente
+# dejaron de llegar mensajes, y un canal mudo se ve igual que un canal sin demanda.
+#
+# Vive acá y no en el VPS por la regla del CLAUDE.md: un vigilante no puede correr en la
+# infraestructura que vigila. GitHub Actions es una tercera infra, independiente de
+# Hetzner y de Vercel.
+name: Watchdog de canales
+
+on:
+  schedule:
+    - cron: '37 8 * * *' # una vez por día; el silencio de un canal se mide en días, no en horas
+  workflow_dispatch:
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar el watchdog de canales
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta el secret CRON_SECRET en el repositorio"
+            exit 1
+          fi
+
+          respuesta=$(curl -sS --max-time 30 -w '\n%{http_code}' \
+            https://mw-micelium.vercel.app/api/cron/canales-watchdog \
+            -H "Authorization: Bearer $CRON_SECRET")
+
+          codigo=$(echo "$respuesta" | tail -n1)
+          cuerpo=$(echo "$respuesta" | sed '$d')
+          echo "HTTP $codigo"
+          echo "$cuerpo"
+
+          if [ "$codigo" != "200" ]; then
+            echo "::error::El watchdog de canales no respondió 200 (respondió $codigo)"
+            exit 1
+          fi
+
+          # El endpoint ya manda el mail; esto lo deja visible en el historial de Actions.
+          if echo "$cuerpo" | grep -q '"mudo":true'; then
+            echo "::warning::Hay al menos un canal mudo (la alerta ya salió por mail)"
+          fi

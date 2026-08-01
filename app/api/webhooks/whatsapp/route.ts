@@ -74,7 +74,7 @@ const MANUAL_PC400  = process.env.MANUAL_PC400  ?? 'https://www.youtube.com/watc
 
 // diag con canal 'wa' para separar de Instagram en la vista de conversaciones.
 function wdiag(kind: string, sender: string, detail: Record<string, unknown>): Promise<void> {
-  return diag(kind, sender, { ...detail, ch: 'wa' })
+  return diag(kind, sender, detail, 'wa')
 }
 
 // Intenta deducir el puntaje del texto de la reseña por WhatsApp (que no viene estructurado):
