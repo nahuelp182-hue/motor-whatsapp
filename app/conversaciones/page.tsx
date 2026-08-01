@@ -96,9 +96,6 @@ export default function ConversacionesPage() {
       const res = await fetch(`/api/conversaciones?days=${days}`)
       const json = (await res.json()) as Data
       setData(json)
-      // Selección por defecto: la primera (la más reciente)
-      const primera = json.conversaciones[0]
-      setSel((prev) => prev ?? (primera ? `${primera.canal}:${primera.sender}` : null))
     } catch {
       setData({ conversaciones: [], totales: { conversaciones: 0, mensajes: 0, derivadas: 0, manuales: 0, seguimientos: 0, feedbacks: 0, errores: 0 }, days, error: 'No se pudo cargar' })
     } finally {
@@ -125,6 +122,14 @@ export default function ConversacionesPage() {
   // seleccionar el hilo equivocado sería peor que no mostrarlo.
   const claveDe = (c: Conversacion) => `${c.canal}:${c.sender}`
   const actual = convs.find((c) => claveDe(c) === sel) ?? null
+
+  // Si lo seleccionado no está en la lista visible —al entrar, al cambiar de canal, al
+  // filtrar o al buscar— se abre la primera. Antes el panel derecho decía "elegí una
+  // conversación" teniendo una sola al lado, y había que hacer un clic de más.
+  useEffect(() => {
+    if (!convs.length || actual) return
+    setSel(claveDe(convs[0]))
+  }, [convs, actual])
   const conteo = (f: (c: Conversacion) => boolean) => todas.filter(f).length
 
   return (
