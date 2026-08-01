@@ -126,6 +126,10 @@ export const CATALOGO: Record<string, EntradaCatalogo> = {
     origen: 'vps', maxHoras: 2,
     que: 'Drena la cola de mensajes salientes del recupero de carrito',
   },
+  'seguimiento-ctwa': {
+    origen: 'vps', maxHoras: 4,
+    que: 'Reimpacta gratis a los leads de anuncios click-to-WhatsApp dentro de su ventana de 72 h',
+  },
   radar: {
     origen: 'vps', maxHoras: 26,
     que: 'Mina sugerencias de tendencias; avisa solo si hay algo emergente',

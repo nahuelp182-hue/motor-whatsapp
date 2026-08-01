@@ -40,6 +40,42 @@ export function pideManual(texto: string): boolean {
   return !RE_PREVENTA.test(texto)
 }
 
+// ─────────────────────────── Señal de cierre ───────────────────────────
+//
+// Dos cosas juntas en la misma conversación: pregunta por el precio Y duda de si va a
+// poder. Ese cruce es el momento de cierre y es donde un humano gana al bot: el que
+// pregunta el precio ya decidió que lo quiere, y el que además duda de sí mismo no
+// necesita una ficha de producto, necesita que alguien le diga que sí puede.
+//
+// Está medido en la Biblioteca: "precio/cómo pago" es el dolor #2 de preventa (24
+// menciones) y "¿me sirve a mí sin experiencia?" el #7 (9, alto en DM). Y el 49% de los
+// mensajes de asesoría van a gente que todavía NO compró — o sea que la asesoría no es
+// post-venta, es lo que cierra la venta.
+//
+// No deriva el chat ni corta al bot: solo avisa. Cortar una conversación que va bien para
+// esperar a que Nahuel mire el teléfono es peor que dejarla seguir.
+
+/** Está preguntando cuánto sale o cómo se paga. */
+const RE_PRECIO =
+  /\b(?:precio|precios|cu[aá]nto\s+(?:sale|cuesta|est[aá]|vale)|cu[aá]nto\s+es|valor|cotiz\w*|cuota\w*|financiac\w*|transferenc\w*|tarjeta|se[ñn]a|presupuesto)\b/i
+
+/** Duda de su propia capacidad, no del producto. */
+const RE_DUDA_CAPACIDAD =
+  /(?:no\s+(?:s[eé]|tengo)\s+(?:nada|ni\s+idea|experiencia|idea)|nunca\s+(?:lo\s+)?hice|primera\s+vez|soy\s+(?:nuev\w+|principiante)|me\s+(?:va\s+a\s+)?(?:sal[ie]\w*|servir[aá]?|animo)|ser[eé]\s+capaz|podr[eé]|me\s+cuesta|es\s+dif[ií]cil|complicad\w+|y\s+si\s+no\s+(?:me\s+sale|funciona)|arruin\w*|fracas\w*)/i
+
+/**
+ * ¿La conversación llegó al momento de cierre?
+ *
+ * Recibe los textos de la conversación, no un mensaje suelto: las dos señales casi nunca
+ * vienen en la misma frase. Lo típico es "¿cuánto sale?" y tres mensajes después "igual
+ * nunca hice esto, no sé si me va a salir".
+ */
+export function esSenalDeCierre(textos: string[]): boolean {
+  const todo = (textos ?? []).filter(Boolean).join('\n')
+  if (!todo) return false
+  return RE_PRECIO.test(todo) && RE_DUDA_CAPACIDAD.test(todo)
+}
+
 /**
  * ¿El mensaje es apenas un dato para identificar la compra? ("24449754", "#1606",
  * "mi pedido es el 1594")

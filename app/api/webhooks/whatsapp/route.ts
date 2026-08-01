@@ -8,7 +8,7 @@ import {
 } from '@/lib/diag'
 import { getEstadoAndreani, pareceTrackingAndreani } from '@/lib/andreani'
 import { mensajeSeguimientoGenerico, esEnvioViejo } from '@/lib/seguimiento'
-import { pideManual, esSoloIdentificador } from '@/lib/intencion'
+import { pideManual, esSoloIdentificador, esSenalDeCierre } from '@/lib/intencion'
 import { esConsultaIntervencion, RESPUESTA_INTERVENCION } from '@/lib/intervencion'
 import { notifyNahuelAdjunto } from '@/lib/notify'
 import { prisma } from '@/lib/prisma'
@@ -1262,6 +1262,38 @@ export async function POST(req: NextRequest) {
           await wdiag('pensado', from, {
             derivar: didDerivar, motivo, accion, feedback, respuesta: outText.slice(0, MAX_TEXTO_DIAG),
           })
+
+          // ─── Señal de cierre ───
+          // Precio + duda de si va a poder, en la misma conversación. Ese cruce es el
+          // momento en que un humano gana al bot: el que pregunta el precio ya decidió que
+          // lo quiere, y el que además duda de sí mismo no necesita una ficha de producto.
+          //
+          // Avisa, NO deriva. Cortar una charla que va bien para esperar a que alguien mire
+          // el teléfono es peor que dejarla seguir; el bot sigue atendiendo mientras tanto.
+          // Y no se avisa si ya se derivó: ahí la persona ya está en el chat.
+          if (!didDerivar) {
+            // Solo los turnos del CLIENTE. Con los del bot incluidos esto se dispara solo:
+            // sus propias respuestas dicen "el precio lo ves en la ficha" y eso alcanza
+            // para que RE_PRECIO matchee sin que el cliente haya preguntado nada.
+            const textos = [
+              ...(await getHistorial(from)).filter((t) => t.role === 'user').map((t) => t.content),
+              mensajeUsuario,
+            ]
+            if (esSenalDeCierre(textos) && !(await huboAvisoReciente(from, 'senal_cierre', 72))) {
+              await wdiag('senal_cierre', from, { mensaje: mensajeUsuario.slice(0, 300) })
+              const origenAd = await origenCtwa(from)
+              await notifyNahuel(
+                '🎯 WhatsApp: momento de cierre — conviene que entres vos',
+                `Alguien preguntó el precio Y dudó de si va a poder, en la misma conversación.\n` +
+                `Es el cruce donde se cierra o se pierde.\n\n` +
+                `Número: ${from}\n` +
+                (nombre ? `Nombre: ${nombre}\n` : '') +
+                (origenAd?.sourceId ? `Vino del anuncio: ${origenAd.sourceId}\n` : 'Origen: orgánico\n') +
+                `Último mensaje: "${mensajeUsuario.slice(0, 300)}"\n\n` +
+                `El bot le sigue contestando normal — esto es solo el aviso.`,
+              )
+            }
+          }
 
           if (feedback) {
             await notifyNahuel(

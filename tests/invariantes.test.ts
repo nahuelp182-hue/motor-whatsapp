@@ -160,6 +160,46 @@ describe('el webhook de WhatsApp tiene techo de gasto', () => {
   })
 })
 
+describe('una derivación se detecta de una sola forma', () => {
+  // EL ERROR QUE ESTO PREVIENE
+  //
+  // Al escribir el seguimiento de CTWA (01/08/2026) filtré las conversaciones ya derivadas
+  // con `kind IN ('derivado', 'handoff_activo')`. El kind 'derivado' NO EXISTE: la
+  // derivación se marca sobre 'pensado' con detail->>'derivar' = 'true', que es como la
+  // lee ultimaDerivacion() en lib/diag.ts.
+  //
+  // Lo grave no es el typo: es que la query seguía siendo SQL válida y devolvía filas.
+  // El filtro simplemente no excluía a nadie, nunca. Un cron que le escribe a gente que
+  // ya está hablando con una persona, y ni un error en los logs. Lo encontré consultando
+  // la base —había 0 filas de ese kind—, no leyendo el código.
+  //
+  // Un filtro que no filtra es peor que no tenerlo, porque parece que está.
+  it("nadie inventa un kind 'derivado'", () => {
+    const culpables = archivosFuente().filter((f) =>
+      /kind\s*(?:=|IN\s*\()[^)\n]*'derivado'/.test(codigoSinComentarios(f)))
+    expect(
+      culpables.map((f) => f.slice(RAIZ.length + 1)),
+      "La derivación se lee con kind='pensado' AND detail->>'derivar'='true'. Ver ultimaDerivacion() en lib/diag.ts",
+    ).toEqual([])
+  })
+
+  // La primera versión de este test marcaba cualquier archivo que nombrara
+  // 'handoff_activo' en una query, y pescó app/api/conversaciones/route.ts —que lo usa
+  // para DIBUJAR el panel, no para excluir a nadie—. Un invariante con falsos positivos se
+  // termina desactivando, así que queda acotado al contexto donde vive el error: excluir.
+  it('quien EXCLUYE conversaciones derivadas usa la convención real', () => {
+    const infractores = archivosFuente().filter((f) => {
+      const c = codigoSinComentarios(f)
+      const bloques = c.match(/NOT EXISTS \([\s\S]{0,400}?\)\)/g) ?? []
+      return bloques.some((b) => b.includes('handoff_activo') && !b.includes("'derivar'"))
+    })
+    expect(
+      infractores.map((f) => f.slice(RAIZ.length + 1)),
+      'Excluir solo por handoff_activo deja pasar las derivaciones normales, que son la mayoría',
+    ).toEqual([])
+  })
+})
+
 describe('el canal de un evento vive en la columna, no en el detalle', () => {
   // EL ERROR QUE ESTO PREVIENE
   //
