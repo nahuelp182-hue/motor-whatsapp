@@ -165,9 +165,22 @@
     // terminaría metido adentro de un producto cualquiera. Sin lugar razonable, no se
     // dibuja — es mejor que aparecer en un lugar absurdo.
     var esFicha = true;
+    var esBlog = false;
     try {
-      if (window.LS && window.LS.template) esFicha = window.LS.template === 'product';
+      if (window.LS && window.LS.template) {
+        esFicha = window.LS.template === 'product';
+        esBlog = /blog/.test(String(window.LS.template));
+      }
     } catch (e) {}
+
+    // En el blog Tiendanube usa `.post-content` como cuerpo (no <article> ni <main>), así que
+    // la lista general no lo encuentra y el widget no se dibuja. La ficha de producto TAMBIÉN
+    // trae ese class en su descripción, por eso el atajo va acotado al template de blog y no
+    // como un candidato más de la lista (ahí desviaría los widgets de la ficha).
+    if (esBlog) {
+      var pc = document.querySelector('.post-content') || document.querySelector('.main-content');
+      if (pc) return pc;
+    }
 
     for (var i = 0; i < candidatos.length; i++) {
       if (i >= 4 && !esFicha) return null;
