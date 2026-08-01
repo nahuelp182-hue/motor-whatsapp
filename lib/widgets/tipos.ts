@@ -239,6 +239,7 @@ export const DESTINOS = [
   { value: '', label: 'Sin enlace (el botón no aparece)' },
   { value: 'https://infomicelium.com.ar', label: 'Tienda — portada' },
   { value: 'https://infomicelium.com.ar/productos', label: 'Tienda — todos los productos' },
+  { value: 'https://infomicelium.com.ar/productos/pack-oferta-incubadora-automatica-inc101/', label: 'Producto — Incubadora INC101 (pack)' },
   { value: '/guia', label: 'Guías — índice' },
   { value: '/guia/asistente', label: 'Guías — asistente' },
   { value: '/contacto', label: 'Contacto' },
