@@ -9,9 +9,9 @@ import { describe, it, expect } from 'vitest'
 import {
   derivarEstado,
   horasDesde,
-  noLlegoACorrer,
+  sinResultado,
   CATALOGO,
-  CODIGOS_NO_ARRANCO,
+  CODIGOS_SIN_RESULTADO,
 } from '@/lib/cron-heartbeat'
 
 const AHORA = new Date('2026-07-31T12:00:00Z')
@@ -57,36 +57,46 @@ describe('derivarEstado', () => {
   })
 })
 
-// El segundo agujero, del 31/07/2026: una tarea de Windows que no arrancaba porque la PC
-// dormía se reportaba igual con ok=true "para no pintarla de rojo". Como el estado se
-// deriva de la FRESCURA del último reporte, cada intento fallido le renovaba el reloj y la
-// dejaba verde para siempre. micelium_ig_reels_semanal estuvo 5 días parado sin que el
-// panel lo marcara. Verde por no haber corrido es peor que rojo por haber fallado.
-describe('no_arranco no cuenta como corrida', () => {
-  it('reconoce los códigos del Programador que significan "no llegó a arrancar"', () => {
-    expect(noLlegoACorrer(-2147020576)).toBe(true) // 0x800710E0, PC suspendida
-    expect(noLlegoACorrer(267011)).toBe(true) // 0x00041303, nunca corrió
-    expect(noLlegoACorrer(267045)).toBe(true) // 0x00041325, todavía en cola
+// Los dos agujeros del 31/07/2026, que son el mismo error visto de los dos lados: tratar
+// como CORRIDA algo que no es el resultado de un trabajo terminado.
+//
+//  1. Guardarlo como éxito. Una tarea que no arrancaba porque la PC dormía se reportaba
+//     con ok=true "para no pintarla de rojo". Como el estado se deriva de la FRESCURA del
+//     último reporte, cada intento fallido le renovaba el reloj y la dejaba verde para
+//     siempre: micelium_ig_reels_semanal estuvo 5 días parado sin que el panel lo marcara.
+//  2. Guardarlo como falla. 0x00041301 ("se está ejecutando ahora") solo dice que el
+//     muestreo cayó en el medio de la corrida. Se guardaba como rojo, y condenaba al
+//     propio heartbeat, que se muestrea a sí mismo mientras corre y lo devuelve siempre.
+describe('lo que no es una corrida terminada no se guarda', () => {
+  it('reconoce los códigos de "no llegó a arrancar"', () => {
+    expect(sinResultado(-2147020576)).toBe(true) // 0x800710E0, PC suspendida
+    expect(sinResultado(267011)).toBe(true) // 0x00041303, nunca corrió
+    expect(sinResultado(267045)).toBe(true) // 0x00041325, todavía en cola
   })
 
-  it('no confunde un exit code real con un "no arrancó"', () => {
+  it('reconoce "se está ejecutando ahora" — no es una falla, es un resultado que falta', () => {
+    // El agujero espejo. Sin esto el heartbeat se reporta en rojo a sí mismo, siempre.
+    expect(sinResultado(267009)).toBe(true) // 0x00041301
+  })
+
+  it('no confunde un exit code real con un código sin resultado', () => {
     // En POSIX van de 0 a 255: ningún job puede colisionar con estos códigos.
-    for (const code of [0, 1, 2, 127, 255]) expect(noLlegoACorrer(code), String(code)).toBe(false)
-    expect(noLlegoACorrer(undefined)).toBe(false)
-    expect(noLlegoACorrer(null)).toBe(false)
+    for (const code of [0, 1, 2, 127, 255]) expect(sinResultado(code), String(code)).toBe(false)
+    expect(sinResultado(undefined)).toBe(false)
+    expect(sinResultado(null)).toBe(false)
   })
 
-  it('ningún código de "no arrancó" cabe en el rango de un exit code POSIX', () => {
+  it('ningún código sin resultado cabe en el rango de un exit code POSIX', () => {
     // Si alguien agrega uno entre 0 y 255, el guardia del ingest empezaría a descartar
     // corridas reales en silencio. Es el único modo en que esta lista puede hacer daño.
-    for (const code of CODIGOS_NO_ARRANCO) {
+    for (const code of CODIGOS_SIN_RESULTADO) {
       expect(code < 0 || code > 255, `${code} colisiona con un exit code real`).toBe(true)
     }
   })
 
   it('sin corridas guardadas, un job de Windows termina en "atrasado" — la ausencia es la señal', () => {
-    // Este es el comportamiento que el arreglo compra: al no guardar los intentos fallidos,
-    // el margen del catálogo se agota y el panel lo marca solo.
+    // Este es el comportamiento que el arreglo compra: al no guardar lo que no terminó, el
+    // margen del catálogo se agota y el panel lo marca solo.
     const semanal = CATALOGO.micelium_ig_reels_semanal
     const vencido = haceHoras(semanal.maxHoras + 1)
     expect(derivarEstado('micelium_ig_reels_semanal', { inicio: vencido, ok: true }, AHORA))

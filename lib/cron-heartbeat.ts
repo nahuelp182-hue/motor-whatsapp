@@ -23,32 +23,43 @@ export type Origen = 'vercel' | 'vps' | 'github' | 'windows'
 export type Estado = 'ok' | 'atrasado' | 'falla' | 'nunca'
 
 /**
- * Códigos del Programador de tareas de Windows que significan "no llegó a arrancar", no
- * "arrancó y falló". Vienen con signo, como los guarda `JobRun.exit_code`.
+ * Códigos del Programador de tareas de Windows que NO son el resultado de un trabajo
+ * terminado. Vienen con signo, como los guarda `JobRun.exit_code`.
  *
+ * No llegó a arrancar:
  *   -2147020576 (0x800710E0) el operador rechazó la solicitud: PC suspendida o a batería
  *        267011 (0x00041303) la tarea nunca corrió
  *        267045 (0x00041325) la tarea está en cola, todavía no arrancó
+ * Arrancó pero todavía no terminó:
+ *        267009 (0x00041301) la tarea se está ejecutando en este momento
  *
- * Una corrida así NO SE GUARDA. El estado del panel se deriva de la frescura del último
- * `JobRun`, y el Programador actualiza su LastRunTime aunque la tarea no haya arrancado:
- * guardar el intento —con cualquier valor de `ok`— le renueva el reloj a un job que no
- * hizo nada. Una tarea cuya PC duerme siempre a su hora se quedaba así en verde para
- * siempre, sin poder llegar nunca a 'atrasado' (visto el 31/07/2026 con
- * micelium_ig_reels_semanal, parado desde el 26/07 sin que el panel lo marcara).
+ * Una corrida así NO SE GUARDA, y los dos motivos son la misma idea vista de los dos lados.
  *
- * Es el mismo principio del encabezado de este archivo: la ausencia tiene que ser la
- * señal. `heartbeat_tareas.ps1` ya se calla del otro lado; esto es la red de abajo, para
- * que ningún reportero futuro pueda reabrir el agujero.
+ * Guardarla como ÉXITO fue el primer agujero: el estado se deriva de la frescura del
+ * último `JobRun`, y el Programador actualiza LastRunTime aunque la tarea no haya
+ * arrancado, así que cada intento fallido le renovaba el reloj a un job que no hizo nada.
+ * Una tarea cuya PC duerme siempre a su hora quedaba en verde para siempre, sin poder
+ * llegar nunca a 'atrasado' (31/07/2026, micelium_ig_reels_semanal: 5 días parado, panel
+ * en verde).
+ *
+ * Guardarla como FALLA es el agujero espejo: 0x00041301 solo dice que el muestreo cayó en
+ * el medio de la corrida, no que algo saliera mal. El resultado se sabrá en la pasada
+ * siguiente. Pintarlo de rojo condena al propio heartbeat, que se muestrea a sí mismo
+ * mientras corre y por lo tanto reporta 0x00041301 SIEMPRE.
+ *
+ * Las dos veces el arreglo es el mismo, y es el principio del encabezado de este archivo:
+ * si no hay resultado, no hay nada que decir, y la ausencia es la señal. El margen ancho
+ * del catálogo hace el resto. `heartbeat_tareas.ps1` ya se calla del otro lado; esto es la
+ * red de abajo, para que ningún reportero futuro pueda reabrirlo.
  *
  * No hay riesgo de colisión con un exit code real: en POSIX van de 0 a 255.
  */
-export const CODIGOS_NO_ARRANCO = [-2147020576, 267011, 267045] as const
+export const CODIGOS_SIN_RESULTADO = [-2147020576, 267011, 267045, 267009] as const
 
-/** ¿Este código dice que el trabajo no llegó a ejecutarse? */
-export function noLlegoACorrer(exitCode: number | undefined | null): boolean {
+/** ¿Este código es algo distinto del resultado de un trabajo terminado? */
+export function sinResultado(exitCode: number | undefined | null): boolean {
   if (exitCode === undefined || exitCode === null) return false
-  return (CODIGOS_NO_ARRANCO as readonly number[]).includes(exitCode)
+  return (CODIGOS_SIN_RESULTADO as readonly number[]).includes(exitCode)
 }
 
 export type EntradaCatalogo = {

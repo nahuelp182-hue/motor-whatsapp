@@ -17,7 +17,7 @@
 // igual deja su excepción en el log y actualiza el mtime. El exit code no se puede fingir.
 import { NextRequest, NextResponse } from 'next/server'
 import { chequearCron } from '@/lib/cron-auth'
-import { marcarHeartbeat, noLlegoACorrer, type Origen } from '@/lib/cron-heartbeat'
+import { marcarHeartbeat, sinResultado, type Origen } from '@/lib/cron-heartbeat'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -45,12 +45,12 @@ export async function POST(req: NextRequest) {
     ? undefined
     : Number(body.exit_code)
 
-  // Un intento que no llegó a arrancar NO ES UNA CORRIDA, así que no se guarda. Guardarlo
-  // le renovaría la frescura a un job que no hizo nada y lo dejaría en verde para siempre;
-  // el razonamiento completo está en CODIGOS_NO_ARRANCO. Se responde 200 a propósito: el
+  // Un trabajo que no arrancó, o que todavía está corriendo, NO ES UNA CORRIDA TERMINADA:
+  // no se guarda ni como éxito ni como falla. El razonamiento completo, y los dos agujeros
+  // que abrió hacerlo, están en CODIGOS_SIN_RESULTADO. Se responde 200 a propósito: el
   // reportero hizo bien su trabajo al contarlo, no hay nada que reintentar.
-  if (noLlegoACorrer(exitCode)) {
-    return NextResponse.json({ ok: true, slug, registrado: false, ignorado: 'no_arranco' })
+  if (sinResultado(exitCode)) {
+    return NextResponse.json({ ok: true, slug, registrado: false, ignorado: 'sin_resultado' })
   }
 
   // Reglas, en orden:
