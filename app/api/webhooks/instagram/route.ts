@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
-import { diag, getHistorial, logClaudeUsage, comentarioYaRespondido, type Turno, type Canal } from '@/lib/diag'
+import { diag, getPool, getHistorial, logClaudeUsage, comentarioYaRespondido, type Turno, type Canal } from '@/lib/diag'
 import { verificarFirmaMeta } from '@/lib/meta-signature'
 import { DESCUENTO_TRANSFERENCIA } from '@/lib/tienda'
 
@@ -175,6 +175,44 @@ function sanitizeIGText(t: string): string {
 }
 
 // ─────────── IG send ───────────
+/**
+ * Nombre y usuario de quien escribe, para que el panel muestre "Nahuel Peralta" y no un
+ * identificador de Meta que no le dice nada a nadie (y que no se puede buscar).
+ *
+ * Se consulta UNA sola vez por persona: antes de pegarle a Graph se mira si ya lo guardamos
+ * en un mensaje anterior. Un DM no cambia de autor, así que reconsultarlo en cada mensaje
+ * sería una llamada de red por mensaje a cambio de nada.
+ *
+ * Best-effort: si la consulta falla, el mensaje se registra igual sin nombre. Perder el
+ * nombre es molesto; perder el mensaje del cliente, no.
+ */
+async function nombreDePerfil(senderId: string): Promise<{ nombre?: string; usuario?: string }> {
+  try {
+    const p = getPool()
+    if (p) {
+      const previo = await p.query(
+        `SELECT detail->>'nombre' AS nombre, detail->>'usuario' AS usuario
+           FROM ig_diag
+          WHERE sender = $1 AND kind = 'recibido' AND detail->>'nombre' IS NOT NULL
+          ORDER BY id DESC LIMIT 1`,
+        [senderId],
+      )
+      const fila = previo.rows[0]
+      if (fila?.nombre) return { nombre: fila.nombre, usuario: fila.usuario ?? undefined }
+    }
+
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/${senderId}?fields=name,username&access_token=${PAGE_TOKEN}`,
+    )
+    if (!res.ok) return {}
+    const d = (await res.json()) as { name?: string; username?: string }
+    return { nombre: d.name, usuario: d.username }
+  } catch (err) {
+    console.error('nombreDePerfil falló:', err)
+    return {}
+  }
+}
+
 /**
  * Manda un DM. Sirve para Instagram y para Messenger: la Send API es la misma y en los dos
  * casos se envía por el ID de la PÁGINA.
@@ -363,7 +401,8 @@ export async function POST(req: NextRequest) {
         const texto = event.message?.text?.trim()
         if (!texto) continue
 
-        await diag('recibido', senderId, { texto: texto.slice(0, 300) }, canal)
+        const perfil = await nombreDePerfil(senderId)
+        await diag('recibido', senderId, { texto: texto.slice(0, 300), ...perfil }, canal)
 
         // Cerebro de Ariel: precios en vivo + KB + derivación, con memoria del hilo (evita re-presentarse)
         const [precios, historial] = await Promise.all([bloquePreciosEnVivo(), getHistorial(senderId)])

@@ -14,6 +14,7 @@ type Conversacion = {
   sender: string
   canal: string
   nombre: string | null
+  usuario: string | null
   ultimoTs: string
   mensajes: Mensaje[]
   derivada: boolean
@@ -116,6 +117,7 @@ export default function ConversacionesPage() {
     if (!testFiltro(c)) return false
     if (!qn) return true
     if ((c.nombre ?? '').toLowerCase().includes(qn)) return true
+    if ((c.usuario ?? '').toLowerCase().includes(qn.replace(/^@/, ''))) return true
     if (c.sender.includes(qn.replace(/\D/g, ''))) return true
     return c.mensajes.some((m) => m.text.toLowerCase().includes(qn))
   })
@@ -134,7 +136,9 @@ export default function ConversacionesPage() {
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">
-              {vista === 'bot' ? 'Conversaciones del bot · WhatsApp' : 'Despachos apícolas · WhatsApp al tío'}
+              {vista === 'bot'
+                ? `Conversaciones del bot${canal === 'todos' ? '' : ` · ${NOMBRE_CANAL[canal]}`}`
+                : 'Despachos apícolas · WhatsApp al tío'}
             </h1>
             <a href="/dashboard" className="text-xs text-white/40 hover:text-white/70">← Volver al dashboard</a>
           </div>
@@ -181,8 +185,12 @@ export default function ConversacionesPage() {
         {/* Filtros por categoría (clickeables) + búsqueda */}
         {vista === 'bot' && t && (
           <div className="mb-4 space-y-3">
-            {/* Canal. Va primero porque es la pregunta más gruesa: por dónde entró. */}
-            <div className="flex flex-wrap gap-2">
+            {/* Canal. Es la pregunta más gruesa —por dónde entró— así que pesa distinto que
+                los filtros de categoría: tarjetas grandes, color de la plataforma y el número
+                bien visible. La primera versión eran píldoras chicas y grises, indistinguibles
+                de la fila de abajo; en una pantalla donde el canal es lo que hay que vigilar,
+                eso lo volvía invisible. */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {CANALES.map((ch) => {
                 const activo = canal === ch.id
                 const n = ch.id === 'todos'
@@ -192,20 +200,32 @@ export default function ConversacionesPage() {
                   <button
                     key={ch.id}
                     onClick={() => { setCanal(ch.id); setSel(null) }}
-                    className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition ${
+                    style={activo ? { borderColor: ch.color, background: `${ch.color}1a` } : undefined}
+                    className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition ${
                       activo
-                        ? 'border-white/20 bg-white/[0.08] text-white'
-                        : 'border-white/[0.06] text-white/45 hover:text-white/80'
+                        ? 'text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04)]'
+                        : 'border-white/[0.07] bg-[#0e0e16] text-white/55 hover:border-white/[0.16] hover:text-white/90'
                     }`}
                   >
-                    <span className="size-1.5 rounded-full" style={{ background: ch.color }} />
-                    {ch.label}
-                    <span className="text-white/40">{n}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ background: ch.color, boxShadow: activo ? `0 0 8px ${ch.color}` : undefined }}
+                      />
+                      <span className="truncate text-sm font-medium">{ch.label}</span>
+                    </span>
+                    <span
+                      className="shrink-0 text-lg font-semibold tabular-nums"
+                      style={{ color: activo ? ch.color : undefined }}
+                    >
+                      {n}
+                    </span>
                   </button>
                 )
               })}
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.05] pt-3">
+              <span className="mr-1 text-[10px] uppercase tracking-widest text-white/25">Categoría</span>
               {FILTROS.map((f) => {
                 const n = conteo(f.test)
                 const activo = filtro === f.id
@@ -302,6 +322,7 @@ export default function ConversacionesPage() {
                         </a>
                       ) : (
                         <span className="text-[11px] text-white/40">
+                          {actual.usuario ? `@${actual.usuario} · ` : ''}
                           {NOMBRE_CANAL[actual.canal] ?? actual.canal} · se responde desde la app de Meta
                         </span>
                       )}

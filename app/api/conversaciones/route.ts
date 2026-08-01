@@ -15,6 +15,8 @@ type Conversacion = {
   /** Por dónde entró: 'wa' | 'ig' | 'messenger'. Determina si se puede responder desde acá. */
   canal: string
   nombre: string | null
+  /** @usuario de Instagram, cuando lo hay. Es lo que permite encontrar a la persona. */
+  usuario: string | null
   ultimoTs: string
   mensajes: Mensaje[]
   derivada: boolean
@@ -67,13 +69,14 @@ export async function GET(req: NextRequest) {
       const clave = `${r.canal}:${r.sender}`
       let c = map.get(clave)
       if (!c) {
-        c = { sender: r.sender, canal: r.canal, nombre: null, ultimoTs: r.ts, mensajes: [], derivada: false, manual: false, seguimiento: false, feedback: false, error: false }
+        c = { sender: r.sender, canal: r.canal, nombre: null, usuario: null, ultimoTs: r.ts, mensajes: [], derivada: false, manual: false, seguimiento: false, feedback: false, error: false }
         map.set(clave, c)
       }
       c.ultimoTs = r.ts
 
       if (r.kind === 'recibido') {
         if (typeof d.nombre === 'string' && d.nombre) c.nombre = d.nombre
+        if (typeof d.usuario === 'string' && d.usuario) c.usuario = d.usuario
         if (typeof d.texto === 'string' && d.texto) c.mensajes.push({ ts: r.ts, role: 'user', text: d.texto })
       } else if (r.kind === 'pensado') {
         const text = typeof d.respuesta === 'string' ? d.respuesta : ''
