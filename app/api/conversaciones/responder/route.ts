@@ -31,7 +31,7 @@ async function horasDesdeUltimoEntrante(sender: string): Promise<number | null> 
   if (!p) return null
   const r = await p.query(
     `SELECT ts FROM ig_diag
-      WHERE sender = $1 AND kind = 'recibido' AND detail->>'ch' = 'wa'
+      WHERE sender = $1 AND kind = 'recibido' AND canal = 'wa'
       ORDER BY id DESC LIMIT 1`,
     [sender],
   )
@@ -86,12 +86,12 @@ export async function POST(req: NextRequest) {
   const detalle = await res.text().catch(() => '')
 
   if (!res.ok) {
-    await diag('wa_send_fail', sender, { ch: 'wa', origen: 'panel', status: res.status, body: detalle.slice(0, 1000) })
+    await diag('wa_send_fail', sender, { origen: 'panel', status: res.status, body: detalle.slice(0, 1000) }, 'wa')
     return NextResponse.json({ ok: false, error: `WhatsApp rechazó el envío (${res.status})` }, { status: 502 })
   }
 
   // Se registra como 'pensado' con accion 'humano' para que el hilo del panel lo muestre en
   // orden junto con lo que dijo el bot, y para que quede claro quién escribió cada cosa.
-  await diag('pensado', sender, { ch: 'wa', respuesta: texto, accion: 'humano', derivar: false })
+  await diag('pensado', sender, { respuesta: texto, accion: 'humano', derivar: false }, 'wa')
   return NextResponse.json({ ok: true })
 }

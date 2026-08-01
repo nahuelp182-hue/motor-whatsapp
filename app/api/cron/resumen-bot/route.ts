@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     const rows = (await p.query(
       `SELECT ts, kind, sender, detail
          FROM ig_diag
-        WHERE detail->>'ch' = 'wa'
+        WHERE canal = 'wa'
           AND kind IN ('recibido','pensado','wa_send_fail','wa_error')
           AND ts > now() - interval '24 hours'
         ORDER BY id ASC`,

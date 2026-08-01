@@ -27,6 +27,17 @@ function archivosFuente(): string[] {
   return out
 }
 
+/**
+ * El código de un archivo sin sus comentarios. Los invariantes de acá buscan patrones que no
+ * se deben USAR; un comentario que EXPLICA por qué no se usan no es una infracción, y sin
+ * esto el propio comentario que documenta la regla la hace fallar.
+ */
+function codigoSinComentarios(ruta: string): string {
+  return readFileSync(ruta, 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '') // bloques
+    .replace(/^\s*\/\/.*$/gm, '') // líneas sueltas
+}
+
 describe('un solo pool de Postgres', () => {
   // EL ERROR QUE ESTO PREVIENE
   //
@@ -100,5 +111,38 @@ describe('la cola no se lee sin tomarla', () => {
   it('tomarLote usa FOR UPDATE SKIP LOCKED', () => {
     const fuente = readFileSync(join(RAIZ, 'lib', 'cola-envios.ts'), 'utf8')
     expect(fuente).toContain('FOR UPDATE SKIP LOCKED')
+  })
+})
+
+describe('el canal de un evento vive en la columna, no en el detalle', () => {
+  // EL ERROR QUE ESTO PREVIENE
+  //
+  // Hasta el 01/08/2026 el canal se marcaba metiendo `ch: 'wa'` adentro del JSON de detalle
+  // de ig_diag, y se leía con `detail->>'ch' = 'wa'`. Dos consecuencias, las dos reales:
+  //
+  // 1. Solo WhatsApp ponía la marca. Instagram y Messenger quedaban indistinguibles entre sí
+  //    y del WhatsApp anterior al 11/07, así que la tabla mostraba un total sano que era todo
+  //    WhatsApp. El webhook de Instagram estuvo TRES SEMANAS sin recibir un mensaje y no
+  //    saltó nada.
+  // 2. Al mover la marca a la columna `canal`, cuatro consultas seguían filtrando por el JSON
+  //    y se quedaban vacías en silencio — entre ellas el panel /conversaciones, que es donde
+  //    se leen las charlas con los clientes. Una convención repartida en seis archivos se
+  //    rompe en cinco cuando cambia.
+  //
+  // Nadie debería volver a decidir el canal leyendo o escribiendo el detalle.
+  it('nadie lee el canal desde el JSON de detalle', () => {
+    const culpables = archivosFuente().filter((f) => codigoSinComentarios(f).includes("->>'ch'"))
+    expect(
+      culpables.map((f) => f.slice(RAIZ.length + 1)),
+      "El canal se filtra con `canal = 'wa'`, no con `detail->>'ch'`",
+    ).toEqual([])
+  })
+
+  it('nadie escribe el canal dentro del detalle', () => {
+    const culpables = archivosFuente().filter((f) => /\bch:\s*'(wa|ig|messenger|web)'/.test(codigoSinComentarios(f)))
+    expect(
+      culpables.map((f) => f.slice(RAIZ.length + 1)),
+      'El canal va como 4º argumento de diag(kind, sender, detail, canal), no adentro de detail',
+    ).toEqual([])
   })
 })

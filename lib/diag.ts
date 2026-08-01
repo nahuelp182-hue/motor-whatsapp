@@ -222,7 +222,7 @@ export async function ultimaDerivacion(sender: string, horas = 6): Promise<Date 
     const r = await p.query(
       `SELECT ts FROM ig_diag
         WHERE sender = $1 AND kind = 'pensado'
-          AND detail->>'ch' = 'wa' AND detail->>'derivar' = 'true'
+          AND canal = 'wa' AND detail->>'derivar' = 'true'
           AND ts > now() - ($2 || ' hours')::interval
         ORDER BY id DESC LIMIT 1`,
       [sender, String(horas)],

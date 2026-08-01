@@ -23,7 +23,7 @@ type Conversacion = {
 }
 
 // Devuelve las conversaciones de WhatsApp (bot) reconstruidas desde ig_diag.
-// Solo filas con detail->>'ch' = 'wa'. Agrupa por número, arma el hilo user/bot.
+// Solo filas del canal 'wa'. Agrupa por número, arma el hilo user/bot.
 //
 // Además de los mensajes de texto entran acá dos cosas que antes no se veían y hacían
 // parecer incoherente la conversación:
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     const rows = (await p.query(
       `SELECT id, ts, kind, sender, detail
          FROM ig_diag
-        WHERE detail->>'ch' = 'wa'
+        WHERE canal = 'wa'
           AND kind IN ('recibido','recibido_archivo','pensado','handoff_activo','wa_send_fail','wa_error')
           AND ts > now() - ($1 || ' days')::interval
         ORDER BY id ASC`,

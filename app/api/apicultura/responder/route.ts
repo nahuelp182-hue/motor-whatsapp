@@ -73,7 +73,7 @@ export async function POST(req: Request) {
   }
 
   // Queda en el hilo del panel, junto a lo que contesta el tío.
-  await diag('mensaje_a_tio', TIO_WA, { texto, via, ch: 'wa' }).catch(() => {})
+  await diag('mensaje_a_tio', TIO_WA, { texto, via }, 'wa').catch(() => {})
 
   return NextResponse.json({ ok: true, via })
 }
