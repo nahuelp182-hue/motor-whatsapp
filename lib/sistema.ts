@@ -5,7 +5,7 @@
 // desde la misma pantalla, pero se calculan por separado: el estado se mira todos los días
 // en cinco segundos, el gasto una vez por mes con calma.
 import { getPool } from '@/lib/db'
-import { CATALOGO, derivarEstado, horasDesde, ultimasCorridas, type Estado, type Origen } from '@/lib/cron-heartbeat'
+import { CATALOGO, derivarEstado, horasDesde, slugsEnCurso, ultimasCorridas, type Estado, type Origen } from '@/lib/cron-heartbeat'
 
 export type JobEstado = {
   slug: string
@@ -19,10 +19,12 @@ export type JobEstado = {
 
 /** Estado de las 46 automatizaciones, ordenadas por urgencia. */
 export async function estadoDeJobs(): Promise<JobEstado[]> {
-  const ultimas = await ultimasCorridas()
+  const [ultimas, corriendo] = await Promise.all([ultimasCorridas(), slugsEnCurso()])
   const ahora = new Date()
 
-  const orden: Record<Estado, number> = { falla: 0, atrasado: 1, nunca: 2, ok: 3 }
+  // 'corriendo' se ordena junto a 'ok': es una novedad, no un problema. Arriba de todo van
+  // las cosas que hay que mirar.
+  const orden: Record<Estado, number> = { falla: 0, atrasado: 1, nunca: 2, corriendo: 3, ok: 4 }
 
   return Object.entries(CATALOGO)
     .map(([slug, cfg]) => {
@@ -32,7 +34,7 @@ export async function estadoDeJobs(): Promise<JobEstado[]> {
         que: cfg.que,
         origen: cfg.origen,
         maxHoras: cfg.maxHoras,
-        estado: derivarEstado(slug, u, ahora),
+        estado: derivarEstado(slug, u, ahora, corriendo.has(slug)),
         horas: horasDesde(u, ahora),
         detalle: u?.detalle ?? null,
       }

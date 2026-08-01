@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     falla: jobs.filter((j) => j.estado === 'falla').length,
     atrasado: jobs.filter((j) => j.estado === 'atrasado').length,
     nunca: jobs.filter((j) => j.estado === 'nunca').length,
+    corriendo: jobs.filter((j) => j.estado === 'corriendo').length,
   }
 
   return NextResponse.json({ jobs, resumen, gasto })

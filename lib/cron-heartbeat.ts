@@ -20,7 +20,7 @@
 import { prisma } from '@/lib/prisma'
 
 export type Origen = 'vercel' | 'vps' | 'github' | 'windows'
-export type Estado = 'ok' | 'atrasado' | 'falla' | 'nunca'
+export type Estado = 'ok' | 'atrasado' | 'falla' | 'nunca' | 'corriendo'
 
 /**
  * Códigos del Programador de tareas de Windows que NO son el resultado de un trabajo
@@ -54,13 +54,45 @@ export type Estado = 'ok' | 'atrasado' | 'falla' | 'nunca'
  *
  * No hay riesgo de colisión con un exit code real: en POSIX van de 0 a 255.
  */
-export const CODIGOS_SIN_RESULTADO = [-2147020576, 267011, 267045, 267009] as const
+export const CODIGOS_NO_ARRANCO = [-2147020576, 267011, 267045] as const
+
+/**
+ * 0x00041301: la tarea arrancó y TODAVÍA ESTÁ CORRIENDO. Es el único de los cuatro que
+ * describe algo que está pasando, y por eso se lo trata distinto desde el 01/08/2026: los
+ * otros tres se callan, este se muestra como 'corriendo' en el panel.
+ *
+ * Mostrarlo NO reabre el agujero de arriba, porque la marca de "en curso" se guarda con
+ * `fin: null` y todo lo que deriva frescura ignora esas filas (ver `ultimasCorridas`). Una
+ * corrida en curso no es una corrida terminada: no renueva el reloj de nadie.
+ */
+export const CODIGO_EN_CURSO = 267009
+
+export const CODIGOS_SIN_RESULTADO = [...CODIGOS_NO_ARRANCO, CODIGO_EN_CURSO] as const
 
 /** ¿Este código es algo distinto del resultado de un trabajo terminado? */
 export function sinResultado(exitCode: number | undefined | null): boolean {
   if (exitCode === undefined || exitCode === null) return false
   return (CODIGOS_SIN_RESULTADO as readonly number[]).includes(exitCode)
 }
+
+/** ¿Este código dice "arrancó y todavía no terminó"? */
+export function enCurso(exitCode: number | undefined | null): boolean {
+  return exitCode === CODIGO_EN_CURSO
+}
+
+/**
+ * Cuánto vale una marca de "en curso" antes de descartarla.
+ *
+ * Hace falta un vencimiento porque NADIE cierra estas marcas: el reportero avisa que la
+ * tarea estaba corriendo, y si el proceso muere de una forma que el Programador no
+ * registra, no llega nunca un "terminó". Sin caducidad, un job quedaría "corriendo" para
+ * siempre — que es la misma mentira tranquilizadora que el verde eterno, con otro color.
+ *
+ * 45 min cubre de sobra a las tareas de esta PC (la más lenta, el pull del CRM, tarda ~1
+ * min) y es más corto que el muestreo del reportero, así que una tarea realmente larga se
+ * vuelve a marcar antes de vencer.
+ */
+export const VENTANA_EN_CURSO_MIN = 45
 
 export type EntradaCatalogo = {
   origen: Origen
@@ -317,8 +349,39 @@ export async function marcarHeartbeat(
         detalle: detalle?.slice(0, 2000) ?? null,
       },
     })
+    // El trabajo terminó: la marca de "en curso" ya no describe nada. Se borra acá y no en
+    // un barrido aparte, para que el panel no muestre "corriendo" un segundo después de
+    // saber el resultado.
+    await prisma.jobRun.deleteMany({ where: { slug, fin: null } })
   } catch (e) {
     console.error('[cron-heartbeat] no se pudo marcar:', slug, e)
+  }
+}
+
+/**
+ * Deja constancia de que `slug` ARRANCÓ y todavía no terminó.
+ *
+ * Se guarda con `fin: null`, que es lo que la distingue de una corrida de verdad en todas
+ * las consultas. Reemplaza la marca anterior del mismo job en vez de acumular: el
+ * reportero de Windows se muestrea a sí mismo mientras corre, así que sin el borrado
+ * escribiría una fila cada pasada, para siempre.
+ */
+export async function marcarEnCurso(slug: string, origen?: Origen): Promise<void> {
+  try {
+    await prisma.jobRun.deleteMany({ where: { slug, fin: null } })
+    await prisma.jobRun.create({
+      data: {
+        slug,
+        origen: origen ?? CATALOGO[slug]?.origen ?? 'vercel',
+        inicio: new Date(),
+        fin: null,
+        exit_code: CODIGO_EN_CURSO,
+        ok: true,
+        detalle: 'en curso',
+      },
+    })
+  } catch (e) {
+    console.error('[cron-heartbeat] no se pudo marcar en curso:', slug, e)
   }
 }
 
@@ -338,11 +401,16 @@ export function derivarEstado(
   slug: string,
   ultima: UltimaCorrida,
   ahora: Date = new Date(),
+  corriendo = false,
 ): Estado {
   const cfg = CATALOGO[slug]
   if (!cfg) return 'ok' // fuera del catálogo = a demanda, no se vigila
+  // Una falla se cuenta ANTES que "corriendo": que el job haya vuelto a arrancar no borra
+  // que la última vez terminó mal. Recién cuando esta corrida termine se sabrá si se
+  // recuperó, y ahí `marcarHeartbeat` reemplaza el resultado.
+  if (ultima && !ultima.ok) return 'falla'
+  if (corriendo) return 'corriendo'
   if (!ultima) return 'nunca'
-  if (!ultima.ok) return 'falla'
   const horas = (ahora.getTime() - ultima.inicio.getTime()) / 3_600_000
   return horas > cfg.maxHoras ? 'atrasado' : 'ok'
 }
@@ -355,11 +423,19 @@ export function horasDesde(ultima: UltimaCorrida, ahora: Date = new Date()): num
 
 export type CorridaResumen = { inicio: Date; ok: boolean; detalle: string | null }
 
-/** Última corrida de cada job del catálogo. Una sola consulta, no una por job. */
+/**
+ * Última corrida TERMINADA de cada job del catálogo. Una sola consulta, no una por job.
+ *
+ * El filtro `fin: { not: null }` es el que sostiene todo el mecanismo de "en curso": si
+ * una marca de arranque entrara acá, le renovaría la frescura al job y lo dejaría verde
+ * por haber arrancado, no por haber funcionado. Es exactamente el agujero de julio, con
+ * otra puerta de entrada. `marcarHeartbeat` siempre escribe `fin`, así que ninguna corrida
+ * real se pierde por este filtro.
+ */
 export async function ultimasCorridas(): Promise<Map<string, CorridaResumen>> {
   const slugs = Object.keys(CATALOGO)
   const filas = await prisma.jobRun.findMany({
-    where: { slug: { in: slugs } },
+    where: { slug: { in: slugs }, fin: { not: null } },
     orderBy: { inicio: 'desc' },
     select: { slug: true, inicio: true, ok: true, detalle: true },
   })
@@ -368,15 +444,29 @@ export async function ultimasCorridas(): Promise<Map<string, CorridaResumen>> {
   return porSlug
 }
 
+/** Jobs con una marca de arranque vigente, es decir: corriendo ahora mismo. */
+export async function slugsEnCurso(ahora: Date = new Date()): Promise<Set<string>> {
+  const corte = new Date(ahora.getTime() - VENTANA_EN_CURSO_MIN * 60_000)
+  const filas = await prisma.jobRun.findMany({
+    where: { fin: null, inicio: { gt: corte } },
+    select: { slug: true },
+  })
+  return new Set(filas.map((f) => f.slug))
+}
+
 /** Los jobs del catálogo que no reportaron a tiempo, fallaron, o nunca reportaron. */
 export async function chequearHeartbeats(): Promise<CronVencido[]> {
   const ultimas = await ultimasCorridas()
+  const corriendo = await slugsEnCurso()
   const ahora = new Date()
   const vencidos: CronVencido[] = []
 
   for (const slug of Object.keys(CATALOGO)) {
     const u = ultimas.get(slug)
-    if (derivarEstado(slug, u, ahora) === 'ok') continue
+    // 'corriendo' no es una alarma: es un trabajo en marcha del que todavía no hay nada
+    // que contar. Avisar por eso sería el falso positivo que este mecanismo vino a matar.
+    const estado = derivarEstado(slug, u, ahora, corriendo.has(slug))
+    if (estado === 'ok' || estado === 'corriendo') continue
     const h = horasDesde(u, ahora)
     vencidos.push({
       nombre: slug,

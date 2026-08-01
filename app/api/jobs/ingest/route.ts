@@ -17,7 +17,7 @@
 // igual deja su excepción en el log y actualiza el mtime. El exit code no se puede fingir.
 import { NextRequest, NextResponse } from 'next/server'
 import { chequearCron } from '@/lib/cron-auth'
-import { marcarHeartbeat, sinResultado, type Origen } from '@/lib/cron-heartbeat'
+import { marcarEnCurso, marcarHeartbeat, enCurso, sinResultado, type Origen } from '@/lib/cron-heartbeat'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -49,6 +49,14 @@ export async function POST(req: NextRequest) {
   // no se guarda ni como éxito ni como falla. El razonamiento completo, y los dos agujeros
   // que abrió hacerlo, están en CODIGOS_SIN_RESULTADO. Se responde 200 a propósito: el
   // reportero hizo bien su trabajo al contarlo, no hay nada que reintentar.
+  //
+  // La única de las dos que deja rastro es "arrancó y sigue corriendo", y en un carril
+  // aparte (`fin: null`) que no cuenta como resultado. Así el panel puede decir "en
+  // proceso" en vez de callarse, sin que eso valga como corrida terminada.
+  if (enCurso(exitCode)) {
+    await marcarEnCurso(slug, origen)
+    return NextResponse.json({ ok: true, slug, registrado: false, en_curso: true })
+  }
   if (sinResultado(exitCode)) {
     return NextResponse.json({ ok: true, slug, registrado: false, ignorado: 'sin_resultado' })
   }

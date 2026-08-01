@@ -8,10 +8,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   derivarEstado,
+  enCurso,
   horasDesde,
   sinResultado,
   CATALOGO,
+  CODIGOS_NO_ARRANCO,
   CODIGOS_SIN_RESULTADO,
+  CODIGO_EN_CURSO,
 } from '@/lib/cron-heartbeat'
 
 const AHORA = new Date('2026-07-31T12:00:00Z')
@@ -101,6 +104,54 @@ describe('lo que no es una corrida terminada no se guarda', () => {
     const vencido = haceHoras(semanal.maxHoras + 1)
     expect(derivarEstado('micelium_ig_reels_semanal', { inicio: vencido, ok: true }, AHORA))
       .toBe('atrasado')
+  })
+})
+
+// El tercer capítulo (01/08/2026). Callarse ante 0x00041301 evitaba el rojo falso, pero
+// dejaba al panel sin poder decir nada: un job que arrancó hace un minuto se veía igual de
+// mudo que uno abandonado. Ahora se muestra 'corriendo', y estos tests fijan los tres
+// límites que impiden que "corriendo" se convierta en la próxima mentira tranquilizadora.
+describe('estado "corriendo"', () => {
+  it('un job sano que está corriendo se muestra "corriendo", no "ok"', () => {
+    expect(derivarEstado('send-pending', { inicio: haceHoras(0.5), ok: true }, AHORA, true))
+      .toBe('corriendo')
+  })
+
+  it('un job que nunca reportó pero está corriendo NO es "nunca"', () => {
+    // Es justo el caso que motivó el cambio: arrancó, todavía no hay resultado.
+    expect(derivarEstado('send-pending', undefined, AHORA, true)).toBe('corriendo')
+  })
+
+  it('"corriendo" NO tapa una falla anterior', () => {
+    // Que haya vuelto a arrancar no borra que la última vez terminó mal. El rojo se apaga
+    // cuando llega un resultado bueno, no cuando el job hace otro intento.
+    expect(derivarEstado('send-pending', { inicio: haceHoras(0.1), ok: false }, AHORA, true))
+      .toBe('falla')
+  })
+
+  it('"corriendo" tapa "atrasado" — se está poniendo al día, no hay nada que avisar', () => {
+    expect(derivarEstado('send-pending', { inicio: haceHoras(30), ok: true }, AHORA, true))
+      .toBe('corriendo')
+  })
+
+  it('sin la marca, nada cambia respecto de antes', () => {
+    // El parámetro es opcional y su ausencia tiene que dar exactamente el estado viejo.
+    expect(derivarEstado('send-pending', { inicio: haceHoras(0.5), ok: true }, AHORA))
+      .toBe('ok')
+    expect(derivarEstado('send-pending', undefined, AHORA)).toBe('nunca')
+  })
+
+  it('solo 0x00041301 cuenta como "en curso"', () => {
+    expect(enCurso(CODIGO_EN_CURSO)).toBe(true)
+    for (const code of CODIGOS_NO_ARRANCO) expect(enCurso(code), String(code)).toBe(false)
+    for (const code of [0, 1, 255]) expect(enCurso(code), String(code)).toBe(false)
+    expect(enCurso(undefined)).toBe(false)
+    expect(enCurso(null)).toBe(false)
+  })
+
+  it('"en curso" sigue siendo un código sin resultado: no se guarda como corrida', () => {
+    // La separación en dos listas no puede haber sacado a 267009 del guardia del ingest.
+    expect(sinResultado(CODIGO_EN_CURSO)).toBe(true)
   })
 })
 

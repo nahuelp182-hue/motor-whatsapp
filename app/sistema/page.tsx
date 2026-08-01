@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { SidebarNav } from '@/components/SidebarNav'
 
-type Estado = 'ok' | 'atrasado' | 'falla' | 'nunca'
+type Estado = 'ok' | 'atrasado' | 'falla' | 'nunca' | 'corriendo'
 type Origen = 'vps' | 'vercel' | 'github' | 'windows'
 
 type Job = {
@@ -31,7 +31,7 @@ type Consumidor = {
 }
 type Datos = {
   jobs: Job[]
-  resumen: { total: number; ok: number; falla: number; atrasado: number; nunca: number }
+  resumen: { total: number; ok: number; falla: number; atrasado: number; nunca: number; corriendo: number }
   gasto: { consumidores: Consumidor[]; total: number; desdeDias: number }
 }
 
@@ -45,11 +45,13 @@ function hace(h: number | null): string {
   return `hace ${Math.round(h / 24)} días`
 }
 
+// 'corriendo' va en azul y no en verde a propósito: no está diciendo que salió bien, está
+// diciendo que todavía no se sabe. Confundirlo con OK es la mentira que se quiere evitar.
 const COLOR: Record<Estado, string> = {
-  ok: '#34d399', falla: '#f87171', atrasado: '#fbbf24', nunca: '#94a3b8',
+  ok: '#34d399', falla: '#f87171', atrasado: '#fbbf24', nunca: '#94a3b8', corriendo: '#60a5fa',
 }
 const ETIQUETA: Record<Estado, string> = {
-  ok: 'OK', falla: 'Falló', atrasado: 'Atrasado', nunca: 'Sin reportar',
+  ok: 'OK', falla: 'Falló', atrasado: 'Atrasado', nunca: 'Sin reportar', corriendo: 'En proceso',
 }
 const ICONO_ORIGEN = { vps: Server, vercel: Cloud, github: Workflow, windows: Monitor }
 const NOMBRE_ORIGEN = { vps: 'VPS', vercel: 'Vercel', github: 'GitHub Actions', windows: 'Windows' }
@@ -72,6 +74,14 @@ function FilaJob({ j }: { j: Job }) {
         <div className="flex flex-wrap items-baseline gap-x-2">
           <span className="font-mono text-[13px] text-white/90">{j.slug}</span>
           <span className="text-[11px] text-white/35">{hace(j.horas)}</span>
+          {/* Se escribe con todas las letras, y no solo con el color del punto, porque es
+              el estado que más se malinterpreta: sin la palabra, un job que arrancó recién
+              se lee como uno que no reportó. */}
+          {j.estado === 'corriendo' && (
+            <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] text-sky-300">
+              En proceso
+            </span>
+          )}
         </div>
         {/* La reseña es lo único que vuelve legible una fila en rojo a las 3 de la mañana. */}
         <p className="mt-0.5 text-[12.5px] leading-snug text-white/55">{j.que}</p>
