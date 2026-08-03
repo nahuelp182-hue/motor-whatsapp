@@ -12,7 +12,11 @@ type Mensaje = {
 }
 type Conversacion = {
   sender: string
+  /** Por dónde entró: 'wa' | 'ig' | 'messenger'. Determina si se puede responder desde acá. */
+  canal: string
   nombre: string | null
+  /** @usuario de Instagram, cuando lo hay. Es lo que permite encontrar a la persona. */
+  usuario: string | null
   ultimoTs: string
   mensajes: Mensaje[]
   derivada: boolean
@@ -22,8 +26,14 @@ type Conversacion = {
   error: boolean
 }
 
-// Devuelve las conversaciones de WhatsApp (bot) reconstruidas desde ig_diag.
-// Solo filas del canal 'wa'. Agrupa por número, arma el hilo user/bot.
+// Devuelve las conversaciones del bot reconstruidas desde ig_diag, de LOS TRES canales:
+// WhatsApp, Instagram y Messenger. Agrupa por interlocutor, arma el hilo user/bot.
+//
+// Hasta el 01/08/2026 el panel mostraba solo WhatsApp, y eso tuvo un costo concreto: el
+// webhook de Instagram dejó de recibir mensajes el 08/07 y nadie lo notó durante tres
+// semanas, porque el único lugar donde se miran las conversaciones no incluía ese canal.
+// Un canal que no se ve en ninguna pantalla es un canal que puede morirse sin que nadie
+// se entere.
 //
 // Además de los mensajes de texto entran acá dos cosas que antes no se veían y hacían
 // parecer incoherente la conversación:
@@ -41,27 +51,32 @@ export async function GET(req: NextRequest) {
 
   try {
     const rows = (await p.query(
-      `SELECT id, ts, kind, sender, detail
+      `SELECT id, ts, kind, sender, detail, canal
          FROM ig_diag
-        WHERE canal = 'wa'
-          AND kind IN ('recibido','recibido_archivo','pensado','handoff_activo','wa_send_fail','wa_error')
+        WHERE canal IN ('wa','ig','messenger')
+          AND kind IN ('recibido','recibido_archivo','pensado','handoff_activo',
+                       'wa_send_fail','wa_error','send_fail','error')
           AND ts > now() - ($1 || ' days')::interval
         ORDER BY id ASC`,
       [String(days)],
-    )).rows as Array<{ id: number; ts: string; kind: string; sender: string; detail: unknown }>
+    )).rows as Array<{ id: number; ts: string; kind: string; sender: string; detail: unknown; canal: string }>
 
+    // La clave incluye el canal: un mismo identificador podría repetirse entre plataformas,
+    // y mezclar dos hilos distintos en uno sería peor que no mostrarlos.
     const map = new Map<string, Conversacion>()
     for (const r of rows) {
       const d = (typeof r.detail === 'string' ? JSON.parse(r.detail) : r.detail) as Record<string, unknown>
-      let c = map.get(r.sender)
+      const clave = `${r.canal}:${r.sender}`
+      let c = map.get(clave)
       if (!c) {
-        c = { sender: r.sender, nombre: null, ultimoTs: r.ts, mensajes: [], derivada: false, manual: false, seguimiento: false, feedback: false, error: false }
-        map.set(r.sender, c)
+        c = { sender: r.sender, canal: r.canal, nombre: null, usuario: null, ultimoTs: r.ts, mensajes: [], derivada: false, manual: false, seguimiento: false, feedback: false, error: false }
+        map.set(clave, c)
       }
       c.ultimoTs = r.ts
 
       if (r.kind === 'recibido') {
         if (typeof d.nombre === 'string' && d.nombre) c.nombre = d.nombre
+        if (typeof d.usuario === 'string' && d.usuario) c.usuario = d.usuario
         if (typeof d.texto === 'string' && d.texto) c.mensajes.push({ ts: r.ts, role: 'user', text: d.texto })
       } else if (r.kind === 'pensado') {
         const text = typeof d.respuesta === 'string' ? d.respuesta : ''
@@ -87,7 +102,8 @@ export async function GET(req: NextRequest) {
             text: 'Ya le pasé tu caso al equipo y lo están viendo 🙌 Te responden por acá o al número que te compartí. Perdón por la demora.',
           })
         }
-      } else if (r.kind === 'wa_send_fail' || r.kind === 'wa_error') {
+      } else if (r.kind === 'wa_send_fail' || r.kind === 'wa_error' || r.kind === 'send_fail' || r.kind === 'error') {
+        // 'send_fail'/'error' son los equivalentes del lado Instagram/Messenger.
         c.error = true
       }
     }
@@ -106,6 +122,11 @@ export async function GET(req: NextRequest) {
       seguimientos: conversaciones.filter((c) => c.seguimiento).length,
       feedbacks: conversaciones.filter((c) => c.feedback).length,
       errores: conversaciones.filter((c) => c.error).length,
+      porCanal: {
+        wa: conversaciones.filter((c) => c.canal === 'wa').length,
+        ig: conversaciones.filter((c) => c.canal === 'ig').length,
+        messenger: conversaciones.filter((c) => c.canal === 'messenger').length,
+      },
     }
 
     return NextResponse.json({ conversaciones, totales, days })
@@ -144,8 +165,15 @@ async function sumarEnviosAutomaticos(
   try {
     // Índice por los últimos 10 dígitos: el teléfono del cliente en Tiendanube y el id de
     // WhatsApp no se escriben igual (prefijo 549, el 15, separadores).
+    // Solo WhatsApp: el cruce es por teléfono, y el identificador de Instagram es un número
+    // largo que sin este filtro podría coincidir en sus últimos 10 dígitos con el de alguien
+    // y colgarle a un hilo de IG un mensaje que salió por WhatsApp.
     const porTel = new Map<string, Conversacion>()
-    for (const c of map.values()) porTel.set(c.sender.replace(/\D/g, '').slice(-10), c)
+    for (const c of map.values()) {
+      if (c.canal !== 'wa') continue
+      porTel.set(c.sender.replace(/\D/g, '').slice(-10), c)
+    }
+    if (porTel.size === 0) return
 
     const envios = (await p.query(
       `SELECT m."createdAt" AS ts, m.tipo_evento, c.telefono

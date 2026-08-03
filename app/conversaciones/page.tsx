@@ -13,7 +13,9 @@ type Mensaje = {
 }
 type Conversacion = {
   sender: string
+  canal: string
   nombre: string | null
+  usuario: string | null
   ultimoTs: string
   mensajes: Mensaje[]
   derivada: boolean
@@ -22,7 +24,11 @@ type Conversacion = {
   feedback: boolean
   error: boolean
 }
-type Totales = { conversaciones: number; mensajes: number; derivadas: number; manuales: number; seguimientos: number; feedbacks: number; errores: number }
+type Totales = {
+  conversaciones: number; mensajes: number; derivadas: number; manuales: number
+  seguimientos: number; feedbacks: number; errores: number
+  porCanal?: { wa: number; ig: number; messenger: number }
+}
 type Data = { conversaciones: Conversacion[]; totales: Totales; days: number; error?: string }
 
 const RANGOS = [
@@ -42,6 +48,20 @@ const FILTROS: Array<{ id: FiltroId; label: string; color?: string; test: (c: Co
   { id: 'error',       label: 'Errores',     color: '#f87171', test: (c) => c.error },
 ]
 
+// Los tres canales por los que puede entrar una conversación. Están acá arriba y no
+// escondidos en un condicional porque el panel mostraba SOLO WhatsApp, y por eso el webhook
+// de Instagram pudo estar tres semanas mudo sin que nadie lo notara: no había pantalla donde
+// se viera su ausencia.
+type CanalId = 'todos' | 'wa' | 'ig' | 'messenger'
+const CANALES: Array<{ id: CanalId; label: string; color: string }> = [
+  { id: 'todos',     label: 'Todos',      color: '#a3a3a0' },
+  { id: 'wa',        label: 'WhatsApp',   color: '#25d366' },
+  { id: 'ig',        label: 'Instagram',  color: '#e1306c' },
+  { id: 'messenger', label: 'Messenger',  color: '#0084ff' },
+]
+const COLOR_CANAL: Record<string, string> = { wa: '#25d366', ig: '#e1306c', messenger: '#0084ff' }
+const NOMBRE_CANAL: Record<string, string> = { wa: 'WhatsApp', ig: 'Instagram', messenger: 'Messenger' }
+
 function hora(ts: string): string {
   return new Date(ts).toLocaleString('es-AR', {
     timeZone: 'America/Argentina/Buenos_Aires',
@@ -49,7 +69,11 @@ function hora(ts: string): string {
   })
 }
 
-function telLindo(s: string): string {
+// Cómo se muestra el interlocutor. En WhatsApp es un teléfono; en Instagram y Messenger es
+// un identificador interno de Meta que no dice nada, así que se acorta para que no ocupe la
+// fila entera fingiendo ser información.
+function telLindo(s: string, canal = 'wa'): string {
+  if (canal !== 'wa') return `#${s.slice(-6)}`
   const d = s.replace(/\D/g, '')
   return d ? `+${d}` : s
 }
@@ -64,6 +88,7 @@ export default function ConversacionesPage() {
   const [loading, setLoading] = useState(true)
   const [sel, setSel] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<FiltroId>('todos')
+  const [canal, setCanal] = useState<CanalId>('todos')
   const [q, setQ] = useState('')
 
   const cargar = useCallback(async () => {
@@ -72,8 +97,6 @@ export default function ConversacionesPage() {
       const res = await fetch(`/api/conversaciones?days=${days}`)
       const json = (await res.json()) as Data
       setData(json)
-      // Selección por defecto: la primera (la más reciente)
-      setSel((prev) => prev ?? json.conversaciones[0]?.sender ?? null)
     } catch {
       setData({ conversaciones: [], totales: { conversaciones: 0, mensajes: 0, derivadas: 0, manuales: 0, seguimientos: 0, feedbacks: 0, errores: 0 }, days, error: 'No se pudo cargar' })
     } finally {
@@ -88,13 +111,26 @@ export default function ConversacionesPage() {
   const testFiltro = FILTROS.find((f) => f.id === filtro)?.test ?? (() => true)
   const qn = q.trim().toLowerCase()
   const convs = todas.filter((c) => {
+    if (canal !== 'todos' && c.canal !== canal) return false
     if (!testFiltro(c)) return false
     if (!qn) return true
     if ((c.nombre ?? '').toLowerCase().includes(qn)) return true
+    if ((c.usuario ?? '').toLowerCase().includes(qn.replace(/^@/, ''))) return true
     if (c.sender.includes(qn.replace(/\D/g, ''))) return true
     return c.mensajes.some((m) => m.text.toLowerCase().includes(qn))
   })
-  const actual = convs.find((c) => c.sender === sel) ?? null
+  // La clave lleva el canal: dos plataformas podrían repetir un identificador, y
+  // seleccionar el hilo equivocado sería peor que no mostrarlo.
+  const claveDe = (c: Conversacion) => `${c.canal}:${c.sender}`
+  const actual = convs.find((c) => claveDe(c) === sel) ?? null
+
+  // Si lo seleccionado no está en la lista visible —al entrar, al cambiar de canal, al
+  // filtrar o al buscar— se abre la primera. Antes el panel derecho decía "elegí una
+  // conversación" teniendo una sola al lado, y había que hacer un clic de más.
+  useEffect(() => {
+    if (!convs.length || actual) return
+    setSel(claveDe(convs[0]))
+  }, [convs, actual])
   const conteo = (f: (c: Conversacion) => boolean) => todas.filter(f).length
 
   return (
@@ -107,7 +143,7 @@ export default function ConversacionesPage() {
           <div>
             <h1 className="text-xl font-semibold">
               {vista === 'bot'
-                ? 'Conversaciones del bot · WhatsApp'
+                ? `Conversaciones del bot${canal === 'todos' ? '' : ` · ${NOMBRE_CANAL[canal]}`}`
                 : vista === 'apicultura'
                   ? 'Despachos apícolas · WhatsApp al tío'
                   : 'Preguntas de MercadoLibre · MICELIUMSTORE'}
@@ -158,7 +194,47 @@ export default function ConversacionesPage() {
         {/* Filtros por categoría (clickeables) + búsqueda */}
         {vista === 'bot' && t && (
           <div className="mb-4 space-y-3">
-            <div className="flex flex-wrap gap-2">
+            {/* Canal. Es la pregunta más gruesa —por dónde entró— así que pesa distinto que
+                los filtros de categoría: tarjetas grandes, color de la plataforma y el número
+                bien visible. La primera versión eran píldoras chicas y grises, indistinguibles
+                de la fila de abajo; en una pantalla donde el canal es lo que hay que vigilar,
+                eso lo volvía invisible. */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {CANALES.map((ch) => {
+                const activo = canal === ch.id
+                const n = ch.id === 'todos'
+                  ? (t.porCanal ? t.porCanal.wa + t.porCanal.ig + t.porCanal.messenger : t.conversaciones)
+                  : (t.porCanal?.[ch.id] ?? 0)
+                return (
+                  <button
+                    key={ch.id}
+                    onClick={() => { setCanal(ch.id); setSel(null) }}
+                    style={activo ? { borderColor: ch.color, background: `${ch.color}1a` } : undefined}
+                    className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition ${
+                      activo
+                        ? 'text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04)]'
+                        : 'border-white/[0.07] bg-[#0e0e16] text-white/55 hover:border-white/[0.16] hover:text-white/90'
+                    }`}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ background: ch.color, boxShadow: activo ? `0 0 8px ${ch.color}` : undefined }}
+                      />
+                      <span className="truncate text-sm font-medium">{ch.label}</span>
+                    </span>
+                    <span
+                      className="shrink-0 text-lg font-semibold tabular-nums"
+                      style={{ color: activo ? ch.color : undefined }}
+                    >
+                      {n}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.05] pt-3">
+              <span className="mr-1 text-[10px] uppercase tracking-widest text-white/25">Categoría</span>
               {FILTROS.map((f) => {
                 const n = conteo(f.test)
                 const activo = filtro === f.id
@@ -199,16 +275,23 @@ export default function ConversacionesPage() {
             <div className={`space-y-1.5 ${actual ? 'hidden lg:block' : ''}`}>
               {convs.map((c) => (
                 <button
-                  key={c.sender}
-                  onClick={() => setSel(c.sender)}
+                  key={claveDe(c)}
+                  onClick={() => setSel(claveDe(c))}
                   className={`w-full rounded-xl border p-3 text-left transition ${
-                    sel === c.sender
+                    sel === claveDe(c)
                       ? 'border-white/[0.15] bg-[#191922]'
                       : 'border-white/[0.06] bg-[#0e0e16] hover:bg-[#14141c]'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium">{c.nombre || telLindo(c.sender)}</span>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span
+                        className="size-1.5 shrink-0 rounded-full"
+                        style={{ background: COLOR_CANAL[c.canal] ?? '#a3a3a0' }}
+                        title={NOMBRE_CANAL[c.canal] ?? c.canal}
+                      />
+                      <span className="truncate text-sm font-medium">{c.nombre || telLindo(c.sender, c.canal)}</span>
+                    </span>
                     <span className="shrink-0 text-[10px] text-white/35">{hora(c.ultimoTs)}</span>
                   </div>
                   <div className="mt-0.5 truncate text-xs text-white/45">
@@ -231,14 +314,27 @@ export default function ConversacionesPage() {
                 <div className="flex h-full flex-col">
                   <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] p-4">
                     <div>
-                      <div className="text-sm font-semibold">{actual.nombre || telLindo(actual.sender)}</div>
-                      <a
-                        href={`https://wa.me/${actual.sender.replace(/\D/g, '')}`}
-                        target="_blank"
-                        className="text-[11px] text-white/40 hover:text-white/70"
-                      >
-                        {telLindo(actual.sender)} · abrir en WhatsApp ↗
-                      </a>
+                      <div className="flex items-center gap-1.5 text-sm font-semibold">
+                        <span
+                          className="size-2 shrink-0 rounded-full"
+                          style={{ background: COLOR_CANAL[actual.canal] ?? '#a3a3a0' }}
+                        />
+                        {actual.nombre || telLindo(actual.sender, actual.canal)}
+                      </div>
+                      {actual.canal === 'wa' ? (
+                        <a
+                          href={`https://wa.me/${actual.sender.replace(/\D/g, '')}`}
+                          target="_blank"
+                          className="text-[11px] text-white/40 hover:text-white/70"
+                        >
+                          {telLindo(actual.sender)} · abrir en WhatsApp ↗
+                        </a>
+                      ) : (
+                        <span className="text-[11px] text-white/40">
+                          {actual.usuario ? `@${actual.usuario} · ` : ''}
+                          {NOMBRE_CANAL[actual.canal] ?? actual.canal} · se responde desde la app de Meta
+                        </span>
+                      )}
                     </div>
                     <button onClick={() => setSel(null)} className="text-xs text-white/40 hover:text-white/70 lg:hidden">
                       ← Lista
@@ -271,7 +367,17 @@ export default function ConversacionesPage() {
                       </div>
                     ))}
                   </div>
-                  <Responder sender={actual.sender} onEnviado={cargar} />
+                  {/* Responder desde el panel solo funciona en WhatsApp: la ruta usa la Cloud
+                      API con el número de la marca. Instagram y Messenger se contestan desde
+                      la app de Meta, y decirlo es mejor que ofrecer un campo que falla. */}
+                  {actual.canal === 'wa' ? (
+                    <Responder sender={actual.sender} onEnviado={cargar} />
+                  ) : (
+                    <div className="border-t border-white/[0.06] p-4 text-xs text-white/40">
+                      Desde acá solo se responde por WhatsApp. Este hilo entró por{' '}
+                      {NOMBRE_CANAL[actual.canal] ?? actual.canal}: contestalo desde la app de Meta.
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex h-40 items-center justify-center text-sm text-white/30">
