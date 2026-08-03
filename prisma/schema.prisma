@@ -412,6 +412,28 @@ model EnvioApicola {
   @@index([fecha_compra])
 }
 
+/// Espejo en Postgres de las preguntas de MercadoLibre (MICELIUMSTORE) que el
+/// autoresponder del VPS clasifica y contesta. Mismo motivo que EnvioApicola: el VPS no
+/// es alcanzable desde Vercel, así que empuja su estado en cada ciclo (cron cada 15 min).
+model MlPregunta {
+  question_id     String    @id // id de la pregunta en la API de ML, clave de idempotencia
+  item_id         String?
+  item_titulo     String?
+  comprador_id    String?
+  comprador_nick  String?
+  texto           String
+  respuesta       String?
+  estado          String // pendiente | auto_respondida | pendiente_aprobacion | bloqueada | respondida_manual
+  motivo_bloqueo  String?
+  intent          String?
+  fecha_pregunta  DateTime
+  fecha_respuesta DateTime?
+  actualizado     DateTime  @updatedAt
+
+  @@index([fecha_pregunta])
+  @@index([estado])
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Auditoría del sistema: una corrida completa de chequeos, disparada a mano desde el panel
 // o sola una vez por día.

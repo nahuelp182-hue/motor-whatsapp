@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { SidebarNav } from '@/components/SidebarNav'
 import { FondoHolografico } from '@/components/FondoHolografico'
 import { PanelApicultura } from '@/components/PanelApicultura'
+import { PanelPreguntasML } from '@/components/PanelPreguntasML'
 
 type Mensaje = {
   ts: string; role: 'user' | 'bot'; text: string; derivar?: boolean; accion?: string
@@ -54,10 +55,10 @@ function telLindo(s: string): string {
 }
 
 export default function ConversacionesPage() {
-  // Dos vistas distintas conviven acá: los clientes que atiende el bot y los despachos
-  // apícolas al tío. No se mezclan en la misma lista porque no se miran por lo mismo:
-  // en una interesa la charla, en la otra si el aviso llegó y si el paquete salió.
-  const [vista, setVista] = useState<'bot' | 'apicultura'>('bot')
+  // Tres vistas distintas conviven acá: los clientes que atiende el bot, los despachos
+  // apícolas al tío, y las preguntas de MercadoLibre. No se mezclan en la misma lista
+  // porque no se miran por lo mismo: charla vs. entrega/despacho vs. pregunta/respuesta.
+  const [vista, setVista] = useState<'bot' | 'apicultura' | 'ml-preguntas'>('bot')
   const [days, setDays] = useState(1)
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
@@ -105,7 +106,11 @@ export default function ConversacionesPage() {
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">
-              {vista === 'bot' ? 'Conversaciones del bot · WhatsApp' : 'Despachos apícolas · WhatsApp al tío'}
+              {vista === 'bot'
+                ? 'Conversaciones del bot · WhatsApp'
+                : vista === 'apicultura'
+                  ? 'Despachos apícolas · WhatsApp al tío'
+                  : 'Preguntas de MercadoLibre · MICELIUMSTORE'}
             </h1>
             <a href="/dashboard" className="text-xs text-white/40 hover:text-white/70">← Volver al dashboard</a>
           </div>
@@ -132,7 +137,7 @@ export default function ConversacionesPage() {
 
         {/* Pestañas */}
         <div className="mb-4 flex gap-1 border-b border-white/[0.06]">
-          {([['bot', 'Clientes (bot)'], ['apicultura', 'Apicultura']] as const).map(([id, label]) => (
+          {([['bot', 'Clientes (bot)'], ['apicultura', 'Apicultura'], ['ml-preguntas', 'Preguntas ML']] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setVista(id)}
@@ -148,6 +153,7 @@ export default function ConversacionesPage() {
         </div>
 
         {vista === 'apicultura' && <PanelApicultura />}
+        {vista === 'ml-preguntas' && <PanelPreguntasML />}
 
         {/* Filtros por categoría (clickeables) + búsqueda */}
         {vista === 'bot' && t && (
