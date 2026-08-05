@@ -370,6 +370,24 @@ model Heartbeat {
   alertado DateTime?
 }
 
+/// Envío ADICIONAL sobre un pedido de Tiendanube que ya tiene su propio tracking principal
+/// (ej. se despachó un accesorio faltante por separado, o un cambio de garantía). TN modela
+/// un único `shipping_tracking_number` por orden, así que este segundo envío no tiene forma
+/// de vivir ahí sin pisar el tracking del envío principal — motor-whatsapp lo guarda acá y
+/// mensajeSeguimiento() lo suma como línea aparte cuando el cliente pregunta por su pedido.
+model EnvioExtra {
+  id            String    @id @default(cuid())
+  orden_numero  Int // número de orden de Tiendanube (Pedido.numero), no el ID interno
+  motivo        String // qué es: "booster faltante", "cambio de cúpula por garantía", ...
+  tracking      String // nº de seguimiento (Andreani u otro correo)
+  esAndreani    Boolean   @default(true)
+  despachado_at DateTime  @default(now())
+  entregado     Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+
+  @@index([orden_numero])
+}
+
 /// Estado de entrega REAL de los mensajes de WhatsApp (webhook `statuses`).
 /// La Cloud API devuelve wamid aunque después el mensaje falle (131047 fuera
 /// de ventana): sin esto, "enviado" no significa "llegó".

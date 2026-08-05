@@ -409,10 +409,34 @@ function mensajePendientePago(numero?: number): string {
     `y te confirma. Apenas quede confirmado, despachamos 👌`
 }
 
+// Envíos adicionales sobre el mismo pedido (ver modelo EnvioExtra): un accesorio faltante
+// o un cambio de garantía despachado aparte, con su propio tracking. Se cuelga como línea
+// extra del mensaje de seguimiento para que el bot no confunda ese tracking con el del
+// envío principal ni lo omita si el cliente pregunta por "el envío" en general.
+async function lineaEnviosExtra(numero?: number): Promise<string> {
+  if (!numero) return ''
+  const extras = await prisma.envioExtra.findMany({ where: { orden_numero: numero } })
+  if (!extras.length) return ''
+  const lineas = await Promise.all(
+    extras.map(async (ex) => {
+      const link = ex.esAndreani ? `https://www.andreani.com/envio/${ex.tracking}` : ex.tracking
+      if (!ex.esAndreani) return `• ${ex.motivo}: seguimiento ${link}`
+      const est = await getEstadoAndreani(ex.tracking)
+      if (!est.ok || est.orden == null) return `• ${ex.motivo}: seguimiento ${link}`
+      if (est.entregado) return `• ${ex.motivo}: ENTREGADO ✅ (${link})`
+      if (est.enSucursal) return `• ${ex.motivo}: EN LA SUCURSAL para retirar 🙌 (${link})`
+      return `• ${ex.motivo}: EN CAMINO 🚚 — ${est.titulo} (${link})`
+    })
+  )
+  return `\n\nAdemás tenés un envío aparte:\n${lineas.join('\n')}`
+}
+
 // Arma un mensaje de seguimiento con el estado REAL del envío. Devuelve null si no se
 // puede dar una respuesta certera (→ el caller deriva al equipo, nunca inventa).
 async function mensajeSeguimiento(pedido: Pedido): Promise<string | null> {
   if (!pedido.encontrado) return null
+
+  const extra = await lineaEnviosExtra(pedido.numero)
 
   // Todavía sin nº de seguimiento: o no se despachó, o recién sale.
   if (!pedido.tracking) {
@@ -421,7 +445,7 @@ async function mensajeSeguimiento(pedido: Pedido): Promise<string | null> {
     // el dato de Tiendanube quedó viejo. No se afirma nada.
     if (esEnvioViejo(pedido.diasDesdeCompra)) return null
     return `Tu pedido #${pedido.numero} está confirmado 🙌 Todavía no salió del depósito; ` +
-      `normalmente se despacha al día siguiente hábil a la mañana. Apenas tenga seguimiento te lo paso.`
+      `normalmente se despacha al día siguiente hábil a la mañana. Apenas tenga seguimiento te lo paso.${extra}`
   }
 
   // Andreani: estado en vivo, certero.
@@ -431,23 +455,27 @@ async function mensajeSeguimiento(pedido: Pedido): Promise<string | null> {
     // sigue por el camino genérico en vez de derivar (antes de preguntar no hay forma de
     // saberlo, y adivinar el correo es justo lo que causó el error del 27/07).
     if (!est.ok || est.orden == null) {
-      if (!/andreani/i.test(pedido.correo ?? '')) return mensajeSeguimientoGenerico(pedido)
+      if (!/andreani/i.test(pedido.correo ?? '')) {
+        const msg = mensajeSeguimientoGenerico(pedido)
+        return msg ? msg + extra : null
+      }
       return null // decía Andreani y Andreani no sabe nada → sin dato certero, deriva
     }
     const link = `https://www.andreani.com/envio/${pedido.tracking}`
     if (est.entregado) {
-      return `Tu pedido #${pedido.numero} figura como ENTREGADO ✅ Si no lo recibiste, avisame y lo revisamos.\n\nSeguimiento: ${link}`
+      return `Tu pedido #${pedido.numero} figura como ENTREGADO ✅ Si no lo recibiste, avisame y lo revisamos.\n\nSeguimiento: ${link}${extra}`
     }
     if (est.enSucursal) {
       return `¡Buena noticia! Tu pedido #${pedido.numero} ya está EN LA SUCURSAL para retirar 🙌 ` +
-        `Llevá tu DNI. Te conviene pasar pronto: si queda muchos días sin retirar, el correo lo devuelve.\n\nSeguimiento: ${link}`
+        `Llevá tu DNI. Te conviene pasar pronto: si queda muchos días sin retirar, el correo lo devuelve.\n\nSeguimiento: ${link}${extra}`
     }
     // En camino / ingresado / pendiente → NO decir "llegó a sucursal".
     return `Tu pedido #${pedido.numero} está EN CAMINO 🚚 (estado actual: ${est.titulo}). ` +
-      `El plazo habitual es de 3 a 5 días hábiles.\n\nSeguílo acá: ${link}`
+      `El plazo habitual es de 3 a 5 días hábiles.\n\nSeguílo acá: ${link}${extra}`
   }
 
-  return mensajeSeguimientoGenerico(pedido)
+  const generico = mensajeSeguimientoGenerico(pedido)
+  return generico ? generico + extra : null
 }
 
 function linkDeManual(m: ManualId): string {
