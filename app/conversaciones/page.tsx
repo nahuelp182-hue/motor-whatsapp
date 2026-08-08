@@ -27,7 +27,7 @@ type Conversacion = {
 type Totales = {
   conversaciones: number; mensajes: number; derivadas: number; manuales: number
   seguimientos: number; feedbacks: number; errores: number
-  porCanal?: { wa: number; ig: number; messenger: number }
+  porCanal?: { wa: number; ig: number; messenger: number; facebook: number }
 }
 type Data = { conversaciones: Conversacion[]; totales: Totales; days: number; error?: string }
 
@@ -48,19 +48,20 @@ const FILTROS: Array<{ id: FiltroId; label: string; color?: string; test: (c: Co
   { id: 'error',       label: 'Errores',     color: '#f87171', test: (c) => c.error },
 ]
 
-// Los tres canales por los que puede entrar una conversación. Están acá arriba y no
+// Los cuatro canales por los que puede entrar una conversación. Están acá arriba y no
 // escondidos en un condicional porque el panel mostraba SOLO WhatsApp, y por eso el webhook
 // de Instagram pudo estar tres semanas mudo sin que nadie lo notara: no había pantalla donde
 // se viera su ausencia.
-type CanalId = 'todos' | 'wa' | 'ig' | 'messenger'
+type CanalId = 'todos' | 'wa' | 'ig' | 'messenger' | 'facebook'
 const CANALES: Array<{ id: CanalId; label: string; color: string }> = [
   { id: 'todos',     label: 'Todos',      color: '#a3a3a0' },
   { id: 'wa',        label: 'WhatsApp',   color: '#25d366' },
   { id: 'ig',        label: 'Instagram',  color: '#e1306c' },
   { id: 'messenger', label: 'Messenger',  color: '#0084ff' },
+  { id: 'facebook',  label: 'Facebook',   color: '#1877f2' },
 ]
-const COLOR_CANAL: Record<string, string> = { wa: '#25d366', ig: '#e1306c', messenger: '#0084ff' }
-const NOMBRE_CANAL: Record<string, string> = { wa: 'WhatsApp', ig: 'Instagram', messenger: 'Messenger' }
+const COLOR_CANAL: Record<string, string> = { wa: '#25d366', ig: '#e1306c', messenger: '#0084ff', facebook: '#1877f2' }
+const NOMBRE_CANAL: Record<string, string> = { wa: 'WhatsApp', ig: 'Instagram', messenger: 'Messenger', facebook: 'Facebook' }
 
 function hora(ts: string): string {
   return new Date(ts).toLocaleString('es-AR', {
@@ -199,11 +200,11 @@ export default function ConversacionesPage() {
                 bien visible. La primera versión eran píldoras chicas y grises, indistinguibles
                 de la fila de abajo; en una pantalla donde el canal es lo que hay que vigilar,
                 eso lo volvía invisible. */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               {CANALES.map((ch) => {
                 const activo = canal === ch.id
                 const n = ch.id === 'todos'
-                  ? (t.porCanal ? t.porCanal.wa + t.porCanal.ig + t.porCanal.messenger : t.conversaciones)
+                  ? (t.porCanal ? t.porCanal.wa + t.porCanal.ig + t.porCanal.messenger + t.porCanal.facebook : t.conversaciones)
                   : (t.porCanal?.[ch.id] ?? 0)
                 return (
                   <button

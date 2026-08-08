@@ -26,8 +26,9 @@ type Conversacion = {
   error: boolean
 }
 
-// Devuelve las conversaciones del bot reconstruidas desde ig_diag, de LOS TRES canales:
-// WhatsApp, Instagram y Messenger. Agrupa por interlocutor, arma el hilo user/bot.
+// Devuelve las conversaciones del bot reconstruidas desde ig_diag, de LOS CUATRO canales:
+// WhatsApp, Instagram, Messenger y comentarios de la página de Facebook. Agrupa por
+// interlocutor, arma el hilo user/bot.
 //
 // Hasta el 01/08/2026 el panel mostraba solo WhatsApp, y eso tuvo un costo concreto: el
 // webhook de Instagram dejó de recibir mensajes el 08/07 y nadie lo notó durante tres
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
     const rows = (await p.query(
       `SELECT id, ts, kind, sender, detail, canal
          FROM ig_diag
-        WHERE canal IN ('wa','ig','messenger')
+        WHERE canal IN ('wa','ig','messenger','facebook')
           AND kind IN ('recibido','recibido_archivo','pensado','handoff_activo',
                        'wa_send_fail','wa_error','send_fail','error')
           AND ts > now() - ($1 || ' days')::interval
@@ -126,6 +127,7 @@ export async function GET(req: NextRequest) {
         wa: conversaciones.filter((c) => c.canal === 'wa').length,
         ig: conversaciones.filter((c) => c.canal === 'ig').length,
         messenger: conversaciones.filter((c) => c.canal === 'messenger').length,
+        facebook: conversaciones.filter((c) => c.canal === 'facebook').length,
       },
     }
 
