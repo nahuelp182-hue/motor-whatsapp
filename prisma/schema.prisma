@@ -218,10 +218,11 @@ model Visitor {
   ft_landing  String? // primera landing (con query completa)
   ft_at       DateTime @default(now())
 
-  // COSIDO A COMPRA — se rellena cuando el visitante llega al thank-you page.
+  // COSIDO A COMPRA — lo sella curiosos_cosido.py cruzando órdenes pagadas de TN.
   email        String?
   order_number Int?
   purchased_at DateTime?
+  total_orden  Decimal?  @db.Decimal(10, 2) // total de la orden (API TN ya lo trae, antes se descartaba)
 
   last_seen DateTime @default(now())
 

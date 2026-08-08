@@ -92,9 +92,19 @@
     });
   }
 
+  /* Mismo vid que curiosos.js (clave __cur_vid, ver public/curiosos.js): así un
+     WidgetEvent puede cruzarse por vid con el Visitor que ya cose curiosos_cosido.py.
+     Fallback a la clave vieja __mic_vid solo de lectura, para no perder de golpe la
+     continuidad de sesiones ya en curso — nunca se vuelve a escribir ahí. */
   function vid() {
-    try { return localStorage.getItem('__mic_vid') || document.cookie.replace(/(?:^|.*;\s*)mic_vid\s*=\s*([^;]*).*$|^.*$/, '$1') || null; }
-    catch (e) { return null; }
+    try {
+      var cur = localStorage.getItem('__cur_vid')
+        || document.cookie.replace(/(?:^|.*;\s*)__cur_vid\s*=\s*([^;]*).*$|^.*$/, '$1');
+      if (cur) return cur;
+      return localStorage.getItem('__mic_vid')
+        || document.cookie.replace(/(?:^|.*;\s*)mic_vid\s*=\s*([^;]*).*$|^.*$/, '$1')
+        || null;
+    } catch (e) { return null; }
   }
 
   var PREVIEW = !!(script && script.hasAttribute('data-preview'));
