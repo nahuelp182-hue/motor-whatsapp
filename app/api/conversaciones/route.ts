@@ -46,7 +46,7 @@ type Conversacion = {
 // Los mensajes que Nahuel o Mateo escriben a mano desde el celular siguen sin aparecer:
 // esos no pasan por ningún sistema nuestro.
 export async function GET(req: NextRequest) {
-  const days = Math.min(Math.max(Number(req.nextUrl.searchParams.get('days') ?? 1), 1), 60)
+  const days = Math.min(Math.max(Number(req.nextUrl.searchParams.get('days') ?? 1), 1), 400)
   const p = getPool()
   if (!p) return NextResponse.json({ error: 'DB no configurada', conversaciones: [], totales: {} })
 

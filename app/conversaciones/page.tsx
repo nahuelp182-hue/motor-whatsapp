@@ -35,6 +35,7 @@ const RANGOS = [
   { label: 'Hoy', days: 1 },
   { label: '7 días', days: 7 },
   { label: '30 días', days: 30 },
+  { label: 'Todo', days: 400 },
 ]
 
 // Filtros por categoría. `test` decide si una conversación entra en el filtro.
