@@ -122,6 +122,10 @@ export const CATALOGO: Record<string, EntradaCatalogo> = {
     origen: 'vps', maxHoras: 2,
     que: 'Pide la reseña cuando el pedido figura entregado',
   },
+  'resenas-google': {
+    origen: 'vps', maxHoras: 30,
+    que: 'Trae las reseñas nuevas de la ficha de Google Business al widget',
+  },
   'send-pending': {
     origen: 'vps', maxHoras: 2,
     que: 'Drena la cola de mensajes salientes del recupero de carrito',
