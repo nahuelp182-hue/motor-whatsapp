@@ -19,7 +19,7 @@ import { costoDe } from '@/lib/precios-ia'
  * `null` = fila vieja, anterior a esta columna. No se adivina: no había forma de saber si
  * era IG o Messenger.
  */
-export type Canal = 'wa' | 'ig' | 'messenger' | 'web'
+export type Canal = 'wa' | 'ig' | 'messenger' | 'web' | 'facebook'
 
 /** Registra un evento de diagnóstico. Nunca lanza. */
 export async function diag(

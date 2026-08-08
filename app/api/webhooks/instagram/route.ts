@@ -289,7 +289,24 @@ async function enviarPrivateReply(commentId: string, texto: string): Promise<boo
 }
 
 type ComentValue = { id?: string; text?: string; from?: { id?: string; username?: string } }
-async function manejarComentario(value: ComentValue) {
+
+// Normaliza un evento field:"feed" (Facebook) al shape que ya espera manejarComentario
+// (el mismo que field:"comments" de Instagram). Solo nos interesan altas de comentario;
+// ediciones/borrados (verb distinto de "add") o reacciones al post (item !== "comment")
+// no son un comentario nuevo para responder.
+function feedAComentValue(value: {
+  item?: string; verb?: string; comment_id?: string; message?: string
+  from?: { id?: string; username?: string; name?: string }
+}): ComentValue | null {
+  if (value.item !== 'comment' || value.verb !== 'add' || !value.comment_id) return null
+  return {
+    id: value.comment_id,
+    text: value.message,
+    from: { id: value.from?.id, username: value.from?.username ?? value.from?.name },
+  }
+}
+
+async function manejarComentario(value: ComentValue, canal: Canal = 'ig') {
   const commentId = value?.id
   const text = (value?.text ?? '').trim()
   const fromId = value?.from?.id
@@ -299,7 +316,7 @@ async function manejarComentario(value: ComentValue) {
   if (!text || comentarioTrivial(text)) return         // reacción/emoji/tag → no responder
   if (await comentarioYaRespondido(commentId)) return  // dedup (Meta reenvía a veces)
 
-  await diag('coment_recibido', String(fromId), { comment_id: commentId, username, texto: text.slice(0, 300) })
+  await diag('coment_recibido', String(fromId), { comment_id: commentId, username, texto: text.slice(0, 300) }, canal)
 
   // DM: respuesta completa del cerebro (precio en escalera, derivación, etc.)
   let dm = ''
@@ -317,11 +334,11 @@ async function manejarComentario(value: ComentValue) {
   const pub = PUBLIC_ACKS[hashIdx(commentId, PUBLIC_ACKS.length)]
   await responderComentarioPublico(commentId, pub)
   await enviarPrivateReply(commentId, dm)
-  await diag('coment_ok', String(fromId), { comment_id: commentId, derivar, publico: pub, dm: dm.slice(0, 300) })
+  await diag('coment_ok', String(fromId), { comment_id: commentId, derivar, publico: pub, dm: dm.slice(0, 300) }, canal)
 
   if (derivar) {
     await notifyNahuel(
-      '🔔 Instagram: comentario derivado',
+      `🔔 ${canal === 'facebook' ? 'Facebook' : 'Instagram'}: comentario derivado`,
       `Comentario de @${username}: "${text}"\nMotivo: ${motivo || '(sin especificar)'}\nSe le respondió por DM invitando a WhatsApp de la empresa.`,
     )
   }
@@ -354,7 +371,13 @@ export async function POST(req: NextRequest) {
       }>
       changes?: Array<{
         field?: string
-        value?: { id?: string; text?: string; from?: { id?: string; username?: string } }
+        // IG manda field:"comments" con id/text/from.username directo en value.
+        // FB manda field:"feed" con item:"comment" y los mismos datos bajo otros nombres
+        // (comment_id en vez de id, message en vez de text, from.name en vez de from.username).
+        value?: {
+          id?: string; text?: string; from?: { id?: string; username?: string }
+          item?: string; verb?: string; comment_id?: string; message?: string
+        }
       }>
     }>
   }
@@ -377,11 +400,20 @@ export async function POST(req: NextRequest) {
   const canal: Canal = body.object === 'page' ? 'messenger' : 'ig'
 
   for (const entry of body.entry ?? []) {
-    // Comentarios en publicaciones (reemplaza la automatización nativa de Meta)
+    // Comentarios en publicaciones (reemplaza la automatización nativa de Meta).
+    // IG manda field:"comments" con el shape directo; FB manda field:"feed" con item/verb
+    // anidados (ver feedAComentValue) — normalizamos y usamos el mismo manejarComentario.
     for (const change of entry.changes ?? []) {
-      if (change.field !== 'comments' || !change.value) continue
-      try { await manejarComentario(change.value) }
-      catch (err) { console.error('IG comment error:', err); await diag('coment_error', 'sys', { error: String(err).slice(0, 500) }, canal) }
+      if (!change.value) continue
+      if (change.field === 'comments') {
+        try { await manejarComentario(change.value, 'ig') }
+        catch (err) { console.error('IG comment error:', err); await diag('coment_error', 'sys', { error: String(err).slice(0, 500) }, 'ig') }
+      } else if (change.field === 'feed') {
+        const cv = feedAComentValue(change.value)
+        if (!cv) continue
+        try { await manejarComentario(cv, 'facebook') }
+        catch (err) { console.error('FB comment error:', err); await diag('coment_error', 'sys', { error: String(err).slice(0, 500) }, 'facebook') }
+      }
     }
 
     for (const event of entry.messaging ?? []) {
