@@ -74,7 +74,12 @@ export async function GET(req: NextRequest) {
     visitors
       .filter(v => {
         const evtAt = eventoPorVid.get(v.vid)
-        return evtAt && v.purchased_at && v.purchased_at.getTime() - evtAt.getTime() <= VENTANA_COSIDO_MS
+        if (!evtAt || !v.purchased_at) return false
+        const delta = v.purchased_at.getTime() - evtAt.getTime()
+        // delta negativo = compró ANTES de este evento (ej. cliente que ya compró y
+        // vuelve a tocar un widget, como el de reseñas post-entrega) — no es la venta
+        // que originó esta conversión, no se le atribuye.
+        return delta >= 0 && delta <= VENTANA_COSIDO_MS
       })
       .map(v => [v.vid, v.total_orden ? Number(v.total_orden) : 0])
   )
