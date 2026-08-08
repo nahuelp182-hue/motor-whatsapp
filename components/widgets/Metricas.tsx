@@ -19,7 +19,7 @@ const D = {
 // Es la razón principal para tener motor propio y no una app de terceros: sin esto los
 // widgets se acumulan "por las dudas" y nadie sabe cuál sirve. Con esto se puede apagar.
 
-type Tot = { impresion: number; interaccion: number; conversion: number; monto: number }
+type Tot = { impresion: number; interaccion: number; conversion: number; monto: number; montoReal: number }
 type Dia = Tot & { fecha: string }
 type Fila = Tot & { id: string; nombre: string; tipo: string; activo: boolean; contexto: string }
 type Datos = { dias: number; total: Tot; activos: number; serie: Dia[]; porWidget: Fila[] }
@@ -91,7 +91,9 @@ export function Metricas() {
               { k: 'Vistas', v: num(t.impresion), s: 'veces que se mostró' },
               { k: 'Interacciones', v: num(t.interaccion), s: `${tasa} de las vistas` },
               { k: 'Al carrito', v: num(t.conversion), s: 'sumados desde un widget' },
-              { k: 'Movido', v: t.monto > 0 ? pesos(t.monto) : '—', s: 'valor de lo agregado' },
+              t.montoReal > 0
+                ? { k: 'Movido', v: pesos(t.montoReal), s: 'ventas confirmadas, no solo agregado' }
+                : { k: 'Movido', v: t.monto > 0 ? pesos(t.monto) : '—', s: 'valor de lo agregado (aún sin venta confirmada)' },
             ].map(m => (
               <div key={m.k} className="rounded-xl p-3.5" style={{ background: D.card }}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: D.faint }}>{m.k}</div>
