@@ -729,10 +729,21 @@
     var alin = c.estrellaAlineacion === 'centro' ? 'center' : c.estrellaAlineacion === 'derecha' ? 'right' : 'left';
     var verFotos = c.mostrarFotos !== false;
 
+    // El "G" de cuatro colores es el mismo SVG que Google publica para su logo — inline
+    // así no depende de ningún recurso externo. Sirve para que el sello de Google se
+    // distinga de un tilde genérico: es lo que hace creíble que la reseña es de afuera.
+    var LOGO_GOOGLE = '<svg class="lg" viewBox="0 0 18 18" width="12" height="12">' +
+      '<path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.09-1.8 2.73v2.27h2.92c1.7-1.57 2.68-3.88 2.68-6.64z"/>' +
+      '<path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.27c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.34C2.44 15.98 5.48 18 9 18z"/>' +
+      '<path fill="#FBBC05" d="M3.97 10.7c-.18-.54-.28-1.11-.28-1.7s.1-1.16.28-1.7V4.96H.96C.35 6.18 0 7.55 0 9s.35 2.82.96 4.04l3.01-2.34z"/>' +
+      '<path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.59-2.59C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.96l3.01 2.34C4.68 5.16 6.66 3.58 9 3.58z"/>' +
+      '</svg>';
     var cards = datos.map(function (r) {
       var sello = '';
       if (c.sello && r.verificada) {
-        sello = '<span class="v">✓ ' + (r.fuente === 'google' ? 'Google' : 'compra verificada') + '</span>';
+        sello = r.fuente === 'google'
+          ? '<span class="v vg">' + LOGO_GOOGLE + ' Reseña de Google</span>'
+          : '<span class="v">✓ compra verificada</span>';
       }
       var estr = (r.rating ? '<div class="rs">' + estrellas(r.rating, tam) + '</div>' : '');
       var foto = (verFotos && r.foto ? '<img class="ph" src="' + esc(r.foto) + '" loading="lazy" alt="">' : '');
@@ -789,7 +800,8 @@
       'p{margin:0 0 12px;font-size:14.5px;line-height:1.6;color:#3a352e}' +
       'footer{display:flex;flex-direction:column;gap:3px}' +
       'b{font-size:13.5px;color:#2a2620}' +
-      '.v{font-size:11.5px;color:' + p.bg + ';font-weight:600}' +
+      '.v{font-size:11.5px;color:' + p.bg + ';font-weight:600;display:flex;align-items:center;gap:4px}' +
+      '.v.vg{color:#5a5650}.v.vg .lg{flex:none}' +
       '.fx{font-size:11px;color:#a89c8e}' +
       '.wr{background:' + p.bg + ';color:' + p.texto + ';padding:11px 20px;border-radius:8px;font-size:14px;font-weight:600}' +
       // Modal

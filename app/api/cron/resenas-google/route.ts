@@ -49,6 +49,16 @@ async function accessToken(): Promise<string | null> {
   return data.access_token ?? null
 }
 
+// Cuando el reviewer escribió en otro idioma, Google antepone la traducción automática y
+// deja el texto real bajo "(Original)". Publicar la traducción (o las dos etiquetas
+// pegadas) rompe la confianza que el widget viene a construir, así que se queda solo con
+// el original; si no hay marcador, el comentario ya estaba en español y se usa tal cual.
+function textoOriginal(comment: string): string {
+  const marca = comment.lastIndexOf('(Original)')
+  if (marca === -1) return comment.trim()
+  return comment.slice(marca + '(Original)'.length).trim()
+}
+
 async function traerResenas(token: string): Promise<GoogleReview[]> {
   const accountId = process.env.GOOGLE_REVIEWS_ACCOUNT_ID
   const locationId = process.env.GOOGLE_REVIEWS_LOCATION_ID
@@ -79,12 +89,14 @@ export async function GET(req: NextRequest) {
     const antes = await prisma.review.count({ where: { store_id: store.id, source: 'google' } })
 
     for (const r of reviews) {
-      const texto = (r.comment ?? '').trim()
+      const texto = textoOriginal(r.comment ?? '')
       if (!texto) continue // Google permite reseña solo con estrellas, sin texto: no sirve para el widget.
 
       await prisma.review.upsert({
         where: { source_external_id: { source: 'google', external_id: r.reviewId } },
-        update: {}, // ya ingestada: no pisar una edición manual hecha desde el panel.
+        // Solo se refresca el texto: approved/rating pueden haberse tocado a mano en el
+        // panel, y una corrida del cron no tiene que pisar esa decisión.
+        update: { texto },
         create: {
           store_id: store.id,
           source: 'google',
