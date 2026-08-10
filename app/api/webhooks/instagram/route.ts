@@ -277,6 +277,12 @@ async function responderComentarioPublico(commentId: string, texto: string): Pro
 
 // Respuesta privada a un comentario = DM al autor referenciando su comentario (recipient.comment_id).
 // Permitida 1 vez por comentario y dentro de los 7 días.
+//
+// OJO — desactivada (ver manejarComentario): el hilo que abre esta llamada no entrega los mensajes
+// de vuelta del usuario al webhook (comprobado 10/08: @gonzahll y @aguero.nicolas2019 contestaron
+// "1" al menú y ig_diag no registró nada — ni 'recibido' ni 'error', el mensaje nunca llegó). Un DM
+// que arranca por recipient.id normal (enviarMensajeIG) sí lo hace, como muestran los DM directos
+// sin comentario de por medio. Se deja la función por si Meta corrige el comportamiento.
 async function enviarPrivateReply(commentId: string, texto: string): Promise<boolean> {
   const res = await fetch(`https://graph.facebook.com/v21.0/${PAGE_ID}/messages`, {
     method: 'POST',
@@ -333,7 +339,9 @@ async function manejarComentario(value: ComentValue, canal: Canal = 'ig') {
 
   const pub = PUBLIC_ACKS[hashIdx(commentId, PUBLIC_ACKS.length)]
   await responderComentarioPublico(commentId, pub)
-  await enviarPrivateReply(commentId, dm)
+  // enviarMensajeIG (recipient.id), NO enviarPrivateReply (recipient.comment_id): ver comentario
+  // en enviarPrivateReply. La respuesta a un comentario abre igual la ventana de mensajería.
+  await enviarMensajeIG(String(fromId), dm, canal)
   await diag('coment_ok', String(fromId), { comment_id: commentId, derivar, publico: pub, dm: dm.slice(0, 300) }, canal)
 
   if (derivar) {
