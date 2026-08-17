@@ -83,19 +83,35 @@ const aparte = (titulo: string, texto: string, cta: { texto: string; url: string
      </td></tr>
    </table>`
 
+// Transporter compartido: antes se creaba uno nuevo por mail, lo que pagaba un handshake
+// TLS completo a Gmail en cada envío. En el cron de ciclo-cultivo, que puede mandar varios
+// mails seguidos en una sola invocación, eso alcanzaba a agotar el maxDuration de Vercel
+// (FUNCTION_INVOCATION_TIMEOUT recurrente desde el 31/07). `pool: true` además reusa la
+// conexión SMTP entre sendMail() sucesivos dentro del mismo proceso.
+let transporter: nodemailer.Transporter | null = null
+function getTransporter(): nodemailer.Transporter | null {
+  if (!GMAIL_PASS) return null
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      pool: true,
+      maxConnections: 3,
+      auth: { user: GMAIL_USER, pass: GMAIL_PASS },
+    })
+  }
+  return transporter
+}
+
 async function enviar(to: string, subject: string, html: string): Promise<boolean> {
-  if (!GMAIL_PASS) {
+  const t = getTransporter()
+  if (!t) {
     console.error('[mails-cliente] sin GMAIL_APP_PASSWORD: no se envía', subject)
     return false
   }
   try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      auth: { user: GMAIL_USER, pass: GMAIL_PASS },
-    })
-    await transporter.sendMail({ from: REMITENTE, to, subject, html })
+    await t.sendMail({ from: REMITENTE, to, subject, html })
     return true
   } catch (e) {
     console.error('[mails-cliente] falló el envío:', subject, e)

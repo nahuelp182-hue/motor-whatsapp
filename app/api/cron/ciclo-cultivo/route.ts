@@ -17,6 +17,7 @@ import {
   comprasParaSeguimiento,
   leadsParaSeguimiento,
   type CompraSeguimiento,
+  type LeadSeguimiento,
 } from '@/lib/pedidos'
 import { crearTokenEntrada } from '@/lib/session'
 import {
@@ -103,22 +104,37 @@ export async function GET(req: NextRequest) {
   const enviados: Array<{ pedido: number; hito: string }> = []
   let fallidos = 0
 
-  for (const c of compras) {
-    const hito = hitoDe(c)
-    if (!hito) continue
+  // En paralelo: antes era un for...of secuencial y con varios hitos pendientes en una
+  // misma corrida (típico después de un fin de semana) el total de round-trips de DB +
+  // SMTP superaba el maxDuration de 60s (FUNCTION_INVOCATION_TIMEOUT recurrente desde el
+  // 31/07). El pool de Postgres sigue con max:1 así que esas queries se siguen encolando,
+  // pero el SMTP (el costo dominante, un handshake TLS por mail) ahora corre concurrente.
+  const resultadosCompras = await Promise.allSettled(
+    compras.map(async (c) => {
+      const hito = hitoDe(c)
+      if (!hito) return null
+      if (!(await tomarLatch(`ciclo:${c.numero}:${hito.id}`))) return null
 
-    if (!(await tomarLatch(`ciclo:${c.numero}:${hito.id}`))) continue
-
-    const token = await crearTokenEntrada(
-      { num: c.numero, nom: c.nombre, eq: c.equipos },
-      secreto,
-    )
-    const ok = await enviarMail(
-      c.email,
-      // Siempre INC101 (hardware), nunca material digital: soloDigital = false.
-      hito.arma(c.nombre, `${BASE_URL}/e/${token}`, false),
-    )
-    if (ok) enviados.push({ pedido: c.numero, hito: hito.id })
+      const token = await crearTokenEntrada(
+        { num: c.numero, nom: c.nombre, eq: c.equipos },
+        secreto,
+      )
+      const ok = await enviarMail(
+        c.email,
+        // Siempre INC101 (hardware), nunca material digital: soloDigital = false.
+        hito.arma(c.nombre, `${BASE_URL}/e/${token}`, false),
+      )
+      return { pedido: c.numero, hito: hito.id, ok }
+    }),
+  )
+  for (const r of resultadosCompras) {
+    if (r.status === 'rejected') {
+      console.error('[ciclo-cultivo] falló un envío de compra:', r.reason)
+      fallidos++
+      continue
+    }
+    if (!r.value) continue
+    if (r.value.ok) enviados.push({ pedido: r.value.pedido, hito: r.value.hito })
     else fallidos++
   }
 
@@ -127,22 +143,33 @@ export async function GET(req: NextRequest) {
   // alguien que ya pagó.
   const leads: Array<{ email: string; hito: string; enviado: boolean }> = []
   try {
-    for (const l of await leadsParaSeguimiento()) {
-      const dias = (Date.now() - l.alta.getTime()) / 86_400_000
-      const hito = HITOS_LEAD.find((h) => dias >= h.desde && dias < h.hasta)
-      if (!hito) continue
+    const candidatos = (await leadsParaSeguimiento())
+      .map((l) => {
+        const dias = (Date.now() - l.alta.getTime()) / 86_400_000
+        const hito = HITOS_LEAD.find((h) => dias >= h.desde && dias < h.hasta)
+        return hito ? { l, hito } : null
+      })
+      .filter((x): x is { l: LeadSeguimiento; hito: (typeof HITOS_LEAD)[number] } => x !== null)
 
-      // El latch se toma solo cuando la secuencia está activa. Si se tomara en seco, el
-      // día que se encienda todos estos leads ya figurarían como avisados y se perderían.
-      if (!LEADS_ACTIVO) {
-        leads.push({ email: l.email, hito: hito.id, enviado: false })
+    const resultadosLeads = await Promise.allSettled(
+      candidatos.map(async ({ l, hito }) => {
+        // El latch se toma solo cuando la secuencia está activa. Si se tomara en seco, el
+        // día que se encienda todos estos leads ya figurarían como avisados y se perderían.
+        if (!LEADS_ACTIVO) return { email: l.email, hito: hito.id, enviado: false }
+        if (!(await tomarLatch(`lead:${l.email}:${hito.id}`))) return null
+        const ok = await enviarMail(l.email, hito.arma())
+        return { email: l.email, hito: hito.id, enviado: ok }
+      }),
+    )
+    for (const r of resultadosLeads) {
+      if (r.status === 'rejected') {
+        console.error('[ciclo-cultivo] falló un envío de lead:', r.reason)
+        fallidos++
         continue
       }
-      if (!(await tomarLatch(`lead:${l.email}:${hito.id}`))) continue
-
-      const ok = await enviarMail(l.email, hito.arma())
-      leads.push({ email: l.email, hito: hito.id, enviado: ok })
-      if (!ok) fallidos++
+      if (!r.value) continue
+      leads.push(r.value)
+      if (!r.value.enviado && LEADS_ACTIVO) fallidos++
     }
   } catch (e) {
     console.error('[ciclo-cultivo] falló la secuencia de leads:', e)
