@@ -1356,8 +1356,20 @@ export async function POST(req: NextRequest) {
         } catch (err) {
           console.error('WA webhook error:', err)
           await wdiag('wa_error', from, { error: String(err).slice(0, 1000) })
+          // Antes esto mandaba "en un ratito te respondemos" y ahí quedaba: nadie
+          // reintenta ni deriva, así que la promesa quedaba incumplida (detectado
+          // 18/08/2026 — 49 mensajes en 7 días con la IA caída por crédito insuficiente,
+          // todos con esa misma respuesta vacía). Ahora deriva de una y avisa a Nahuel,
+          // igual que el resto de las derivaciones.
           try {
-            await enviarMensajeWA(from, '¡Hola! 👋 Gracias por escribirnos, en un ratito te respondemos 🍄')
+            await derivarAlEquipo(from, 'Perdón, tuvimos un problema técnico justo con tu mensaje 🙏 Te paso con el equipo:')
+            await notifyNahuel(
+              '⚠️ WhatsApp: el bot falló al responder — derivado',
+              `El bot tuvo un error técnico procesando este mensaje y se derivó automáticamente.\n\n` +
+              `Número: ${from}\n` +
+              `Error: ${String(err).slice(0, 300)}\n\n` +
+              `Si el error se repite mucho, puede ser algo de fondo (ej. crédito de la API agotado).`,
+            )
           } catch {}
         }
         })
