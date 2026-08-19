@@ -87,6 +87,31 @@ export async function GET(req: NextRequest) {
       await notifyNahuel('🍄 Resumen diario del bot (WhatsApp)', body)
     }
 
+    // ── Tasa de error del bot ─────────────────────────────────────────────────────────
+    // "⚠️ Errores de envío" ya salía en el resumen de arriba, pero como una línea más
+    // entre varias — nadie la lee como alarma. El 12-18/08/2026 el crédito de Claude se
+    // agotó y 49 de 89 mensajes (55%) fallaron durante 6 días sin que este cron dijera
+    // nada aparte: el número estaba, pero enterrado. Esto dispara aparte, con umbral,
+    // cuando la proporción de errores es alta — no solo cuando hay error.
+    try {
+      const UMBRAL_TASA_ERROR = 0.2 // 20%: un puñado de fallos sueltos no dispara, una fuga sí
+      const tasaError = entrantes > 0 ? errores / entrantes : 0
+      if (entrantes >= 5 && tasaError > UMBRAL_TASA_ERROR) {
+        await notifyNahuel(
+          '🚨 El bot de WhatsApp está fallando mucho',
+          `De ${entrantes} mensajes recibidos en las últimas 24 h, ${errores} fallaron ` +
+          `(${Math.round(tasaError * 100)}%).\n\n` +
+          `Causa más común: crédito de la API de Claude agotado (mensaje "credit balance ` +
+          `too low"). Revisar console.anthropic.com → Billing de la organización de ` +
+          `mw-micelium.\n\n` +
+          `Mientras tanto el bot deriva al equipo en cada falla — no se pierde el ` +
+          `mensaje, pero tampoco responde solo.`,
+        )
+      }
+    } catch (e) {
+      console.error('[resumen-bot] chequeo de tasa de error falló:', e)
+    }
+
     // ── Heartbeat de los otros crons (VPS + Vercel) ──────────────────────────────────
     // Va acá y no en un cron propio: mientras no esté confirmado el plan de Vercel, un
     // cron nuevo podría no correr nunca. Este SÍ corre (es el que acaba de mandar este
