@@ -65,13 +65,62 @@ async function viaTelegram(text: string) {
   })
 }
 
-async function viaWhatsApp(text: string) {
-  if (!WA_PHONE_ID || !WA_TOKEN) return
+// Plantilla aprobada por Meta (categoría UTILITY, id 2272352020233100, enviada a revisión
+// el 20/08/2026) con dos variables: {{1}} asunto, {{2}} detalle. Existe porque un mensaje de
+// TEXTO común solo entrega si hay una ventana de 24h abierta con el número del bot — y
+// Nahuel casi nunca le escribe a ese número, así que en la práctica esa ventana nunca está
+// abierta y el aviso urgente (el que más importa: bot caído, saldo agotado) es justo el que
+// más fallaba en silencio.
+const WA_TEMPLATE_NAME = 'bot_alerta_falla'
+const WA_TEMPLATE_LANG = 'es_AR'
+
+/** Los parámetros de plantilla de WhatsApp rechazan saltos de línea y tienen un largo
+ *  razonable: sin este recorte, un body con \n de sobra devuelve error y cae al fallback. */
+function paramSeguro(s: string, max: number): string {
+  return s.replace(/\s*\n+\s*/g, ' · ').slice(0, max)
+}
+
+async function viaWhatsAppPlantilla(subject: string, body: string): Promise<boolean> {
+  const r = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: NAHUEL_WA,
+      type: 'template',
+      template: {
+        name: WA_TEMPLATE_NAME,
+        language: { code: WA_TEMPLATE_LANG },
+        components: [{
+          type: 'body',
+          parameters: [
+            { type: 'text', text: paramSeguro(subject, 200) },
+            { type: 'text', text: paramSeguro(body, 600) },
+          ],
+        }],
+      },
+    }),
+  })
+  return r.ok
+}
+
+async function viaWhatsAppTexto(text: string): Promise<void> {
   await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ messaging_product: 'whatsapp', to: NAHUEL_WA, type: 'text', text: { body: text } }),
   })
+}
+
+/**
+ * Prueba primero la plantilla (entrega siempre, aprobada o no la ventana de 24h). Si Meta la
+ * rechaza —todavía PENDING, o algo cambió en la revisión— cae a texto plano, que entrega
+ * solo si la ventana está abierta. Nunca deja el aviso sin intentar por las dos vías.
+ */
+async function viaWhatsApp(subject: string, body: string): Promise<void> {
+  if (!WA_PHONE_ID || !WA_TOKEN) return
+  const ok = await viaWhatsAppPlantilla(subject, body).catch(() => false)
+  if (!ok) await viaWhatsAppTexto(`${subject}\n\n${body}`)
 }
 
 export type Adjunto = { filename: string; content: Buffer; contentType?: string }
@@ -86,7 +135,7 @@ export async function notifyNahuelAdjunto(subject: string, body: string, adjunto
       attachments: [{ filename: adjunto.filename, content: adjunto.content, contentType: adjunto.contentType }],
     })
     // Ping fuera de banda para que lo vea al toque (el adjunto va por mail).
-    await Promise.allSettled([viaTelegram(`${subject}\n\n${body}`), viaWhatsApp(`${subject}\n\n${body}`)])
+    await Promise.allSettled([viaTelegram(`${subject}\n\n${body}`), viaWhatsApp(subject, body)])
   } catch (e) {
     console.error('notifyNahuelAdjunto falló:', e)
   }
@@ -98,7 +147,7 @@ export async function notifyNahuel(subject: string, body: string): Promise<void>
   const results = await Promise.allSettled([
     viaEmail(subject, body),
     viaTelegram(full),
-    viaWhatsApp(full),
+    viaWhatsApp(subject, body),
   ])
   results.forEach((r, i) => {
     if (r.status === 'rejected') console.error(`notifyNahuel canal ${i} falló:`, r.reason)
