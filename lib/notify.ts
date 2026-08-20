@@ -9,8 +9,13 @@ const ALERT_EMAIL = process.env.ALERT_EMAIL         ?? 'nahuelp182@gmail.com'
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? ''
 const TG_CHAT  = process.env.TELEGRAM_CHAT_ID   ?? ''
 
-const WA_PHONE_ID = process.env.WA_PHONE_NUMBER_ID ?? ''
-const WA_TOKEN    = process.env.WA_TOKEN           ?? ''
+// WA_TOKEN/WA_PHONE_NUMBER_ID nunca se cargaron en producción — el webhook manda mensajes
+// con otros nombres (WHATSAPP_TOKEN/WHATSAPP_PHONE_NUMBER_ID). Resultado real, verificado
+// contra `vercel env ls`: este canal estuvo muerto desde que se escribió, sin tirar error
+// (el guard de abajo lo deja pasar en silencio). Reusa esas credenciales como fallback: son
+// el mismo número, no hace falta un token aparte para avisarte a vos.
+const WA_PHONE_ID = process.env.WA_PHONE_NUMBER_ID ?? process.env.WHATSAPP_PHONE_NUMBER_ID ?? ''
+const WA_TOKEN    = process.env.WA_TOKEN           ?? process.env.WHATSAPP_TOKEN           ?? ''
 const NAHUEL_WA   = process.env.NAHUEL_WA_PHONE    ?? '5493522412228'
 
 // Un solo transporter para todo el proceso, en vez de uno nuevo en cada mensaje.

@@ -1,0 +1,48 @@
+# Vigilante de fallas del bot al responder (saldo de Anthropic agotado u otro error).
+#
+# El 12-18/08/2026 el crédito de Anthropic se agotó y 17 conversaciones se quedaron sin
+# ninguna respuesta durante una semana, sin que nada avisara — canales-watchdog mide otra
+# cosa (silencio del canal completo) y no lo detecta.
+#
+# Corre cada 15 min, no una vez al día: acá el tiempo hasta enterarse importa. GitHub Actions
+# y no el VPS ni Vercel, por la misma razón que el resto de los vigilantes: tercera
+# infraestructura, independiente de las dos que vigila.
+name: Watchdog de IA (bot sin responder)
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar el watchdog
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta el secret CRON_SECRET en el repositorio"
+            exit 1
+          fi
+
+          respuesta=$(curl -sS --max-time 30 -w '\n%{http_code}' \
+            https://mw-micelium.vercel.app/api/cron/ia-watchdog \
+            -H "Authorization: Bearer $CRON_SECRET")
+
+          codigo=$(echo "$respuesta" | tail -n1)
+          cuerpo=$(echo "$respuesta" | sed '$d')
+          echo "HTTP $codigo"
+          echo "$cuerpo"
+
+          if [ "$codigo" != "200" ]; then
+            echo "::error::El watchdog no respondió 200 (respondió $codigo)"
+            exit 1
+          fi
+
+          # El endpoint ya manda el aviso si hace falta; esto solo lo deja visible acá.
+          total=$(echo "$cuerpo" | grep -o '"total":[0-9]*' | grep -o '[0-9]*')
+          if [ -n "$total" ] && [ "$total" -ge 3 ]; then
+            echo "::warning::$total errores del bot en los últimos 20 min (la alerta ya salió si correspondía)"
+          fi
