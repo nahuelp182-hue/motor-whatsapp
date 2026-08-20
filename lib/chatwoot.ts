@@ -13,10 +13,14 @@ const habilitado = !!(CW_URL && CW_TOKEN && CW_ACCOUNT && CW_INBOX)
 type ContactoCw = { id: number; identifier?: string; phone_number?: string }
 type ConversacionCw = { id: number; inbox_id: number }
 
+// Caddy descarta cualquier header con guion bajo al parsear el pedido entrante (verificado
+// 20/08/26: "api_access_token" nunca llega al backend, "X-Cw-Token" sí). El Caddyfile del
+// VPS traduce X-Cw-Token → Api_access_token antes de reenviarlo a Chatwoot, así que acá se
+// manda con guion.
 async function cwFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${CW_URL}/api/v1/accounts/${CW_ACCOUNT}${path}`, {
     ...init,
-    headers: { api_access_token: CW_TOKEN, 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: { 'X-Cw-Token': CW_TOKEN, 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   })
   if (!res.ok) {
     throw new Error(`Chatwoot ${path} -> ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`)
