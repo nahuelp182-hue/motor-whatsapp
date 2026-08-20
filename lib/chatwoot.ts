@@ -69,14 +69,30 @@ async function postearMensaje(
   })
 }
 
+// Ambas se llaman con `await` desde el webhook (dentro de after(), en segundo plano —
+// nunca antes de responderle a Meta). Tragan su propio error: si Chatwoot falla, el bot
+// nunca se entera. El await SÍ es necesario acá: en Vercel una promesa sin await que sea
+// la última acción de la tarea puede quedar cortada cuando el runtime da por terminada la
+// función, antes de que el POST a Chatwoot llegue a salir (visto en vivo el 20/08/26: el
+// mensaje entrante se espejaba bien —tenía 20 s de debounce detrás para terminar en paz—
+// pero la respuesta saliente, al ser la última acción de la tarea, nunca llegaba).
+
 // Mensaje del cliente hacia el bot.
-export function espejarEntrante(phone: string, texto: string, nombre?: string): void {
+export async function espejarEntrante(phone: string, texto: string, nombre?: string): Promise<void> {
   if (!habilitado) return
-  postearMensaje(phone, texto, 'incoming', nombre).catch((e) => console.error('Chatwoot mirror (in) error:', e))
+  try {
+    await postearMensaje(phone, texto, 'incoming', nombre)
+  } catch (e) {
+    console.error('Chatwoot mirror (in) error:', e)
+  }
 }
 
 // Respuesta del bot (o del equipo) hacia el cliente.
-export function espejarSaliente(phone: string, texto: string): void {
+export async function espejarSaliente(phone: string, texto: string): Promise<void> {
   if (!habilitado) return
-  postearMensaje(phone, texto, 'outgoing').catch((e) => console.error('Chatwoot mirror (out) error:', e))
+  try {
+    await postearMensaje(phone, texto, 'outgoing')
+  } catch (e) {
+    console.error('Chatwoot mirror (out) error:', e)
+  }
 }

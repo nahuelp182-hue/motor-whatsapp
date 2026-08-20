@@ -629,7 +629,7 @@ async function enviarMensajeWA(to: string, texto: string): Promise<boolean> {
     await wdiag('wa_send_fail', to, { status: res.status, body: bodyText.slice(0, 1500), texto: texto.slice(0, 200) })
   } else {
     await wdiag('wa_send_ok', to, { status: res.status })
-    espejarSaliente(to, texto)
+    await espejarSaliente(to, texto)
   }
   return res.ok
 }
@@ -680,7 +680,7 @@ async function enviarBotonWA(to: string, cuerpo: string, displayText: string, ur
     await wdiag('wa_send_fail', to, { status: res.status, body: bodyText.slice(0, 1500), texto: '[cta_url]' })
   } else {
     await wdiag('wa_send_ok', to, { status: res.status, kind: 'cta_url' })
-    espejarSaliente(to, `${cuerpo}\n\n[botón] ${displayText}: ${url}`)
+    await espejarSaliente(to, `${cuerpo}\n\n[botón] ${displayText}: ${url}`)
   }
   return res.ok
 }
@@ -719,7 +719,7 @@ async function manejarArchivo(
   caption: string, filenameHint: string | undefined,
 ): Promise<void> {
   await wdiag('recibido_archivo', from, { kind, caption: caption.slice(0, 200), nombre, mediaId })
-  espejarEntrante(from, `[${kind === 'image' ? 'imagen' : 'documento'} recibido]${caption ? ` — ${caption}` : ''}`, nombre)
+  await espejarEntrante(from, `[${kind === 'image' ? 'imagen' : 'documento'} recibido]${caption ? ` — ${caption}` : ''}`, nombre)
   const media = await descargarMediaWA(mediaId)
   const ext = kind === 'document'
     ? (filenameHint?.split('.').pop() || (media?.mime.split('/')[1] ?? 'pdf'))
@@ -1068,7 +1068,7 @@ export async function POST(req: NextRequest) {
         try {
           // 'recibido'/'pensado' son los kinds que getHistorial() consulta para reconstruir el hilo
           await wdiag('recibido', from, { texto: texto.slice(0, MAX_TEXTO_DIAG), wamid: msg.id, nombre })
-          espejarEntrante(from, texto, nombre)
+          await espejarEntrante(from, texto, nombre)
 
           // Auto-responder de otro negocio/bot (ej. APIDAN) → no responder, cortar el loop.
           if (esAutoRespuesta(texto)) {
