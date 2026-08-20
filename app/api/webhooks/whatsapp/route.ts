@@ -99,7 +99,7 @@ const WA_BTN_TEXT = 'Chatear con equipo' // ≤20 chars (límite de botón cta_u
 const TIENDA_BASE = 'https://infomicelium.com.ar/productos'
 
 // Material por comprador verificado (link, no PDF). Coincide con el bot del VPS.
-const MANUAL_INC101 = process.env.MANUAL_INC101 ?? 'https://drive.google.com/drive/folders/1jTrnlfAGvPp1qkw5ZBBTtIdIXB-g2DOv'
+const MANUAL_INC101 = process.env.MANUAL_INC101 ?? 'https://drive.google.com/drive/folders/1A9dca3diES0O4k3crJxffCOiJkn5f2gT'
 const MANUAL_PC400  = process.env.MANUAL_PC400  ?? 'https://www.youtube.com/watch?v=Un_uMpa30so'
 
 // diag con canal 'wa' para separar de Instagram en la vista de conversaciones.
