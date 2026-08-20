@@ -1,0 +1,46 @@
+# Vigilante de la zona ciega del handoff a Mateo (WhatsApp) — clientes derivados de los
+# que no hay forma de confirmar si les contestaron.
+#
+# Distinto de canales-watchdog.yml (canal entero, en días) y de ia-watchdog.yml (fallas del
+# bot, en minutos): este mira, por cliente derivado, cuánto tiempo lleva en la zona ciega.
+# Vive acá y no en el VPS ni en vercel.json por la misma regla que el resto de la vigilancia
+# (ver CLAUDE.md del repo): un vigilante no puede depender de la infraestructura que vigila,
+# y Vercel Hobby topea en 2 crons diarios.
+name: Watchdog de atención
+
+on:
+  schedule:
+    - cron: '47 * * * *' # cada hora (minuto 47 para esquivar el pico en punto)
+  workflow_dispatch:
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar el watchdog de atención
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta el secret CRON_SECRET en el repositorio"
+            exit 1
+          fi
+
+          respuesta=$(curl -sS --max-time 30 -w '\n%{http_code}' \
+            https://mw-micelium.vercel.app/api/cron/atencion-watchdog \
+            -H "Authorization: Bearer $CRON_SECRET")
+
+          codigo=$(echo "$respuesta" | tail -n1)
+          cuerpo=$(echo "$respuesta" | sed '$d')
+          echo "HTTP $codigo"
+          echo "$cuerpo"
+
+          if [ "$codigo" != "200" ]; then
+            echo "::error::El watchdog de atención no respondió 200 (respondió $codigo)"
+            exit 1
+          fi
+
+          # El endpoint ya manda el mail; esto lo deja visible en el historial de Actions.
+          if echo "$cuerpo" | grep -qE '"avisados":[1-9]'; then
+            echo "::warning::Hubo al menos un aviso de atención (ya salió por mail)"
+          fi

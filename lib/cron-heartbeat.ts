@@ -162,6 +162,10 @@ export const CATALOGO: Record<string, EntradaCatalogo> = {
     origen: 'github', maxHoras: 1,
     que: 'Avisa cuando el bot falla al responder (saldo de Anthropic agotado u otro error), corre cada 15 min',
   },
+  'atencion-watchdog': {
+    origen: 'github', maxHoras: 4,
+    que: 'Avisa cuando un cliente lleva horas derivado a Mateo sin forma de confirmar que le contestaron',
+  },
 
   // ── Scripts del VPS, envueltos por run_job.sh ───────────────────────────────────────
   // Los slugs los deriva `envolver_crontab.py` del comando, no de una lista escrita a
