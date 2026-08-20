@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Cambio de criterio respecto al resto de la suite (ver vitest.config.ts: "a propósito NO
 // levanta base ni servidor"): acá SÍ se ejercita el route handler completo, mockeando el
@@ -36,6 +36,10 @@ function filaError(detail: unknown, canal = 'wa') {
   return { canal, detail: JSON.stringify(detail), ts: new Date().toISOString() }
 }
 
+// Mismo patrón de snapshot/restauración que tests/cron-auth.test.ts: no alcanza con
+// PONER el env var en cada test, hay que devolverlo tal cual estaba antes de éste.
+const prevCronSecret = process.env.CRON_SECRET
+
 beforeEach(() => {
   queryMock.mockReset()
   notifyNahuelMock.mockReset()
@@ -43,6 +47,11 @@ beforeEach(() => {
   consumirLimiteMock.mockReset()
   consumirLimiteMock.mockResolvedValue({ permitido: true, contador: 1, limite: 1, resetEn: 3600 })
   process.env.CRON_SECRET = CRON_SECRET
+})
+
+afterEach(() => {
+  if (prevCronSecret === undefined) delete process.env.CRON_SECRET
+  else process.env.CRON_SECRET = prevCronSecret
 })
 
 describe('GET /api/cron/ia-watchdog', () => {
