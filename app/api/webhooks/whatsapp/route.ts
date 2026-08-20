@@ -4,7 +4,7 @@ import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
 import {
   diag, getHistorial, logClaudeUsage, hayMensajePosterior, textosDeLaRafaga,
-  wamidEsNuevo, ultimaDerivacion, huboAvisoReciente, origenCtwa, type Turno,
+  wamidEsNuevo, ultimaDerivacion, huboAvisoReciente, contarAccionReciente, origenCtwa, type Turno,
 } from '@/lib/diag'
 import { getEstadoAndreani, pareceTrackingAndreani } from '@/lib/andreani'
 import { mensajeSeguimientoGenerico, esEnvioViejo } from '@/lib/seguimiento'
@@ -28,6 +28,14 @@ const HANDOFF_HORAS = 6
 // Cuánto vale el "te pedí el dato para mandarte el material". Pasada esa ventana, un número
 // suelto vuelve a ser lo que parece: una consulta por el envío.
 const HORAS_MANUAL_PENDIENTE = 24
+
+// Cuántas respuestas "libres" seguidas (la rama genérica, sin ninguna resolución de código
+// detrás — ej. un link roto que el modelo no sabe arreglar) se toleran antes de ofrecer una
+// persona aunque el modelo no lo haya marcado. Detectado en la auditoría del 20/08: un
+// cliente con el link del manual roto recibió la misma disculpa 3 veces seguidas antes de
+// que alguien lo derivara. Con 2, la 3ª respuesta libre pasa a una persona.
+const RESPUESTAS_LIBRES_ANTES_DE_DERIVAR = 2
+const VENTANA_PATINA_MIN = 45
 
 // Tope de lo que se guarda en ig_diag de cada mensaje. NO es cosmético: 'recibido' y
 // 'pensado' son de donde getHistorial() reconstruye la conversación para el modelo, y
@@ -1284,7 +1292,22 @@ export async function POST(req: NextRequest) {
             accion = 'feedback'
             await enviarMensajeWA(from, outText)
           } else if (respuesta) {
-            await enviarMensajeWA(from, respuesta)
+            // Rama genérica: el modelo respondió sin que ninguna rama de código lo resolviera
+            // y sin marcar [DERIVAR: sí]. Es exactamente donde "patina" — el modelo puede
+            // insistir con lo mismo (disculparse, reenviar el mismo link) sin darse cuenta de
+            // que no está resolviendo nada. Antes de responder libre una vez más, contamos
+            // cuántas van en esta ventana.
+            const libresSeguidas = await contarAccionReciente(from, 'respuesta_libre', VENTANA_PATINA_MIN)
+            if (libresSeguidas >= RESPUESTAS_LIBRES_ANTES_DE_DERIVAR) {
+              outText = 'Veo que esto no se está resolviendo del todo por acá — te paso con el equipo para que lo mire directo 👇'
+              didDerivar = true
+              accion = 'patina_derivado'
+              await derivarAlEquipo(from, outText)
+            } else {
+              outText = respuesta
+              accion = 'respuesta_libre'
+              await enviarMensajeWA(from, respuesta)
+            }
           }
 
           await wdiag('pensado', from, {

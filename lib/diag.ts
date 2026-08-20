@@ -290,6 +290,31 @@ export async function huboAvisoReciente(sender: string, kind: string, horas: num
   }
 }
 
+/**
+ * Cuántas respuestas 'pensado' con esta `accion` mandó el bot a este sender en la ventana.
+ * Sirve de red de seguridad para el "patinar": el modelo no siempre marca [DERIVAR: sí]
+ * cuando no puede resolver algo (ej. un link roto, se detectó en la auditoría del 20/08 que
+ * lo reintentaba disculpándose en vez de pasar a una persona) — esto cuenta CUÁNTAS veces
+ * ya pasó, sin depender del propio criterio del modelo para saberlo. Ante error devuelve 0
+ * (no fuerza una derivación de más por un problema de base).
+ */
+export async function contarAccionReciente(sender: string, accion: string, minutos: number): Promise<number> {
+  try {
+    const p = getPool()
+    if (!p) return 0
+    const r = await p.query(
+      `SELECT count(*)::int AS n FROM ig_diag
+        WHERE sender = $1 AND kind = 'pensado' AND detail->>'accion' = $2
+          AND ts > now() - ($3 || ' minutes')::interval`,
+      [sender, accion, String(minutos)],
+    )
+    return r.rows[0]?.n ?? 0
+  } catch (e) {
+    console.error('contarAccionReciente error:', e)
+    return 0
+  }
+}
+
 export type Turno = { role: 'user' | 'assistant'; content: string }
 
 /**
