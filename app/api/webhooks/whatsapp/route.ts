@@ -4,7 +4,9 @@ import { KB_MICELIUM } from '@/lib/kb-micelium'
 import { notifyNahuel } from '@/lib/notify'
 import {
   diag, getHistorial, logClaudeUsage, hayMensajePosterior, textosDeLaRafaga,
-  wamidEsNuevo, ultimaDerivacion, huboAvisoReciente, contarAccionReciente, origenCtwa, type Turno,
+  wamidEsNuevo, ultimaDerivacion, huboAvisoReciente, origenCtwa,
+  handoffEsPermanente, esCierreDeHandoff, KIND_HANDOFF_CERRADO, contarRespuestaRepetida,
+  type Turno,
 } from '@/lib/diag'
 import { getEstadoAndreani, pareceTrackingAndreani } from '@/lib/andreani'
 import { mensajeSeguimientoGenerico, esEnvioViejo } from '@/lib/seguimiento'
@@ -25,6 +27,11 @@ const DEBOUNCE_MS = 20000
 // Una vez que el chat se derivó al equipo, durante estas horas lo maneja una persona:
 // el bot no vuelve a responder (más allá de un recordatorio cada 2 h).
 const HANDOFF_HORAS = 6
+
+// Ventana del handoff que NO expira por motivo (plata, cancelacion, conflicto legal). No es
+// "infinito" literal: es un tope alto para que la consulta siga acotada y un chat de hace
+// meses no reviva el lock. Ver `handoffEsPermanente` en lib/diag.ts.
+const HANDOFF_HORAS_MAX = 24 * 30
 
 // Cuánto vale el "te pedí el dato para mandarte el material". Pasada esa ventana, un número
 // suelto vuelve a ser lo que parece: una consulta por el envío.
@@ -359,14 +366,71 @@ async function ordenesTN(params: string): Promise<OrdenTN[]> {
   return Array.isArray(data) ? (data as OrdenTN[]) : []
 }
 
+// Una opcion de menu, en las dos formas que produce el modelo (verificadas contra las
+// respuestas reales en la base): "1- Incubadora" y "1\uFE0F\u20E3 Info y precios".
+//
+// Va como literal de regex y NO como new RegExp(string): en la forma string, los escapes
+// \u los resuelve el string antes de compilar el patron y la deteccion devuelve siempre 0.
+const RE_OPCION_MENU = /^[ \t]*(?:[1-4]\uFE0F?\u20E3|[1-4][-.)])[ \t]*\S/gmu
+
+/**
+ * ¿Esta respuesta es el saludo-menú o el listado de productos?
+ *
+ * Las dos son "respuesta libre" para el código, pero son el flujo funcionando: ofrecen
+ * opciones y esperan que el cliente elija. Contarlas como intentos fallidos es lo que hacía
+ * que un cliente nuevo llegara derivado al tercer mensaje (ver contarRespuestaRepetida).
+ *
+ * Se detectan por su forma —una lista numerada de opciones— y no por su texto exacto: el
+ * modelo la reescribe en cada turno, así que un match literal no serviría.
+ */
+function esRespuestaDeMenu(texto: string): boolean {
+  if (!texto) return false
+  // Dos formas verificadas en las respuestas reales: '1- Incubadora' y '1️⃣ Info y precios'.
+  const opciones = texto.match(RE_OPCION_MENU) ?? []
+  return opciones.length >= 2
+}
+
+/**
+ * Números de pedido que el cliente nombró EN LA CONVERSACIÓN, del más reciente al más viejo.
+ *
+ * POR QUÉ EXISTE (caso Leo, 20/08/2026)
+ * Un cliente escribió "Sigo teniendo inconvenientes con el pedido #1597" y, dos turnos
+ * después, "me dicen que lo devolvieron". Ese último mensaje no tiene dígitos, así que
+ * buscarPedido caía al barrido por teléfono y devolvía la orden MÁS RECIENTE del cliente
+ * (#1616). El bot le contestó dos veces seguidas "Tu pedido #1616 está confirmado, todavía
+ * no salió del depósito" a alguien que reclamaba la devolución del #1597.
+ *
+ * El número que el cliente ya dijo vale para toda la conversación, no solo para el turno
+ * en que lo escribió: era la conversación natural (describir el problema en vez de repetir
+ * el número) la que rompía la búsqueda.
+ *
+ * Solo se toman los del CLIENTE: las respuestas del bot también nombran pedidos, y usarlas
+ * realimentaría el error (si contestó por el #1616, ese número volvería a ganar).
+ */
+function pedidosMencionados(historial: Turno[], mensajeActual: string): string[] {
+  const numeros: string[] = []
+  const previos = historial.filter((t) => t.role === 'user').map((t) => t.content).reverse()
+  for (const t of [mensajeActual, ...previos]) {
+    // "#1597" o "pedido 1597": el # o la palabra lo distinguen de un DNI o un código postal.
+    for (const m of t.matchAll(/(?:#\s*|\b(?:pedido|orden|compra)\s+#?\s*)(\d{3,6})\b/gi)) {
+      if (!numeros.includes(m[1])) numeros.push(m[1])
+    }
+  }
+  return numeros
+}
+
 // Busca un pedido del cliente por teléfono, por un dato numérico del mensaje (nº de orden o
 // DNI) o por NOMBRE. Incluye pendientes de pago (devuelve `pagado`) para poder avisarle al
 // cliente que su pago figura pendiente en vez de decir "no existe". Excluye canceladas.
 // Estrategia: primero `q=` (una consulta, ~0,5 s); recién si no hay nada, se pagina.
-async function buscarPedido(phone: string, texto: string, perfil?: string): Promise<Pedido> {
+async function buscarPedido(phone: string, texto: string, perfil?: string, historial: Turno[] = []): Promise<Pedido> {
   if (!TN_TOKEN) return { encontrado: false, pagado: false, manuales: [] }
   const tel8 = soloDigitos(phone).slice(-8)
   const tokens = texto.match(/\d{3,9}/g) ?? [] // posible nº orden (4) o DNI (7-8)
+  // Un pedido nombrado en la conversación gana contra "la orden más reciente de este
+  // teléfono" (ver pedidosMencionados). Van primero para que la búsqueda directa los
+  // resuelva antes de llegar al barrido.
+  const mencionados = pedidosMencionados(historial, texto)
   const nombres = nombresCandidatos(texto, perfil)
   // Un pedido viejo sin pagar se guarda aparte y solo se usa si no aparece nada mejor:
   // si el cliente tiene además un pedido reciente, ese es el que importa.
@@ -381,7 +445,7 @@ async function buscarPedido(phone: string, texto: string, perfil?: string): Prom
   }
   try {
     // 1) Búsqueda directa de Tiendanube (nº de orden, nombre, mail). Barata y precisa.
-    for (const term of [...tokens, ...nombres]) {
+    for (const term of [...mencionados, ...tokens, ...nombres]) {
       const t = term.trim()
       if (t.length < 3) continue
       for (const o of await ordenesTN(`status=any&per_page=20&q=${encodeURIComponent(t)}`)) {
@@ -526,6 +590,7 @@ OJO, no confundas uso normal con modificación: SACAR O DESTAPAR LA CÚPULA es n
 NO describas de qué material es una pieza, cómo está sellada, pegada o sujeta, ni por qué está puesta: nada de eso está en la KB. Si preguntan por eso, decí solamente si esa parte se saca o no.
 
 ACÁ NO TENÉS HERRAMIENTAS PARA RESOLVER. Por eso DERIVÁ (no lo resuelvas solo, no inventes datos) cuando el cliente pida: roturas/garantía/fallas que hay que gestionar, plata/reintegros/reembolsos, cambios de pedido (cuotas, dirección, cancelación), reclamos que escalan, temas legales/salud, o mayoristas/prensa.
+REGLA DURA — NUNCA ANUNCIES UNA GESTIÓN QUE NO HICISTE: no tenés forma de abrir un reclamo en Andreani ni en ningún correo, de gestionar un reintegro, de cancelar una compra ni de hablar con el correo. Está PROHIBIDO decir "ya hice el reclamo", "acabo de hacer un reclamo", "ya lo reclamamos" o dar un NÚMERO DE CASO (CAS-... o cualquier otro): ese número no existe y es mentirle al cliente. Lo único verdadero que podés decir es que lo pasás al equipo para que abra el reclamo. Si el cliente pide un comprobante del reclamo o su número → DERIVÁ. (El 19/08/2026 el bot inventó "CAS-2024XXXXX" dos veces al mismo cliente; contestó "Mentira" y anunció una denuncia en Defensa del Consumidor.)
 PSILOCIBE / "MÁGICOS" / GOLDEN TEACHER: NO derivés por esto. Respondé SIEMPRE con esta única línea neutral y cerrá el tema: "La incubadora sirve para cualquier tipo de cultivo de hongos; controla temperatura y humedad de forma automática. Sobre especies puntuales no asesoramos, pero el equipo funciona igual para lo que quieras cultivar 🙌". No des instrucciones ni recomendaciones de cepas/dosis. Solo si el cliente INSISTE reiteradamente, ahí sí marcá DERIVAR.
 Cuando DERIVES: en la RESPUESTA invitá al cliente, breve y cálido, a SEGUIR POR WHATSAPP con el equipo (ahí lo atienden mejor). NO escribas vos el número ni el link de WhatsApp: el sistema agrega el link automáticamente al final de tu respuesta. Ej. de cierre: "Para esto te ayudamos mejor con el equipo 👇". Y marcá DERIVAR.
 
@@ -1003,7 +1068,19 @@ export async function POST(req: NextRequest) {
           continue
         }
         if (desde10 === last10(NAHUEL_WA)) {
-          // Mensajes del propio Nahuel al número: que NO responda el bot.
+          // Mensajes del propio Nahuel al numero: que NO responda el bot.
+          //
+          // Salvo uno: "cerrar <telefono>" libera el handoff permanente de ese cliente
+          // (ver handoffEsPermanente). Sin esta orden, un caso sensible dejaria al bot mudo
+          // con ese cliente durante semanas aunque el problema ya estuviera resuelto:
+          // Nahuel contestando desde su propio numero no deja rastro en la base, porque el
+          // bridge de lectura de WhatsApp esta bloqueado.
+          const aCerrar = esCierreDeHandoff(texto)
+          if (aCerrar) {
+            await wdiag(KIND_HANDOFF_CERRADO, aCerrar, { por: 'nahuel', wamid: msg.id })
+            await enviarMensajeWA(from, `Listo: el bot vuelve a atender a ${aCerrar} con normalidad 👌`)
+            continue
+          }
           await wdiag('interno_nahuel', from, { texto: texto.slice(0, 300), wamid: msg.id })
           continue
         }
@@ -1082,15 +1159,24 @@ export async function POST(req: NextRequest) {
           // Si el chat ya se derivó al equipo, lo tiene una persona: el bot NO vuelve a
           // pensar ni a re-derivar (antes repetía el mismo "no encontré tu compra 👇"
           // una y otra vez). Como mucho, un recordatorio cada 2 h de que ya está avisado.
-          const derivadoEn = await ultimaDerivacion(from, HANDOFF_HORAS)
+          // Un caso delicado (plata, cancelacion, conflicto legal) NO expira por tiempo:
+          // sigue en manos de una persona hasta que alguien lo cierre. Ver
+          // `handoffEsPermanente` para el caso real que motivo esto (Gerchu, 19/08/2026).
+          const permanente = await handoffEsPermanente(from)
+          const derivadoEn = await ultimaDerivacion(from, permanente ? HANDOFF_HORAS_MAX : HANDOFF_HORAS)
           if (derivadoEn) {
-            const yaAvisado = await huboAvisoReciente(from, 'handoff_activo', 2)
+            // El recordatorio se acota mas en los casos permanentes: repetir "ya lo estan
+            // viendo" cada 2 h durante dias a alguien que reclama plata es peor que el
+            // silencio — es exactamente el tono que le hizo contestar "Mentira" a Gerchu.
+            const horasAviso = permanente ? 24 : 2
+            const yaAvisado = await huboAvisoReciente(from, 'handoff_activo', horasAviso)
             if (!yaAvisado) {
               await enviarMensajeWA(from,
                 'Ya le pasé tu caso al equipo y lo están viendo 🙌 Te responden por acá o al número que te compartí. Perdón por la demora.')
             }
             await wdiag('handoff_activo', from, {
               texto: texto.slice(0, 200), desde: derivadoEn.toISOString(), aviso: !yaAvisado,
+              permanente,
             })
             return
           }
@@ -1160,8 +1246,19 @@ export async function POST(req: NextRequest) {
             //
             // Estado REAL del envío (Tiendanube + Andreani). Nunca inventa: si no hay dato
             // certero, deriva al equipo.
-            const pedido = await buscarPedido(from, mensajeUsuario, nombre)
-            if (pedido.dudoso) {
+            const pedido = await buscarPedido(from, mensajeUsuario, nombre, historial)
+            // El cliente nombró un pedido concreto y la búsqueda trajo OTRO: no se le
+            // responde por el que no preguntó (caso Leo: reclamaba el #1597 y recibió dos
+            // veces el estado del #1616). Puede ser un pedido de otra persona, uno viejo
+            // fuera del barrido o un número mal tipeado — en los tres casos lo mira alguien.
+            const pedidoPedido = pedidosMencionados(historial, mensajeUsuario)[0]
+            if (pedidoPedido && pedido.encontrado && String(pedido.numero) !== pedidoPedido) {
+              outText = `No pude confirmar el estado del pedido #${pedidoPedido} desde acá 🙌 ` +
+                'Te paso con el equipo para que lo revise y te diga exactamente en qué está 👇'
+              didDerivar = true
+              accion = 'pedido_no_coincide'
+              await derivarAlEquipo(from, outText)
+            } else if (pedido.dudoso) {
               // Pedido viejo que figura sin pagar: puede estar cobrado y despachado sin
               // haberse marcado en TN. Reclamarle el pago a quien ya pagó es ofensivo, y
               // afirmar que está pago sería inventar. No se nombra el estado: lo ve el equipo.
@@ -1225,7 +1322,7 @@ export async function POST(req: NextRequest) {
             }
           } else if (quiereManual) {
             // Comprador pidió material → verificar compra por teléfono o dato numérico.
-            const pedido = await buscarPedido(from, mensajeUsuario, nombre)
+            const pedido = await buscarPedido(from, mensajeUsuario, nombre, historial)
             if (pedido.dudoso) {
               // Compra vieja que figura sin pagar (ver 'pedido_viejo_sin_confirmar' arriba):
               // puede estar cobrada hace meses. No le reclamamos el pago ni le negamos el
@@ -1300,17 +1397,27 @@ export async function POST(req: NextRequest) {
             // Rama genérica: el modelo respondió sin que ninguna rama de código lo resolviera
             // y sin marcar [DERIVAR: sí]. Es exactamente donde "patina" — el modelo puede
             // insistir con lo mismo (disculparse, reenviar el mismo link) sin darse cuenta de
-            // que no está resolviendo nada. Antes de responder libre una vez más, contamos
-            // cuántas van en esta ventana.
-            const libresSeguidas = await contarAccionReciente(from, 'respuesta_libre', VENTANA_PATINA_MIN)
-            if (libresSeguidas >= RESPUESTAS_LIBRES_ANTES_DE_DERIVAR) {
+            // que no está resolviendo nada.
+            // NO cuenta como patinar una respuesta que HACE AVANZAR la charla. El saludo-menú
+            // y el listado de productos son `respuesta_libre` y son el flujo funcionando: el
+            // 21/08/2026 tres clientes que pidieron el precio de la INC101 fueron derivados
+            // en el tercer mensaje —antes de recibir el precio— porque el menú les había
+            // quemado los dos créditos. Ninguno volvió a escribir.
+            //
+            // Patinar es REPETIR: mandar otra vez lo mismo que ya no resolvió. Eso se mide
+            // comparando la respuesta con las anteriores, no contando turnos.
+            const accionLibre = esRespuestaDeMenu(respuesta) ? 'menu_catalogo' : 'respuesta_libre'
+            const repetidas = accionLibre === 'respuesta_libre'
+              ? await contarRespuestaRepetida(from, respuesta, VENTANA_PATINA_MIN)
+              : 0
+            if (repetidas >= RESPUESTAS_LIBRES_ANTES_DE_DERIVAR) {
               outText = 'Veo que esto no se está resolviendo del todo por acá — te paso con el equipo para que lo mire directo 👇'
               didDerivar = true
               accion = 'patina_derivado'
               await derivarAlEquipo(from, outText)
             } else {
               outText = respuesta
-              accion = 'respuesta_libre'
+              accion = accionLibre
               await enviarMensajeWA(from, respuesta)
             }
           }

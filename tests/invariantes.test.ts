@@ -233,26 +233,36 @@ describe('el canal de un evento vive en la columna, no en el detalle', () => {
   })
 })
 
-describe('el freno de "patina" cuenta la misma acción que marca', () => {
+describe('el freno de "patina" mide repetición, no cantidad de turnos', () => {
   // EL ERROR QUE ESTO PREVIENE
   //
-  // El 20/08/2026 se agregó una red de seguridad: si el bot ya mandó 2 respuestas "libres"
-  // seguidas al mismo cliente sin resolver nada (rama genérica, sin ninguna resolución de
-  // código detrás), la 3ª deriva sola en vez de insistir — nació de un caso real donde el
-  // bot reenvió 3 veces el mismo link roto disculpándose.
+  // El freno original (20/08/2026) contaba respuestas "libres" seguidas con
+  // contarAccionReciente(from, respuesta_libre), sin mirar su contenido. El 21/08 se vio
+  // el efecto en producción: el saludo-menú y el listado de productos TAMBIÉN son
+  // respuesta_libre, así que un cliente nuevo que navegaba el menú quemaba los dos créditos
+  // antes de preguntar nada. Tres personas que pidieron el precio de la INC101 fueron
+  // derivadas en el tercer mensaje, antes de recibirlo, y ninguna volvió a escribir.
   //
-  // El mecanismo son DOS lugares que tienen que decir el mismo string: la rama que MARCA
-  // `accion = 'respuesta_libre'` y la llamada que CUENTA `contarAccionReciente(from,
-  // 'respuesta_libre', ...)`. Si se desalinean —typo al tocar cualquiera de los dos—, el
-  // contador nunca encuentra nada, siempre da 0, y el freno queda desarmado para siempre sin
-  // un solo error en ningún lado. Mismo patrón que 'derivado' arriba, un escalón más
-  // silencioso: ahí al menos la query devolvía filas equivocadas: acá no devuelve ninguna.
-  it('el string que se cuenta es el mismo que el que se marca', () => {
+  // Ahora el freno compara el CONTENIDO (contarRespuestaRepetida) y exime al menú
+  // (esRespuestaDeMenu). Lo que hay que sostener es que esas dos piezas sigan cableadas: si
+  // alguien vuelve a contar turnos, el bot vuelve a cortar ventas sin un solo error visible.
+  it('el freno compara el contenido de la respuesta, no cuenta acciones', () => {
     const codigo = readFileSync(join(RAIZ, 'app', 'api', 'webhooks', 'whatsapp', 'route.ts'), 'utf8')
-    const mCuenta = codigo.match(/contarAccionReciente\(from,\s*'([^']+)'/)
-    const mMarca = codigo.match(/accion\s*=\s*'(respuesta_libre)'/)
-    expect(mCuenta?.[1], 'No se encontró la llamada a contarAccionReciente(from, ...): ¿se movió o se borró?').toBeTruthy()
-    expect(mMarca?.[1], "No se encontró accion = 'respuesta_libre': ¿se renombró la acción?").toBeTruthy()
-    expect(mCuenta?.[1]).toBe(mMarca?.[1])
+    expect(
+      codigo,
+      'El freno volvió a contar turnos (contarAccionReciente) en vez de comparar contenido',
+    ).not.toMatch(/contarAccionReciente\(from,\s*.respuesta_libre/)
+    expect(
+      codigo.includes('contarRespuestaRepetida('),
+      'Falta contarRespuestaRepetida: el freno de patina quedó sin medición',
+    ).toBe(true)
+  })
+
+  it('el menú y el catálogo quedan exentos del freno', () => {
+    const codigo = readFileSync(join(RAIZ, 'app', 'api', 'webhooks', 'whatsapp', 'route.ts'), 'utf8')
+    expect(
+      codigo.includes('esRespuestaDeMenu(respuesta)'),
+      'Sin la exención del menú, el flujo de venta vuelve a derivarse solo',
+    ).toBe(true)
   })
 })

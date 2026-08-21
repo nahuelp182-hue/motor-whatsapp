@@ -357,3 +357,272 @@ export async function getHistorial(sender: string, sinceHours = 6, maxTurnos = 1
     return []
   }
 }
+
+/**
+ * Motivos de derivación que NO expiran por tiempo.
+ *
+ * POR QUÉ EXISTE (caso Gerchu Bollati, 19/08/2026)
+ * Un cliente con 10 días de demora pidió cancelar la compra. El bot derivó bien, nadie
+ * atendió, y a las 6 h `HANDOFF_HORAS` venció: el bot volvió a agarrar el chat y le repitió
+ * "EN CAMINO 🚚, plazo 3-5 días hábiles" a alguien que ya llevaba 10 días esperando. En el
+ * turno siguiente le inventó un número de reclamo de Andreani. El cliente contestó
+ * "Mentira. Eso después no pasa" y anunció una denuncia en Defensa del Consumidor.
+ *
+ * La derivación no falló: falló el VENCIMIENTO de la derivación. Un caso de plata, de
+ * cancelación o con mención legal no vuelve al bot porque pasaron 6 horas — vuelve cuando
+ * una persona lo cierra. Si nadie lo atiende, el problema es que nadie lo atendió, y para
+ * eso está `atencion-watchdog`; taparlo con una respuesta automática lo empeora.
+ *
+ * El resto de las derivaciones (consulta de uso, un dato que el bot no tenía) sí expiran:
+ * ahí retomar la conversación es lo correcto, no hay nada delicado en juego.
+ */
+const ACCIONES_HANDOFF_PERMANENTE = new Set([
+  'no_reconoce_compra',         // cree que le cobraron algo que no compró
+  'pedido_viejo_sin_confirmar', // estado de compra sin confirmar
+  'consulta_intervencion',      // pidió modificar el equipo (garantía)
+])
+
+/**
+ * Texto del cliente o motivo del modelo que vuelve el handoff permanente aunque la acción
+ * no esté en la lista de arriba. Son las palabras que marcan que el caso ya no es una
+ * consulta: es plata, cancelación o un conflicto.
+ */
+const RE_HANDOFF_PERMANENTE =
+  /\b(?:cancel\w*|reembols\w*|reintegr\w*|devoluci[óo]n\s+del\s+dinero|defensa\s+del\s+consumidor|denunci\w*|abogad\w*|estaf\w*|fraude|desconozco\s+(?:el\s+)?(?:cargo|cobro)|contracargo|chargeback)\b/i
+
+/**
+ * Tope de antigüedad de un handoff permanente.
+ *
+ * "No expira por tiempo" significa que no se suelta a las 6 h, no que dure para siempre.
+ * Un caso sensible que lleva SEMANAS sin una sola señal ya no es un caso abierto: o se
+ * resolvió por fuera (Nahuel contestando desde su número, que no deja rastro acá) o el
+ * cliente se fue. Verificado en la base real: dos personas que en julio avisaron "no compré
+ * nada" —un envío masivo mal dirigido, ya resuelto— seguían marcadas 27 días después. Sin
+ * este tope, el bot les habría quedado mudo si volvían a escribir.
+ *
+ * El tope se cuenta desde la última ACTIVIDAD del cliente, no desde la derivación: mientras
+ * siga escribiendo, el caso sigue vivo por más días que hayan pasado.
+ */
+const DIAS_HANDOFF_PERMANENTE = 14
+/**
+ * Ventana en la que se buscan los mensajes del cliente que acompañaron a la derivación.
+ * Se mide HACIA ATRÁS DESDE LA DERIVACIÓN, no desde ahora: lo que importa es con qué
+ * contexto se derivó ese caso, no lo que el cliente escriba después.
+ */
+const HORAS_CONTEXTO_DERIVACION = 12
+
+/**
+ * Cómo se CIERRA un handoff permanente.
+ *
+ * Sin esto, marcar un caso como permanente lo dejaría mudo hasta que la derivación salga de
+ * la ventana larga — 30 días en los que el bot no le contesta a un cliente cuyo problema
+ * quizás ya se resolvió por WhatsApp normal. Nahuel escribiéndole al cliente desde su
+ * número no deja rastro acá (el bridge de lectura está bloqueado por WhatsApp), así que el
+ * cierre tiene que ser un acto explícito.
+ *
+ * Se cierra escribiéndole al PROPIO número del bot (que es lo que ya genera
+ * `interno_nahuel`) un mensaje que contenga "cerrar <telefono>". Ver `esCierreDeHandoff`.
+ */
+export const KIND_HANDOFF_CERRADO = 'handoff_cerrado'
+
+/**
+ * ¿El handoff de este sender es permanente (no expira por tiempo)?
+ *
+ * Devuelve false —o sea, el handoff vuelve a expirar normalmente— si una persona ya cerró
+ * el caso a mano después de esa derivación. Ante error devuelve false: un fallo de base no
+ * debe dejar a un cliente sin respuesta durante semanas.
+ */
+export async function handoffEsPermanente(sender: string): Promise<boolean> {
+  try {
+    const p = getPool()
+    if (!p) return false
+    const r = await p.query(
+      `SELECT ts, detail->>'accion' AS accion, detail->>'motivo' AS motivo
+         FROM ig_diag
+        WHERE sender = $1 AND kind = 'pensado'
+          AND canal = 'wa' AND detail->>'derivar' = 'true'
+        ORDER BY id DESC LIMIT 1`,
+      [sender],
+    )
+    const fila = r.rows[0]
+    if (!fila) return false
+
+    // ¿Alguien ya cerró este caso a mano DESPUÉS de la derivación? Entonces deja de ser
+    // permanente y el bot puede volver a atender a este cliente con normalidad.
+    const cerrado = await p.query(
+      `SELECT 1 FROM ig_diag
+        WHERE sender = $1 AND kind = $2 AND ts > $3 LIMIT 1`,
+      [sender, KIND_HANDOFF_CERRADO, fila.ts],
+    )
+    if ((cerrado.rowCount ?? 0) > 0) return false
+
+    // ¿Sigue vivo? Un caso sin ninguna señal en semanas ya no retiene al bot (ver
+    // DIAS_HANDOFF_PERMANENTE). Se mide por la última actividad del cliente en el canal.
+    const vivo = await p.query(
+      `SELECT 1 FROM ig_diag
+        WHERE sender = $1 AND canal = 'wa'
+          AND ts > now() - ($2 || ' days')::interval LIMIT 1`,
+      [sender, String(DIAS_HANDOFF_PERMANENTE)],
+    )
+    if ((vivo.rowCount ?? 0) === 0) return false
+
+    if (fila.accion && ACCIONES_HANDOFF_PERMANENTE.has(fila.accion)) return true
+    if (fila.motivo && RE_HANDOFF_PERMANENTE.test(fila.motivo)) return true
+
+    // El motivo del modelo puede venir vacío (pasó en el caso Gerchu: el 'pensado' que
+    // derivó por la cancelación tenía motivo cargado, pero el segundo no). Por eso también
+    // se miran los mensajes con los que el cliente llegó A ESA derivación —acotados a la
+    // ventana previa y al mismo canal, para no arrastrar una charla vieja ni un mensaje de
+    // Instagram del mismo número.
+    const t = await p.query(
+      `SELECT detail->>'texto' AS texto FROM ig_diag
+        WHERE sender = $1 AND kind = 'recibido' AND canal = 'wa'
+          AND ts <= $2 AND ts > $2::timestamptz - ($3 || ' hours')::interval
+        ORDER BY id DESC LIMIT 20`,
+      [sender, fila.ts, String(HORAS_CONTEXTO_DERIVACION)],
+    )
+    return t.rows.some((x) => x.texto && RE_HANDOFF_PERMANENTE.test(x.texto))
+  } catch (e) {
+    console.error('handoffEsPermanente error:', e)
+    return false
+  }
+}
+
+/**
+ * ¿Este mensaje interno (de Nahuel al número del bot) cierra el handoff de alguien?
+ * Formato: "cerrar 5493513298375" (o con +, espacios o guiones). Devuelve el sender
+ * normalizado a dígitos, o null si el mensaje no es una orden de cierre.
+ */
+export function esCierreDeHandoff(texto: string): string | null {
+  const m = texto?.match(/\bcerrar\s+\+?([\d\s-]{8,20})\b/i)
+  if (!m) return null
+  const digitos = m[1].replace(/\D/g, '')
+  return digitos.length >= 8 ? digitos : null
+}
+
+/**
+ * ¿Cuántas veces el bot ya le mandó a este sender una respuesta CASI IGUAL a ésta?
+ *
+ * POR QUÉ NO ALCANZA CON CONTAR TURNOS (auditoría del 21/08/2026)
+ * El freno anterior contaba respuestas 'respuesta_libre' seguidas, sin mirar su contenido.
+ * El saludo-menú y el listado de productos también son 'respuesta_libre', así que todo
+ * cliente nuevo que navegaba el menú quemaba sus dos créditos antes de preguntar nada: tres
+ * personas que pidieron el precio de la INC101 fueron derivadas en el tercer mensaje, antes
+ * de recibirlo. Ninguna volvió a escribir.
+ *
+ * Un bot que responde tres cosas DISTINTAS está avanzando; uno que manda la misma disculpa
+ * tres veces, no. Eso es lo que se mide acá.
+ *
+ * La comparación es por prefijo normalizado, no exacta: las respuestas que patinan varían en
+ * un emoji o una palabra ("Perdón, no encontré..." / "Perdón! No encontré...") y una
+ * igualdad estricta no las agruparía. Ante error devuelve 0 (no fuerza una derivación de
+ * más por un problema de base).
+ */
+export async function contarRespuestaRepetida(
+  sender: string,
+  respuesta: string,
+  minutos: number,
+): Promise<number> {
+  try {
+    const p = getPool()
+    if (!p) return 0
+    const huella = huellaTexto(respuesta)
+    if (!huella) return 0
+    const r = await p.query(
+      `SELECT detail->>'respuesta' AS respuesta FROM ig_diag
+        WHERE sender = $1 AND kind = 'pensado' AND canal = 'wa'
+          AND ts > now() - ($2 || ' minutes')::interval
+        ORDER BY id DESC LIMIT 10`,
+      [sender, String(minutos)],
+    )
+    return r.rows.filter((x) => x.respuesta && huellaTexto(x.respuesta) === huella).length
+  } catch (e) {
+    console.error('contarRespuestaRepetida error:', e)
+    return 0
+  }
+}
+
+/** Normaliza para comparar: sin emojis, signos ni acentos, y solo el arranque del mensaje. */
+function huellaTexto(t: string): string {
+  return t
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 60)
+}
+
+/**
+ * Salud del mostrador en las últimas 24 h: no si el bot funciona, sino si SIRVE.
+ *
+ * POR QUÉ EXISTE (auditoría del 21/08/2026)
+ * El resumen diario vigilaba cola, crons, errores de envío y gasto de Claude — todo sobre
+ * la máquina, nada sobre la atención. Un bot que deriva el 100% de los chats y deja a los
+ * clientes esperando pasa las cuatro alertas en verde. De hecho pasó: el caso que terminó
+ * con un cliente anunciando una denuncia en Defensa del Consumidor no encendió una sola luz.
+ *
+ * QUÉ SE PUEDE MEDIR Y QUÉ NO
+ * No hay forma de saber si Mateo contestó: sus respuestas salen de su teléfono y el bridge
+ * de lectura está bloqueado por WhatsApp (confirmado en vivo el 20/08/2026). Así que NO se
+ * mide "tiempo de respuesta humana" —sería inventar—, sino la única huella que sí queda en
+ * la base: el cliente que, después de ser derivado, SIGUIÓ ESCRIBIENDO. Cada uno de esos
+ * mensajes es alguien que no recibió respuesta de nadie y volvió a insistir.
+ *
+ * Medido sobre 30 días reales al escribir esto: 8 de 21 derivados (38%) siguieron
+ * escribiendo tras el handoff.
+ */
+export async function saludDelMostrador24h(): Promise<{
+  derivados: number
+  sinAtender: number
+  esperaMaxHoras: number
+  patinaron: number
+  resueltos: number
+} | null> {
+  try {
+    const p = getPool()
+    if (!p) return null
+    const r = await p.query(
+      `WITH der AS (
+         SELECT sender, ts,
+                row_number() OVER (PARTITION BY sender ORDER BY id DESC) AS rn
+           FROM ig_diag
+          WHERE canal = 'wa' AND kind = 'pensado' AND detail->>'derivar' = 'true'
+            AND ts > now() - interval '24 hours'
+       ), ultima AS (
+         SELECT sender, ts FROM der WHERE rn = 1
+       )
+       SELECT
+         (SELECT count(*) FROM ultima)::int AS derivados,
+         (SELECT count(*) FROM ultima u
+           WHERE EXISTS (SELECT 1 FROM ig_diag h
+                          WHERE h.sender = u.sender AND h.kind = 'handoff_activo'
+                            AND h.ts > u.ts))::int AS sin_atender,
+         COALESCE((SELECT max(EXTRACT(epoch FROM (h.ts - u.ts)) / 3600)
+                     FROM ultima u
+                     JOIN ig_diag h ON h.sender = u.sender
+                    WHERE h.kind = 'handoff_activo' AND h.ts > u.ts), 0) AS espera_max,
+         (SELECT count(*) FROM ig_diag
+           WHERE canal = 'wa' AND kind = 'pensado'
+             AND detail->>'accion' = 'patina_derivado'
+             AND ts > now() - interval '24 hours')::int AS patinaron,
+         (SELECT count(*) FROM ig_diag
+           WHERE canal = 'wa' AND kind = 'pensado'
+             AND detail->>'derivar' = 'false'
+             AND ts > now() - interval '24 hours')::int AS resueltos`,
+    )
+    const f = r.rows[0]
+    if (!f) return null
+    return {
+      derivados: f.derivados ?? 0,
+      sinAtender: f.sin_atender ?? 0,
+      esperaMaxHoras: Math.round((Number(f.espera_max) || 0) * 10) / 10,
+      patinaron: f.patinaron ?? 0,
+      resueltos: f.resueltos ?? 0,
+    }
+  } catch (e) {
+    console.error('saludDelMostrador24h error:', e)
+    return null
+  }
+}
