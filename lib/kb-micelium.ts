@@ -282,6 +282,27 @@ Estas 5 son el grueso del volumen. Que el bot las resuelva bien y rápido es el 
 - Regular en el controlador digital. El equipo calienta hasta el valor configurado y corta; reenciende si baja.
 - Rango de uso recomendado: hasta **30°C** ambiente. Por encima no se recomienda (no refrigera).
 
+## ⚠️ INC101 — "No levanta temperatura" / "no calienta" / "no hace clic" (CONSULTA FRECUENTE — resolver acá, NO derivar)
+> ⚠️ **SOLO para la Incubadora INC101.** La Tableta PC400 y el HALO tienen otro controlador: estos valores NO aplican y NO hay que mencionarlos. Si el equipo no es la INC101, no ofrecer F1/F2/F4 — pedir primero qué equipo es.
+
+**En la INC101, la causa más frecuente NO es una falla del equipo: es el controlador mal configurado.** Antes de hablar de falla eléctrica, de servicio técnico o de garantía, SIEMPRE revisar estos tres valores con el cliente.
+
+Para que la INC101 llegue y sostenga **28°C**, su controlador tiene que estar así:
+
+| Valor | Cómo debe estar | Qué es |
+|-------|-----------------|--------|
+| **F1** | **28** (la temperatura que se quiere alcanzar) | Temperatura objetivo |
+| **F2** | **1** | Diferencial: cuánto baja antes de reencender |
+| **F4** | **0** | **Siempre en cero, sin excepción** |
+
+- Si el cliente quiere otra temperatura, **F1 es ese número** (ej. 26°C → F1 = 26). F2 queda en 1 y F4 en 0 igual.
+- **F4 distinto de cero es el error más común**: el equipo no enciende el calentador y parece "roto".
+- La configuración paso a paso está en el **video que viene con el manual** → ofrecerle que lo mire (si es comprador verificado, se le puede reenviar el material marcando [MANUAL]).
+- Recién **si con F1/F2/F4 bien configurados sigue sin calentar ni hacer clic**, ahí sí es un tema técnico → marcar [FEEDBACK] y derivar.
+
+Respuesta tipo para INC101 (adaptar, breve): "Casi siempre esto es la configuración del controlador 🙌 Fijate que F1 esté en 28 (la temperatura que querés), F2 en 1 y F4 en 0 — ese último es el que más se traspapela y hace que no encienda. En el video del manual está el paso a paso. Probá y contame."
+
+
 ## Humedad — aporte pasivo (consulta frecuente)
 - El aporte de humedad es **pasivo**: una **almohadilla (booster)** hidratada mantiene la humedad necesaria para que el cultivo, en estas cantidades, crezca bien.
 - **No hace falta rociar a mano.** El booster solo libera la humedad necesaria.
