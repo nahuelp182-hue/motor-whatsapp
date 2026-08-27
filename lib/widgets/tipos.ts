@@ -145,7 +145,7 @@ const GRUPO_POR_KEY: Record<string, GrupoKey> = {
   solo_movil: 'comportamiento', fijo: 'comportamiento', modo: 'comportamiento',
   ventana: 'comportamiento', factor: 'comportamiento', minimo: 'comportamiento',
   cantidad: 'comportamiento', formulario: 'comportamiento', permitirFoto: 'comportamiento',
-  filtroProducto: 'comportamiento', productos: 'comportamiento', hasta: 'comportamiento',
+  filtroProducto: 'comportamiento', orden: 'comportamiento', productos: 'comportamiento', hasta: 'comportamiento',
   objetivo: 'comportamiento', corte: 'comportamiento', dias_envio: 'comportamiento',
   dias_entrega: 'comportamiento', sabados: 'comportamiento', hora_corte: 'comportamiento',
   dia_sab: 'comportamiento', horas_reloj: 'comportamiento', feriados: 'comportamiento',
@@ -735,6 +735,18 @@ const TIPOS_BASE: TipoWidget[] = [
         tipo: 'booleano',
         porDefecto: true,
         ayuda: 'Si lo apagás, las reseñas con foto se ven igual pero sin la imagen (solo el texto).',
+      },
+      {
+        key: 'orden',
+        label: 'Orden de las reseñas',
+        tipo: 'select',
+        porDefecto: 'recientes',
+        opciones: [
+          { value: 'recientes', label: 'Más nuevas primero' },
+          { value: 'antiguas', label: 'Más viejas primero' },
+          { value: 'mejor_calificadas', label: 'Mejor calificadas primero' },
+        ],
+        ayuda: 'Cómo se acomodan las reseñas dentro del bloque, antes de cortar por "Cuántas mostrar".',
       },
       {
         key: 'filtroProducto',

@@ -93,10 +93,14 @@ export async function GET(req: NextRequest) {
       const elegidos = Array.isArray(cfg.productos)
         ? (cfg.productos as Record<string, unknown>[]).map(p => String(p?.id ?? '')).filter(Boolean)
         : []
+      const orden = (['recientes', 'antiguas', 'mejor_calificadas'].includes(String(cfg.orden))
+        ? cfg.orden
+        : 'recientes') as 'recientes' | 'antiguas' | 'mejor_calificadas'
       const bloque = await resenasPublicas(store.id, cantidad, {
         modo,
         productoActual: productoActual || null,
         productosElegidos: elegidos,
+        orden,
       })
       salida.datos = bloque.items
       salida.resumen = { promedio: bloque.promedio, total: bloque.total }

@@ -161,6 +161,7 @@ async function capturarResenaSiCorresponde(from: string, texto: string): Promise
         customer_id: match.customer_id,
         texto: texto.slice(0, 1000),
         rating: estrellasDelTexto(texto),
+        approved: false,
       },
     })
   } catch {

@@ -129,7 +129,7 @@ model Review {
   rating         Int?
   texto          String
   source         String    @default("whatsapp") // whatsapp | google | form
-  approved       Boolean   @default(true)
+  approved       Boolean   @default(false)
   fecha          DateTime? // fecha real de la reseña (Google la trae; WhatsApp usa createdAt)
   external_id    String? // id de la reseña en su fuente (Google) para no duplicar en cada sync
   product_id     String? // id de producto de Tiendanube al que apunta la reseña

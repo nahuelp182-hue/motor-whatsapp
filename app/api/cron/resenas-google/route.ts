@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
           autor: r.reviewer?.displayName ?? 'Cliente de Google',
           texto,
           rating: r.starRating ? STARS[r.starRating] : null,
-          approved: true,
+          approved: false,
           fecha: new Date(r.createTime),
         },
       })

@@ -28,6 +28,7 @@ export type FiltroResenas = {
   modo: 'todas' | 'este' | 'elegidos'
   productoActual?: string | null
   productosElegidos?: string[]
+  orden?: 'recientes' | 'antiguas' | 'mejor_calificadas'
 }
 
 export type ResenasBloque = {
@@ -66,7 +67,9 @@ export async function resenasPublicas(
   // DESC pone los NULL primero, y como WhatsApp/formulario no traen `fecha`, las de Google
   // (que sí la traen) quedarían al fondo y podrían no entrar en el corte. Cuando el cron de
   // Google ingesta una reseña, le pone createdAt = fecha real de la reseña, así la mezcla
-  // por recencia sigue siendo correcta.
+  // por recencia sigue siendo correcta. "Mejor calificadas" no puede resolverse en la
+  // consulta (rating es opcional y sin estrellas debe ir al final, no arriba con NULLS
+  // FIRST), así que se ordena en memoria tras traer todo.
   const filas = await prisma.review.findMany({
     where,
     orderBy: { createdAt: 'desc' },
@@ -81,7 +84,15 @@ export async function resenasPublicas(
     ? Math.round((conEstrella.reduce((s, r) => s + (r.rating ?? 0), 0) / conEstrella.length) * 10) / 10
     : null
 
-  const items: ResenaPublica[] = utiles
+  const ordenadas = (() => {
+    if (filtro.orden === 'antiguas') return [...utiles].reverse()
+    if (filtro.orden === 'mejor_calificadas') {
+      return [...utiles].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
+    }
+    return utiles // recientes: ya viene así de la consulta
+  })()
+
+  const items: ResenaPublica[] = ordenadas
     .slice(0, Math.min(30, Math.max(1, cantidad)))
     .map(r => {
       const fuente = (r.source as ResenaPublica['fuente']) ?? 'whatsapp'
