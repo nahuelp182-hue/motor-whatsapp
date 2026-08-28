@@ -7,6 +7,12 @@ Plataforma interna de Micelium Argentina sobre Next.js 16 (App Router) + Prisma 
 es multi-tenant (`Store`, `store_id`) pero el runtime atiende una sola tienda. Ver
 `PLAN_ARQUITECTURA.md` para el estado y el plan de correcciones.
 
+**Este repo se despliega en más de una instancia.** Cada despliegue tiene su propia base y
+atiende una sola tienda; lo que se comparte es el código. Además de Micelium está
+**Osamayor** (motor de widgets para una segunda tienda de Tiendanube): ver `OSAMAYOR.md`
+para la configuración completa y `OSAMAYOR_AGENDA.md` para el estado del trabajo.
+Consecuencia práctica: **un arreglo del motor de widgets hay que desplegarlo en las dos**.
+
 Conviven ~7 productos: bot de WhatsApp, portal de guías (`guias.infomicelium.com.ar`),
 motor de widgets, tracking de curiosos, radar, calendario y atribución de ads.
 
