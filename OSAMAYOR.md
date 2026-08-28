@@ -298,15 +298,46 @@ alrededor de la PC, el VPS y la base de Micelium, y Osamayor no es ninguna de la
 | Tests | Los mismos 21 corren sobre el mismo código. |
 | Backup del código | `claude-sync` espeja el repo a GitHub. Es el mismo repo. |
 
-### Lo que hay que montar aparte
+### La solución montada (28/08/2026)
 
-| Pieza | Estado por defecto | Qué hacer |
+**Dos capas, a propósito.** El backup nativo de Supabase queda como primera línea, pero no
+alcanza solo: *un backup del que no podés bajarte el archivo no es un backup, es una promesa
+del proveedor*. Si la cuenta se cae, se suspende o se pierde el acceso, ese backup no sirve.
+
+**Capa 1 — backups nativos de Supabase.** Se configuran en su proyecto. Cubren el error
+común: borrar algo sin querer y querer volver atrás rápido.
+
+**Capa 2 — dump propio semanal, en otra infraestructura.**
+`~/.claude/backup_osamayor.sh` (va al VPS) hace `pg_dump` de la base entera todos los lunes
+a las 4:30 y lo deja en `/root/backup/osamayor/`. Decisiones del script:
+
+- **`--no-owner --no-acl`**: el dump tiene que poder restaurarse en *otra* base con *otro*
+  usuario. Sin eso, un restore de emergencia falla por roles que no existen — justo el
+  escenario para el que existe.
+- **Escribe a `.parcial` y renombra al final**: un dump cortado a la mitad no queda con
+  nombre de bueno.
+- **Rechaza dumps de menos de 10 KB**: una base que responde pero no trae nada es un fallo
+  silencioso.
+- **Verifica el gzip con `gzip -t`**: un archivo del tamaño correcto pero corrupto es el peor
+  caso, parece backup hasta el día que se necesita.
+- **Rota a 90 días, y borra los viejos recién después** de confirmar que el nuevo está sano.
+
+**Capa 3 — vigilancia.** `backup_watchdog.py` (ya corría los lunes 9:00 en el VPS) ahora
+tiene un tercer grupo, **"Base de Osamayor", con umbral de 10 días** — el más corto de los
+tres, porque su dump es semanal y automático: 10 días significa que fallaron dos corridas
+seguidas. Los otros grupos son manuales y toleran más. Si falla, el mail explica que es un
+cron del VPS y dónde mirar el log, en vez de dar las instrucciones manuales que no aplican.
+
+**Por qué el umbral más corto es el de ella:** es la única base con datos de **otra persona**.
+Una reseña que escribió un cliente en su tienda no se puede volver a generar.
+
+### Lo que queda por decidir
+
+| Pieza | Estado | Qué falta |
 |---|---|---|
-| **Backup de su base** | **Ninguno.** El backup de Supabase es por proyecto. | Configurar backups en su proyecto, con retención declarada. |
-| **Sus credenciales** | Fuera del `.7z` cifrado. `backup_rescate.ps1` arma el paquete desde `~/.claude/`. | Sumarlas al paquete o documentar dónde viven. |
-| **Watchdog de backups** | No la conoce. `backup_watchdog.py` solo vigila lo que tiene declarado. | Agregarla, o aceptar explícitamente que no se vigila. |
-| **Fotos de reseñas (Blob)** | Sin respaldo propio. | Decidir si se respaldan; son contenido de clientes reales. |
-| **Aviso de caída** | El heartbeat de crons notifica a Micelium. Su cron de Google puede morir callado. | Que su heartbeat avise a algún lado. |
+| **Fotos de reseñas (Blob)** | Sin respaldo. Están como URL dentro del dump, pero el archivo vive en Vercel. | Decidir si se respaldan. Son contenido de clientes reales. |
+| **Sus credenciales** | Fuera del `.7z` cifrado (`backup_rescate.ps1` arma desde `~/.claude/`). | Sumarlas o documentar dónde viven. |
+| **Aviso de caída de su cron de Google** | El heartbeat notifica a Micelium. | Que avise a algún lado para su instancia. |
 
 El hardening del VPS (firewall Hetzner, SSH sin password) **no aplica**: nada de Osamayor
 pasa por el VPS. Vercel y Supabase son gestionados, con su propia superficie de ataque.

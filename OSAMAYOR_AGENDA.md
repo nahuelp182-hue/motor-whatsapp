@@ -22,18 +22,18 @@ una decisión, o mirar algo con ojo humano.
 
 **Etapa actual: 0 — Antes de tocar nada.** Nada de código escrito todavía.
 
-**Progreso:** 0 de 6 etapas · **1 de 40 ítems**
+**Progreso:** 0 de 6 etapas cerradas · **3 hechos + 1 a medias, de 42 ítems**
 
 | Etapa | Qué es | Estado | Falta | De quién |
 |---|---|---|---|---|
-| 0 | Antes de tocar nada | ⬜ pendiente | 5 (+4 datos) | casi todo 👤 |
+| 0 | Antes de tocar nada | 🟡 1 a medias | 4 (+4 datos) | casi todo 👤 |
 | 1 | Que el motor arranque sin lo de Micelium | ⬜ pendiente | 7 | casi todo 🤖 |
 | 2 | Su instancia, con su dominio | ⬜ pendiente | 10 | mitad y mitad |
 | 3 | Instalar en su tienda | ⬜ pendiente | 6 | casi todo 🤖 |
-| 4 | Respaldos y avisos | ⬜ pendiente | 8 | mitad y mitad |
+| 4 | Respaldos y avisos | 🟡 2 de 10 | 8 | casi todo 👤 |
 | 5 | Que desplegar dos veces no se olvide | 🟡 1 de 4 | 3 | casi todo 🤖 |
 
-_40 = 44 casillas menos las 4 de "Después (no ahora)", que no son de este tramo._
+_42 casillas en las etapas 0–5. Las 4 de "Después (no ahora)" no cuentan._
 
 ### 👤 Lo que necesito de vos AHORA
 
@@ -50,6 +50,9 @@ Sin esto el proyecto no arranca. Es todo de la etapa 0:
 Con 1 a 4 puedo empezar la etapa 1. El 5 recién hace falta en la etapa 2, y el 6 conviene
 antes de crear la base.
 
+**Y cuando exista la base** (etapa 4, ya escrito y esperando): subir al VPS el script de
+respaldo y su vigilancia. Los pasos exactos están en la etapa 4.
+
 ---
 
 ## Etapa 0 — Antes de tocar nada
@@ -57,13 +60,15 @@ antes de crear la base.
 Recolección. No se escribe código. Existe porque **la etapa 2 se traba sin estos datos**, y
 porque hay un pendiente heredado que puede romper la base nueva.
 
-- [ ] 👤 **Verificar si las tres migraciones pendientes se aplicaron a producción.**
-      Al 27/07/2026 estaban sin aplicar: `20260727130000_cron_heartbeat`,
-      `20260727140000_integridad_esquema`, `20260727150000_cola_envios`.
-      **Por qué importa acá:** si la base de Osamayor se crea desde el schema actual, va a
-      tener un esquema que la de Micelium todavía no tiene.
-      **Corré:** `npx prisma migrate status` con la `DATABASE_URL` de producción y pasame la
-      salida. Yo no tengo ese secreto.
+- [~] 👤 **Verificar si las tres migraciones de julio se aplicaron a producción.**
+      `PLAN_ARQUITECTURA.md` las daba por pendientes al 27/07: `cron_heartbeat`,
+      `integridad_esquema`, `cola_envios`.
+      **Revisado el 28/08:** hay **7 migraciones posteriores** en disco, la última del
+      26/08 (`review_approved_default_false`). Prisma no deja crear migraciones nuevas
+      sobre una base desincronizada sin protestar, así que **casi con seguridad ya se
+      aplicaron** y el aviso del plan quedó viejo. Riesgo bajo, no bloqueante.
+      **Para cerrarlo del todo:** `npx prisma migrate status` con la `DATABASE_URL` de
+      producción. No está en el disco (no hay `.env`), así que lo tenés que correr vos.
 - [ ] 👤 **Datos de la tienda**, para completar la ficha de `OSAMAYOR.md`:
       - [ ] Nombre comercial
       - [ ] ID de tienda en Tiendanube
@@ -172,15 +177,34 @@ PC, el VPS y la base de Micelium. Una base nueva de Supabase nace **sin respaldo
 Va después de instalar porque antes no hay nada que perder — y antes de dar el proyecto por
 cerrado porque después ya hay reseñas y fotos de clientes reales adentro.
 
-- [ ] 👤 **Backups de su base**, con retención declarada. Se configura en el dashboard de
-      Supabase. Decime cuál quedó y lo anoto en `OSAMAYOR.md`.
+- [x] 🤖 **Script de dump propio escrito.** `~/.claude/backup_osamayor.sh` — `pg_dump`
+      semanal, con las defensas que hacen que un backup sea de verdad: escribe a `.parcial`
+      y renombra al final, rechaza dumps de menos de 10 KB, verifica el gzip con `gzip -t`,
+      rota a 90 días borrando los viejos **después** de confirmar que el nuevo está sano.
+      `--no-owner --no-acl` para que se pueda restaurar en otra base con otro usuario.
+      Hecho 28/08/2026. **Falta instalarlo en el VPS** (ver abajo).
+- [x] 🤖 **Vigilancia enganchada.** `backup_watchdog.py` (ya corría lunes 9:00 en el VPS)
+      tiene un tercer grupo, "Base de Osamayor", umbral **10 días** — el más corto, porque
+      su dump es automático y semanal. El mail de alerta ahora explica que es un cron del
+      VPS y dónde mirar el log. Hecho 28/08/2026. **Falta subir el archivo al VPS.**
+- [ ] 👤 **Instalar el dump en el VPS.** Tres pasos:
+      1. `scp ~/.claude/backup_osamayor.sh root@100.117.45.81:/root/scripts/` y `chmod +x`
+      2. Guardar la connection string en `/root/.claude/osamayor-db` (`chmod 600`).
+         **⚠️ Puerto 5432, NO 6543.** El 6543 es el pooler en transaction mode —el que usa
+         la app— y `pg_dump` no funciona ahí. Va la conexión directa: en Supabase,
+         Settings → Database → Connection string → URI. El script avisa si detecta 6543.
+      3. `crontab -e` → `30 4 * * 1 /root/scripts/backup_osamayor.sh >> /var/log/backup_osamayor.log 2>&1`
+      Además subir el `backup_watchdog.py` actualizado, y verificar que `pg_dump` del VPS
+      sea de versión >= la del servidor (Supabase corre PG 15/16).
+- [ ] 👤 **Backups nativos de Supabase** en su proyecto, con retención declarada. Es la
+      primera línea; el dump propio es la segunda.
 - [ ] 🤝 **Probar la restauración una vez.** Un backup no probado no es un backup.
+      Restaurar el dump en una base descartable y ver que las tablas están.
 - [ ] 👤 **Sus credenciales al paquete cifrado** (`backup_rescate.ps1` arma el `.7z` desde
       `~/.claude/`), o documentar dónde viven y por qué no están ahí. Necesita la passphrase.
-- [ ] 🤖 **Sumarla a `backup_watchdog.py`**, o dejar escrito que no se vigila. Lo que no se
-      puede quedar es en el medio: creer que está vigilada sin estarlo.
-- [ ] 🤝 **Decidir qué pasa con las fotos de reseñas.** Son contenido de clientes reales y no
-      tienen respaldo propio. La decisión es tuya; el script lo hago yo.
+- [ ] 🤝 **Decidir qué pasa con las fotos de reseñas.** Están como URL dentro del dump, pero
+      el archivo vive en Vercel Blob. Son contenido de clientes reales. La decisión es tuya;
+      el script lo hago yo.
 - [ ] 🤖 **Que su heartbeat de crons avise a algún lado.** Hoy el aviso va a Micelium; su
       cron de Google puede morir en silencio.
 - [ ] 👤 **Verificar que la contraseña del panel es distinta** a la de Micelium.
