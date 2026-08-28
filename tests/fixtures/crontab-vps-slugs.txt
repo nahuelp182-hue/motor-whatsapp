@@ -1,0 +1,34 @@
+# Slugs de run_job.sh en el crontab del VPS (100.117.45.81), uno por línea.
+# Fuente de verdad para el test que exige que todo job del VPS esté en CATALOGO.
+#
+# Regenerar cuando se agregue o saque un job del crontab:
+#   ssh root@100.117.45.81 "crontab -l | grep -o 'run_job.sh [a-z0-9_-]*' | awk '{print \$2}' | sort -u"
+#
+# Capturado: 2026-08-22 (agenda_precios_ml salio del VPS: lo corre la tarea de Windows)
+auditoria_sistema
+backup_watchdog
+blog_seo_report_email
+crm_cron
+crm_watchdog
+curiosos_cosido_live
+daily_report_email
+envio_manuales_sku
+envio_manuales_sku_reporte
+fb_mensajes_email
+geo_report_email
+ig_auto_confirmar
+ig_auto_insights
+ig_auto_proponer
+ig_auto_publicar
+ig_auto_reel
+ig_moderation_email
+meta_capi_backfill_live
+meta_organic_attribution
+meta_sync_suscriptores_push
+ml_autoresponder_vps
+ml_ventas_apicola
+ml_ventas_apicola_reporte_mes
+ml_ventas_apicola_reporte_semana
+mp_ventas_split_email
+precios_guardian
+recordatorio_sucursal

@@ -19,7 +19,7 @@ import { getPool } from '@/lib/db'
 import { notifyNahuel } from '@/lib/notify'
 import { consumirLimite } from '@/lib/ratelimit'
 import { marcarHeartbeat } from '@/lib/cron-heartbeat'
-import { ultimaDerivacion, handoffEsPermanente } from '@/lib/diag'
+import { ultimaDerivacion, handoffEsPermanente, diag } from '@/lib/diag'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -44,6 +44,8 @@ const HANDOFF_ALERTA_H = 3
 const REALERTA_H = 6
 /** Los casos sensibles se recuerdan mas seguido: nadie mas los va a destrabar. */
 const REALERTA_PERMANENTE_H = 2
+/** kind del log que numera los avisos de este caso (ver `contarAvisosDelCaso`). */
+const KIND_WATCHDOG_AVISADO = 'watchdog_avisado'
 
 export async function GET(req: Request) {
   const noAuth = chequearCron(req)
@@ -106,27 +108,102 @@ async function revisarZonaCiega(pool: NonNullable<ReturnType<typeof getPool>>) {
     if (!permitido) continue
 
     avisados++
-    // Un caso delicado no es "puede que ya este resuelto": el bot esta callado a proposito
-    // y nadie mas lo va a atender. El aviso lo dice con todas las letras.
+
+    // Nº de este aviso DENTRO del caso actual (reinicia si el caso se cerró y reabrió: se
+    // cuenta desde `desde`, el inicio de ESTA derivación, no desde siempre). Tope en 3: a
+    // partir de ahí no tiene sentido seguir contando en el título, ya se avisó de sobra.
+    const nroAviso = Math.min(await contarAvisosDelCaso(pool, sender, desde) + 1, 3)
+    const nombre = await nombreDe(pool, sender)
+
     await notifyNahuel(
       permanente
-        ? `⚠️ Caso SENSIBLE sin atender hace ${Math.round(horas)} h (plata / cancelación / legal)`
-        : `Cliente esperando a Mateo hace ${Math.round(horas)} h (sin confirmación)`,
+        ? `⚠️ [Alerta ${nroAviso}/3] Caso SENSIBLE sin atender — ${Math.round(horas)} h`
+        : `[Alerta ${nroAviso}/3] Cliente esperando a Mateo — ${Math.round(horas)} h`,
       permanente
-        ? `Un cliente con un reclamo DELICADO (cancelación, reintegro o conflicto) está derivado ` +
-          `desde hace ${Math.round(horas)} h.\n\n` +
-          `El bot NO va a retomar este chat: en estos casos el handoff no expira a propósito ` +
-          `(el 19/08/2026 el bot retomó uno así y terminó inventando un número de reclamo, con el ` +
-          `cliente anunciando una denuncia en Defensa del Consumidor).\n\n` +
-          `O sea: si no entra una persona, este cliente no recibe respuesta de nadie.\n\n` +
-          `Ver el hilo: https://mw-micelium.vercel.app/conversaciones`
-        : `Este cliente está derivado desde hace ${Math.round(horas)} h y seguimos sin poder confirmar ` +
-          `si alguien le contestó — las respuestas de Mateo no quedan logueadas en ningún sistema.\n\n` +
-          `No es necesariamente un problema: puede que ya esté resuelto por WhatsApp normal y este ` +
-          `aviso sea el único rastro que va a quedar. Solo lo marcamos porque ya pasó tiempo.\n\n` +
-          `Ver el hilo: https://mw-micelium.vercel.app/conversaciones`,
+        ? formatearAlerta({
+            titulo: '⚠️ CASO SENSIBLE — plata / cancelación / legal',
+            cliente: nombre, sender,
+            resumen:
+              `Cancelación/reintegro/conflicto sin resolver, derivado hace ${Math.round(horas)} h. ` +
+              `El bot NO va a retomar este chat a propósito (el 19/08/2026 inventó un número de ` +
+              `reclamo en un caso así). Si no entra una persona, no recibe respuesta de nadie.`,
+            nroAviso,
+          })
+        : formatearAlerta({
+            titulo: 'Cliente esperando a Mateo',
+            cliente: nombre, sender,
+            resumen:
+              `Derivado hace ${Math.round(horas)} h, sin confirmación de que alguien contestó — las ` +
+              `respuestas de Mateo no quedan logueadas en ningún sistema.\n` +
+              `No es necesariamente un problema: puede que ya esté resuelto por WhatsApp normal.`,
+            nroAviso,
+          }),
     )
+    await diag(KIND_WATCHDOG_AVISADO, sender, { nroAviso, permanente, horas: Math.round(horas) }, 'wa')
   }
 
   return { revisados: rows.length, avisados }
+}
+
+/** Cuántos avisos de este cron ya salieron para este caso, desde que arrancó (`desde`). */
+async function contarAvisosDelCaso(
+  pool: NonNullable<ReturnType<typeof getPool>>, sender: string, desde: Date,
+): Promise<number> {
+  try {
+    const { rows } = await pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM ig_diag
+        WHERE sender = $1 AND kind = $2 AND canal = 'wa' AND ts >= $3`,
+      [sender, KIND_WATCHDOG_AVISADO, desde],
+    )
+    return Number(rows[0]?.n ?? 0)
+  } catch {
+    return 0 // ante error, mejor mostrar "1/3" de más que romper el aviso
+  }
+}
+
+/** Nombre del cliente si quedó logueado en algún 'recibido' previo. Best-effort. */
+async function nombreDe(pool: NonNullable<ReturnType<typeof getPool>>, sender: string): Promise<string | null> {
+  try {
+    const { rows } = await pool.query<{ nombre: string | null }>(
+      `SELECT detail->>'nombre' AS nombre FROM ig_diag
+        WHERE sender = $1 AND kind = 'recibido' AND canal = 'wa' AND detail->>'nombre' IS NOT NULL
+        ORDER BY id DESC LIMIT 1`,
+      [sender],
+    )
+    // El nombre es el perfil de WhatsApp del cliente, texto libre sin sanitizar en origen:
+    // se recorta y se limpia de saltos de línea para que no rompa el formato de la alerta.
+    const nombre = rows[0]?.nombre
+    return nombre ? nombre.replace(/\s+/g, ' ').trim().slice(0, 60) || null : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Arma el cuerpo de la alerta con secciones separadas visualmente (nada de un párrafo
+ * pegado): CASO / CLIENTE / cómo cerrarlo / resumen. Por email y Telegram esto sale con
+ * saltos de línea reales, bien legible.
+ *
+ * Por WhatsApp (plantilla de Meta) los \n se colapsan a " · " y el body se corta a 600
+ * caracteres (ver `paramSeguro` en lib/notify.ts) — por eso el comando "cerrar <tel>" va
+ * ANTES del resumen largo, no al final: si ese canal corta el mensaje, lo primero que se
+ * pierde es el resumen, nunca la forma de frenar las alertas. El comando se manda tal cual,
+ * respondiendo al mismo chat de WhatsApp desde el que llega esta alerta — el webhook ya lo
+ * procesa (ver `esCierreDeHandoff`).
+ */
+function formatearAlerta(p: {
+  titulo: string; cliente: string | null; sender: string; resumen: string; nroAviso: number
+}): string {
+  const lineaCliente = p.cliente ? `${p.cliente} · ${p.sender}` : p.sender
+  return (
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `${p.titulo}\n` +
+    `Alerta ${p.nroAviso}/3 de este caso\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `👤 CLIENTE: ${lineaCliente}\n\n` +
+    `✅ PARA CERRAR (frena las alertas de este caso):\n` +
+    `Respondé a este mismo chat con:\ncerrar ${p.sender}\n\n` +
+    `📋 RESUMEN:\n${p.resumen}\n\n` +
+    `🔗 Ver hilo: https://mw-micelium.vercel.app/conversaciones`
+  )
 }

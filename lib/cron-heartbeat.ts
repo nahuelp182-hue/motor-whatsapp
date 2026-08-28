@@ -212,6 +212,26 @@ export const CATALOGO: Record<string, EntradaCatalogo> = {
     origen: 'vps', maxHoras: 26,
     que: 'Sube precios de Tiendanube por inflación, con aviso previo para vetar',
   },
+  // La agenda de precios de ML corre en la PC (tarea AgendaPreciosML-MICELIUMSTORE), no
+  // en el VPS: es la única de las dos que baja el token ML fresco antes de aplicar. Hasta
+  // el 22/08/2026 la disparaban las DOS, casi a la misma hora y sobre dos copias distintas
+  // de conciliacion.db; el cron del VPS quedó comentado ese día.
+  //
+  // El slug sale de heartbeat_tareas.ps1, que lo deriva del nombre de la tarea
+  // ('AgendaPreciosML-MICELIUMSTORE' -> 'agendapreciosml_miceliumstore'). Si se renombra
+  // la tarea, cambia el slug y esta entrada deja de encontrarla.
+  agendapreciosml_miceliumstore: {
+    origen: 'windows', maxHoras: 50,
+    que: 'Aplica en ML los ajustes de precio agendados para hoy',
+  },
+  // El auditor del sistema tiene que vigilarse a sí mismo por acá: es el que reporta el
+  // estado de todo lo demás, así que si se cae en silencio se lleva puesta la vigilancia
+  // entera. Es exactamente el caso "un vigilante que depende de lo que vigila" del
+  // encabezado de este archivo, visto desde el otro lado.
+  auditoria_sistema: {
+    origen: 'vps', maxHoras: 26,
+    que: 'Corre los chequeos de salud del sistema y los manda a /api/auditoria/ingest',
+  },
   mp_ventas_split_email: {
     origen: 'vps', maxHoras: 400,
     que: 'Corte de MercadoPago separado en apícola / incubadora / otros',
