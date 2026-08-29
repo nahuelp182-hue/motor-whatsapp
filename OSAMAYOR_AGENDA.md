@@ -26,43 +26,40 @@ una decisión, o mirar algo con ojo humano.
 
 ## 📍 Dónde estamos
 
-**Etapa actual: 2 — Su instancia, con su dominio.** Base y deploy YA ESTÁN (pasos 1-3 de la
-etapa, hechos y verificados en vivo). Faltan Blob y la autorización de la app (pasos 4-6).
+**Etapa actual: 2 — Su instancia, con su dominio.** OAuth completa y verificada en vivo
+(29/08): la tienda está dada de alta con su access token real. Solo falta Blob (paso 4).
 
 **La instancia vive en: `https://osamayor-nine.vercel.app`**
 
-**Progreso:** 0 de 6 etapas cerradas · **13 hechos + 2 a medias, de 43 ítems**
+**Progreso:** 0 de 6 etapas cerradas · **16 hechos + 2 a medias, de 43 ítems**
 
 | Etapa | Qué es | Estado | Falta | De quién |
 |---|---|---|---|---|
-| 0 | Antes de tocar nada | 🟡 datos sí, token no | 2 | 👤 |
+| 0 | Antes de tocar nada | 🟡 datos sí, migración por confirmar | 2 | 👤 |
 | 1 | Que el motor arranque sin lo de Micelium | 🟡 3 de 7 | 4 | casi todo 🤖 |
-| 2 | Su instancia, con su dominio | 🟡 6 de 10 | 4 | 👤 primero |
+| 2 | Su instancia, con su dominio | 🟡 9 de 10 | 1 | 👤 |
 | 3 | Instalar en su tienda | ⬜ pendiente | 6 | casi todo 🤖 |
 | 4 | Respaldos y avisos | 🟡 2 de 10 | 8 | casi todo 👤 |
 | 5 | Que desplegar dos veces no se olvide | 🟡 1 de 4 | 3 | casi todo 🤖 |
 
 _42 casillas en las etapas 0–5. Las 4 de "Después (no ahora)" no cuentan._
 
-**Dos hallazgos grandes en el camino, documentados en `OSAMAYOR.md`:** 6 tablas faltaban
+**Tres hallazgos grandes en el camino, documentados en `OSAMAYOR.md`:** 6 tablas faltaban
 del historial de migraciones de Prisma (afecta a cualquier tercera instancia futura, no
-solo Osamayor), y crear un proyecto de Vercel sin código delante lo deja mal configurado
-para Next.js. Los dos ya están resueltos y con el arreglo commiteado.
+solo Osamayor); crear un proyecto de Vercel sin código delante lo deja mal configurado para
+Next.js; y el callback OAuth registraba webhooks de OSA MAYOR apuntando a Micelium por un
+bug de "tienda propia" que no contemplaba dos instancias (sin daño real, pero arreglado).
+Los tres ya están resueltos y con el arreglo commiteado.
 
 ### 👤 Lo que necesito de vos AHORA
 
-La instancia ya está viva en `https://osamayor-nine.vercel.app`. Faltan tres cosas, todas
-en el dashboard de Vercel/Tiendanube — no las puedo hacer yo:
+Una sola cosa, en el dashboard de Vercel — no lo puedo hacer yo:
 
 1. **Conectar Vercel Blob** al proyecto `osamayor`, para las fotos de reseñas y widgets.
    Vercel dashboard → proyecto `osamayor` → Storage → Connect Blob.
-2. **Apuntar el callback de la app `32868`** en el Portal de Partners de Tiendanube a
-   `https://osamayor-nine.vercel.app/api/auth/tiendanube/callback`.
-3. **Autorizar la app** entrando a la URL de instalación de esa app en OSA MAYOR. El
-   callback da de alta la tienda y guarda el token solo.
 
-Con eso cerrada la etapa 2, sigo yo con la etapa 3 (instalar `mic.js` en el storefront y
-verificar visualmente) sin necesitar nada más de vos hasta ahí.
+Con eso cerrada la etapa 2, sigo yo con la etapa 3 (instalar `mic.js` en el storefront de
+OSA MAYOR y verificar visualmente) sin necesitar nada más de vos hasta ahí.
 
 **Guardaste ya en tu gestor de contraseñas:** la contraseña de la base de Supabase, la del
 panel de Osamayor y el `CRON_SECRET` — las tres se generaron y mostraron durante el setup.
@@ -174,11 +171,13 @@ Los pasos 1 a 3 **no se pueden reordenar**. El resto sí.
    ahora: lo va a escribir el callback en el paso 6.
 4. [ ] **Conectar Blob** al proyecto nuevo (para las fotos de reseñas). **Pendiente** —
    requiere entrar al dashboard de Vercel, no se pudo hacer por CLI/API.
-5. [ ] **Apuntar el callback de la app `32868`** en el Portal de Partners a
-   `https://osamayor-nine.vercel.app/api/auth/tiendanube/callback`.
-6. [ ] **Autorizar la app** entrando a la URL de instalación. El callback da de alta la
-   tienda en `Store` y guarda el token. **Verificar que la respuesta traiga
-   `"creada": true"`.**
+5. [x] **Apuntar el callback de la app `32868`** en el Portal de Partners. Hecho 29/08 por
+   Nahuel, a `https://osamayor-nine.vercel.app/api/auth/tiendanube/callback`.
+6. [x] **Autorizar la app.** Hecho 29/08: `{"ok":true,"store_id":"3224928","creada":true}`.
+   **Bug encontrado y arreglado en el momento**: el callback registró webhooks apuntando a
+   Micelium por un bug de "tienda propia" que no contemplaba dos instancias — sin daño real
+   (la firma los habría rechazado), pero se arregló la causa y se borró el webhook mal
+   registrado de la cuenta real. Ver `OSAMAYOR.md`.
 
 - [x] 👤 **Base de datos nueva.** Hecho 28/08 — Supabase, proyecto `osamayor`.
 - [x] 🤖 **Migraciones de Prisma sobre la base nueva.** Hecho 28/08, con el hallazgo de las
@@ -189,8 +188,8 @@ Los pasos 1 a 3 **no se pueden reordenar**. El resto sí.
       **Pendiente** — requiere el dashboard de Vercel.
 - [x] 👤 **NO habilitar las variables de base en Preview.** No se tocó Preview al cargar
       las variables — solo se agregaron a Production. Verificado 28/08.
-- [ ] 🤖 **Cargar su tienda en `Store`**: id de Tiendanube, token, dominio. Sale sola cuando
-      se autorice la app (paso 6 de arriba) — el callback ya está preparado para crearla.
+- [x] 🤖 **Cargar su tienda en `Store`**: id de Tiendanube, token, dominio. Hecho 29/08 —
+      la creó el callback OAuth solo. Access token real de 40 caracteres, verificado.
 - [x] 🤖 **`BASE` en `mic.js` deja de estar fijo.** Hecho 28/08: se deduce de
       `new URL(document.currentScript.src).origin`, sin necesidad de configurar nada en la
       etiqueta ni en el storefront. Con respaldo al dominio de Micelium si `currentScript`

@@ -88,6 +88,25 @@ Verificado con Prisma Client real (el mismo adapter `pg` + pooler que usa `lib/p
 contra el pooler 6543: `Widget`, `Review` y `Store` responden. Migraciones al día
 (`prisma migrate status` → "Database schema is up to date!").
 
+### Hecho el 29/08: OAuth completa, token real guardado
+
+Nahuel apuntó el callback de la app `32868` en el Portal de Partners a
+`https://osamayor-nine.vercel.app/api/auth/tiendanube/callback` y autorizó la app desde el
+admin de OSA MAYOR (`emuna23.mitiendanube.com/admin/apps/32868/authorize`). El callback
+devolvió `{"ok":true,"store_id":"3224928","creada":true}` — la tienda quedó dada de alta y
+el **access token real** guardado (40 caracteres, verificado contra la base).
+
+**Bug encontrado en el momento, con la tienda real ya autorizada:** el callback registró
+webhooks de pedidos apuntando a `mw-micelium.vercel.app` (hardcodeado), porque
+`esTiendaPropia = storeId === TN_STORE_ID` asumía una sola instancia posible — con dos,
+cada una tiene su propio `TN_STORE_ID`, así que en Osamayor la comparación también daba
+`true`. **Sin daño real** (los client secret de las dos apps son distintos, Micelium habría
+rechazado esos webhooks con 401 por firma inválida), pero la funcionalidad quedaba rota:
+Osamayor nunca iba a recibir sus propios webhooks. Arreglado: ahora la decisión es "¿esta
+instancia tiene bot de WhatsApp?" (`WHATSAPP_TOKEN` configurado), no un ID de tienda — y la
+URL sale del propio origin del request. El webhook mal registrado (id `39173527`) se listó
+y se borró de la cuenta real de OSA MAYOR.
+
 ### Hallazgo del 28/08: el proyecto de Vercel necesita código delante para detectar Next.js
 
 `vercel project add <nombre>` crea el proyecto **vacío**, sin mirar código, y lo deja con
