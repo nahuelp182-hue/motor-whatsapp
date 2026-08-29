@@ -33,13 +33,27 @@ despliegue. Acá solo se anota qué existe y dónde.
 
 | Dato | Valor |
 |---|---|
-| Nombre comercial | _(pendiente)_ |
+| Nombre comercial | **OSA MAYOR** |
 | Dueña | Novia de Nahuel. Nahuel administra, tiene todas las credenciales. |
-| ID de tienda Tiendanube | _(pendiente)_ |
-| Dominio del storefront | _(pendiente)_ |
+| ID de tienda Tiendanube | **`3224928`** — verificado 28/08 contra `LS.store` del storefront |
+| Dominio del storefront | **`www.tiendaosamayor.com.ar`** |
+| Dominio interno TN | `emuna23.mitiendanube.com` |
+| Cuenta / mail | `info.osamayor20@gmail.com` |
+| App de Tiendanube | ID **`32868`**, ya instalada en la tienda |
+| GA4 | `G-KEXLLEL92E` (ya configurado en el storefront) |
 | Dominio de la instancia | _(pendiente)_ |
 | Base de datos | _(pendiente)_ |
 | Ficha de Google Business | Sí, tiene. Cuenta de Google distinta a la de Micelium. |
+
+> **⚠️ Ojo con los dos números.** `32868` es el ID de la **app** en el Portal de Partners;
+> `3224928` es el ID de la **tienda**. La API de Tiendanube quiere el de la tienda: usar el
+> de la app devuelve 401 y parece un problema de token cuando no lo es. Verificado el
+> 28/08/2026 — se perdió un rato en eso.
+>
+> **El access token todavía no existe.** El valor de 48 caracteres que circuló es el
+> **client secret** de la app, no un access token (los de tienda son 40 hex). Un access
+> token no se copia de ningún lado: sale del flujo OAuth cuando la app se instala. Ver la
+> etapa 0 de la agenda.
 
 ---
 
