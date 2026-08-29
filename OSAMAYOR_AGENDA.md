@@ -26,38 +26,46 @@ una decisión, o mirar algo con ojo humano.
 
 ## 📍 Dónde estamos
 
-**Etapa actual: 2 — Su instancia, con su dominio.** Va ANTES de terminar la etapa 0: la app
-`32868` es propia de OSA MAYOR, así que conviene crear la instancia y recién ahí autorizar,
-en vez de guardar el token en la base de Micelium y mudarlo después.
+**Etapa actual: 2 — Su instancia, con su dominio.** Base y deploy YA ESTÁN (pasos 1-3 de la
+etapa, hechos y verificados en vivo). Faltan Blob y la autorización de la app (pasos 4-6).
 
-**Progreso:** 0 de 6 etapas cerradas · **8 hechos + 2 a medias, de 43 ítems**
-(43 porque se sumó el ítem de "confirmar el callback" en la etapa 0, ya resuelto)
+**La instancia vive en: `https://osamayor-nine.vercel.app`**
+
+**Progreso:** 0 de 6 etapas cerradas · **13 hechos + 2 a medias, de 43 ítems**
 
 | Etapa | Qué es | Estado | Falta | De quién |
 |---|---|---|---|---|
 | 0 | Antes de tocar nada | 🟡 datos sí, token no | 2 | 👤 |
 | 1 | Que el motor arranque sin lo de Micelium | 🟡 3 de 7 | 4 | casi todo 🤖 |
-| 2 | Su instancia, con su dominio | 🟡 1 de 10 | 9 | 👤 primero |
+| 2 | Su instancia, con su dominio | 🟡 6 de 10 | 4 | 👤 primero |
 | 3 | Instalar en su tienda | ⬜ pendiente | 6 | casi todo 🤖 |
 | 4 | Respaldos y avisos | 🟡 2 de 10 | 8 | casi todo 👤 |
 | 5 | Que desplegar dos veces no se olvide | 🟡 1 de 4 | 3 | casi todo 🤖 |
 
 _42 casillas en las etapas 0–5. Las 4 de "Después (no ahora)" no cuentan._
 
+**Dos hallazgos grandes en el camino, documentados en `OSAMAYOR.md`:** 6 tablas faltaban
+del historial de migraciones de Prisma (afecta a cualquier tercera instancia futura, no
+solo Osamayor), y crear un proyecto de Vercel sin código delante lo deja mal configurado
+para Next.js. Los dos ya están resueltos y con el arreglo commiteado.
+
 ### 👤 Lo que necesito de vos AHORA
 
-Sin esto el proyecto no arranca. Es todo de la etapa 0:
+La instancia ya está viva en `https://osamayor-nine.vercel.app`. Faltan tres cosas, todas
+en el dashboard de Vercel/Tiendanube — no las puedo hacer yo:
 
-1. **ID de tienda y token de API de Tiendanube** de su tienda.
-2. **Dominio de su storefront** (la dirección de la tienda).
-3. **Nombre comercial** de la tienda.
-4. **Con qué dominio querés su panel** (de ahí sale `PUBLIC_BASE_URL`).
-5. **Acceso a su cuenta de Google** para el OAuth de la ficha.
-6. **Correr `npx prisma migrate status`** con la `DATABASE_URL` de producción y pasarme la
-   salida — yo no tengo el secreto.
+1. **Conectar Vercel Blob** al proyecto `osamayor`, para las fotos de reseñas y widgets.
+   Vercel dashboard → proyecto `osamayor` → Storage → Connect Blob.
+2. **Apuntar el callback de la app `32868`** en el Portal de Partners de Tiendanube a
+   `https://osamayor-nine.vercel.app/api/auth/tiendanube/callback`.
+3. **Autorizar la app** entrando a la URL de instalación de esa app en OSA MAYOR. El
+   callback da de alta la tienda y guarda el token solo.
 
-Con 1 a 4 puedo empezar la etapa 1. El 5 recién hace falta en la etapa 2, y el 6 conviene
-antes de crear la base.
+Con eso cerrada la etapa 2, sigo yo con la etapa 3 (instalar `mic.js` en el storefront y
+verificar visualmente) sin necesitar nada más de vos hasta ahí.
+
+**Guardaste ya en tu gestor de contraseñas:** la contraseña de la base de Supabase, la del
+panel de Osamayor y el `CRON_SECRET` — las tres se generaron y mostraron durante el setup.
 
 **Y cuando exista la base** (etapa 4, ya escrito y esperando): subir al VPS el script de
 respaldo y su vigilancia. Los pasos exactos están en la etapa 4.
@@ -152,35 +160,37 @@ Casi todo configuración. Un solo cambio de código imprescindible.
 
 Los pasos 1 a 3 **no se pueden reordenar**. El resto sí.
 
-1. **Crear la base** (Supabase, proyecto nuevo). Guardar las dos cadenas de conexión: la
-   del pooler (6543) para el runtime y la directa (5432) para migraciones.
-2. **Aplicar las 24 migraciones** con `DATABASE_URL` apuntando a la **directa**:
-   `npx prisma migrate deploy`.
-   **Antes que el deploy**, no después: Prisma hace `SELECT` de todas las columnas del
-   modelo, así que una app desplegada contra una base vacía se cae en la primera consulta.
-3. **Crear el deploy en Vercel** desde este mismo repo, rama `master`, con las variables de
-   `.env.osamayor.ejemplo`. `TN_ACCESS_TOKEN` queda **vacío** por ahora: lo va a escribir
-   el callback en el paso 6.
-4. **Conectar Blob** al proyecto nuevo (para las fotos de reseñas).
-5. **Apuntar el callback de la app `32868`** en el Portal de Partners a
-   `https://<su-dominio>/api/auth/tiendanube/callback`.
-6. **Autorizar la app** entrando a la URL de instalación. El callback da de alta la tienda
-   en `Store` y guarda el token. **Verificar que la respuesta traiga `"creada": true`** —
-   si dice `false` es que la tienda ya existía, y si no aparece el campo, el deploy es
-   viejo y no tiene el arreglo del callback.
+1. [x] **Crear la base** (Supabase, proyecto `osamayor`, `us-east-2`). Hecho 28/08.
+2. [x] **Aplicar las migraciones.** Hecho 28/08 — con un hallazgo grande en el camino: 6
+   tablas faltaban del historial (ver `OSAMAYOR.md`, arreglado con una migración nueva) y
+   2 migraciones de tablas ajenas al motor de widgets se saltearon a propósito. Verificado
+   con Prisma Client real contra el pooler: `Widget`/`Review`/`Store` responden.
+3. [x] **Crear el deploy en Vercel.** Hecho 28/08 — con un hallazgo: crear el proyecto con
+   `vercel project add` (sin código delante) lo deja mal configurado (`Framework Preset:
+   Other`, rompe el middleware). Se resolvió con `vercel link` parado en el código real
+   (vía `git worktree`), que detecta Next.js solo. **Bonus:** eso conectó el repo de
+   GitHub automáticamente — la etapa 5 (deploy automático) ya quedó resuelta.
+   Dominio: **`https://osamayor-nine.vercel.app`**. `TN_ACCESS_TOKEN` queda vacío por
+   ahora: lo va a escribir el callback en el paso 6.
+4. [ ] **Conectar Blob** al proyecto nuevo (para las fotos de reseñas). **Pendiente** —
+   requiere entrar al dashboard de Vercel, no se pudo hacer por CLI/API.
+5. [ ] **Apuntar el callback de la app `32868`** en el Portal de Partners a
+   `https://osamayor-nine.vercel.app/api/auth/tiendanube/callback`.
+6. [ ] **Autorizar la app** entrando a la URL de instalación. El callback da de alta la
+   tienda en `Store` y guarda el token. **Verificar que la respuesta traiga
+   `"creada": true"`.**
 
-- [ ] 👤 **Base de datos nueva.** Separada de la de Micelium. Se crea desde el dashboard de
-      Supabase; pasame los datos de conexión cuando esté.
-- [ ] 🤝 **Migraciones de Prisma sobre la base nueva.** Yo preparo el comando, **vos lo
-      corrés** (necesita la `DATABASE_URL` real). Primero migración, después deploy — Prisma
-      hace `SELECT` de todas las columnas y un schema adelantado rompe el arranque.
-- [ ] 👤 **Despliegue nuevo desde el mismo repo**, con sus variables. Se hace en Vercel.
+- [x] 👤 **Base de datos nueva.** Hecho 28/08 — Supabase, proyecto `osamayor`.
+- [x] 🤖 **Migraciones de Prisma sobre la base nueva.** Hecho 28/08, con el hallazgo de las
+      6 tablas faltantes (ver arriba y `OSAMAYOR.md`).
+- [x] 🤖 **Despliegue nuevo desde el mismo repo.** Hecho 28/08 —
+      `https://osamayor-nine.vercel.app`, con el hallazgo del Framework Preset (ver arriba).
 - [ ] 👤 **Almacenamiento Blob propio**, para que sus fotos no caigan en el de Micelium.
-      Verificar cómo se llama la variable en el despliegue.
-- [ ] 👤 **NO habilitar las variables de base en Preview.** En Micelium quedaron habilitadas
-      y eso hace que cualquier rama escriba en la base real. No repetir el error.
-- [ ] 🤝 **Cargar su tienda en `Store`**: id de Tiendanube, token, dominio. Yo preparo la
-      inserción, vos la corrés contra su base.
+      **Pendiente** — requiere el dashboard de Vercel.
+- [x] 👤 **NO habilitar las variables de base en Preview.** No se tocó Preview al cargar
+      las variables — solo se agregaron a Production. Verificado 28/08.
+- [ ] 🤖 **Cargar su tienda en `Store`**: id de Tiendanube, token, dominio. Sale sola cuando
+      se autorice la app (paso 6 de arriba) — el callback ya está preparado para crearla.
 - [x] 🤖 **`BASE` en `mic.js` deja de estar fijo.** Hecho 28/08: se deduce de
       `new URL(document.currentScript.src).origin`, sin necesidad de configurar nada en la
       etiqueta ni en el storefront. Con respaldo al dominio de Micelium si `currentScript`

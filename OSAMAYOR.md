@@ -41,8 +41,8 @@ despliegue. Acá solo se anota qué existe y dónde.
 | Cuenta / mail | `info.osamayor20@gmail.com` |
 | App de Tiendanube | ID **`32868`** — app **propia de OSA MAYOR**, distinta a la de Micelium. Ya instalada en la tienda. |
 | GA4 | `G-KEXLLEL92E` (ya configurado en el storefront) |
-| Dominio de la instancia | _(pendiente)_ |
-| Base de datos | _(pendiente)_ |
+| Dominio de la instancia | **`https://osamayor-nine.vercel.app`** — Vercel, proyecto `osamayor`, conectado a este repo/rama `master` |
+| Base de datos | **Supabase, proyecto `osamayor`** (`ref: erqxzysaucxwlymyykau`, región `us-east-2`). 24+1 migraciones aplicadas y verificadas 28/08. |
 | Ficha de Google Business | Sí, tiene. Cuenta de Google distinta a la de Micelium. |
 
 > **⚠️ Ojo con los dos números.** `32868` es el ID de la **app** en el Portal de Partners;
@@ -87,6 +87,35 @@ tiene esas migraciones aplicadas con su checksum, y no hay que arriesgar eso.
 Verificado con Prisma Client real (el mismo adapter `pg` + pooler que usa `lib/prisma.ts`)
 contra el pooler 6543: `Widget`, `Review` y `Store` responden. Migraciones al día
 (`prisma migrate status` → "Database schema is up to date!").
+
+### Hallazgo del 28/08: el proyecto de Vercel necesita código delante para detectar Next.js
+
+`vercel project add <nombre>` crea el proyecto **vacío**, sin mirar código, y lo deja con
+`Framework Preset: Other`. Con eso el middleware falla al deployar: `"The Edge Function
+middleware is referencing unsupported modules: @/lib/session"` — un error que no tiene nada
+que ver con el código (se confirmó deployando el mismo commit como preview en Micelium, que
+sí funcionó: `readyState: READY`).
+
+**La forma correcta:** `vercel link` parado en un directorio que YA tiene el código de
+Next.js delante. Ahí sí dice `Detected Next.js` y deja el preset correcto. Se hizo con
+`git worktree` para no ensuciar el checkout real del repo.
+
+**Beneficio extra:** ese mismo `link` conectó el repo de GitHub al proyecto automáticamente
+(`Connecting GitHub repository... Connected`) — la etapa 5 (deploy automático por rama) ya
+quedó resuelta de arranque, no hace falta configurarla aparte.
+
+Deployado y verificado en vivo el 28/08: `/login` → 200, `/api/widgets/config` → 200,
+`/dashboard/widgets` sin sesión → 307 (redirige a login, el middleware protege bien).
+
+### Credenciales generadas el 28/08 (guardadas en el gestor de contraseñas de Nahuel)
+
+No van acá los valores — solo el registro de que existen y dónde viven:
+
+| Qué | Etiqueta en el gestor |
+|---|---|
+| Contraseña de la base (Supabase) | "Supabase — OSA MAYOR — DB" |
+| Contraseña del panel | "Osamayor — panel" |
+| `CRON_SECRET` | "Osamayor — CRON_SECRET" |
 
 ### Decidido el 28/08: primero la instancia, después la auth
 
