@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...salvo los ejemplos: son plantillas sin un solo valor real, y su razón de existir es
+# que alguien las encuentre en el repo cuando tenga que levantar una instancia nueva.
+# Un ejemplo ignorado no le sirve a nadie.
+!.env*.ejemplo
+!.env.example
 
 # vercel
 .vercel

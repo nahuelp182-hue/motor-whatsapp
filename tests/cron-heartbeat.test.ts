@@ -5,6 +5,8 @@
 // El caso que motivó todo esto: `CronHeartbeat` estuvo vacía desde el 27/07 hasta el
 // 31/07 y nadie se enteró. "Nunca reportó" tiene que ser un estado explícito y ruidoso,
 // no un vacío que se confunde con silencio sano. De ahí el primer test.
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   derivarEstado,
@@ -181,5 +183,38 @@ describe('CATALOGO', () => {
     for (const [slug, cfg] of Object.entries(CATALOGO)) {
       expect(cfg.origen, `${slug} no puede depender de los crons de Vercel`).not.toBe('vercel')
     }
+  })
+
+  it('todo job del crontab del VPS está vigilado', () => {
+    // EL AGUJERO QUE CIERRA ESTE TEST
+    //
+    // `agenda_precios_ml` falló seis días seguidos sin que nada avisara. No fue una falla
+    // del reporte: `run_job.sh` mandaba el exit≠0 puntualmente a /api/jobs/ingest. El
+    // problema es que un slug que el CATALOGO no conoce no lo vigila nadie — se guarda la
+    // corrida y ahí muere. Un job puede estar reportando perfectamente y ser invisible.
+    //
+    // Se descubrió a mano el 22/08/2026, auditando precios de ML por otro motivo. Sin este
+    // test, el próximo job que alguien agregue al crontab y olvide acá repite el caso.
+    //
+    // El fixture es una foto del crontab: el test no puede hacer SSH. Si se agrega un job
+    // al VPS hay que regenerarlo (el comando está en la cabecera del archivo), y eso es a
+    // propósito — obliga a pasar por acá.
+    const crudo = readFileSync(
+      join(__dirname, 'fixtures', 'crontab-vps-slugs.txt'),
+      'utf-8',
+    )
+    const delVps = crudo
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#'))
+
+    expect(delVps.length, 'el fixture quedó vacío: se rompió la captura').toBeGreaterThan(20)
+
+    const sinVigilar = delVps.filter((slug) => !CATALOGO[slug])
+    expect(
+      sinVigilar,
+      `estos jobs corren en el VPS pero no están en CATALOGO, así que pueden fallar en ` +
+        `silencio: ${sinVigilar.join(', ')}`,
+    ).toEqual([])
   })
 })
