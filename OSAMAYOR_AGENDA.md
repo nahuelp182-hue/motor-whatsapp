@@ -26,16 +26,18 @@ una decisión, o mirar algo con ojo humano.
 
 ## 📍 Dónde estamos
 
-**Etapa actual: 1 — Que el motor arranque sin lo de Micelium.** Avanzando; la 0 quedó
-trabada esperando el access token real (ver abajo).
+**Etapa actual: 2 — Su instancia, con su dominio.** Va ANTES de terminar la etapa 0: la app
+`32868` es propia de OSA MAYOR, así que conviene crear la instancia y recién ahí autorizar,
+en vez de guardar el token en la base de Micelium y mudarlo después.
 
-**Progreso:** 0 de 6 etapas cerradas · **6 hechos + 2 a medias, de 42 ítems**
+**Progreso:** 0 de 6 etapas cerradas · **8 hechos + 2 a medias, de 43 ítems**
+(43 porque se sumó el ítem de "confirmar el callback" en la etapa 0, ya resuelto)
 
 | Etapa | Qué es | Estado | Falta | De quién |
 |---|---|---|---|---|
-| 0 | Antes de tocar nada | 🟡 datos sí, token no | 3 | 👤 |
-| 1 | Que el motor arranque sin lo de Micelium | 🟡 2 de 7 | 5 | casi todo 🤖 |
-| 2 | Su instancia, con su dominio | ⬜ pendiente | 10 | mitad y mitad |
+| 0 | Antes de tocar nada | 🟡 datos sí, token no | 2 | 👤 |
+| 1 | Que el motor arranque sin lo de Micelium | 🟡 3 de 7 | 4 | casi todo 🤖 |
+| 2 | Su instancia, con su dominio | 🟡 1 de 10 | 9 | 👤 primero |
 | 3 | Instalar en su tienda | ⬜ pendiente | 6 | casi todo 🤖 |
 | 4 | Respaldos y avisos | 🟡 2 de 10 | 8 | casi todo 👤 |
 | 5 | Que desplegar dos veces no se olvide | 🟡 1 de 4 | 3 | casi todo 🤖 |
@@ -84,12 +86,10 @@ porque hay un pendiente heredado que puede romper la base nueva.
             secret* de la app, no un access token (los de tienda son 40 hex; da 401).
             No se copia de ningún panel: **sale del flujo OAuth** al instalar la app.
       - [x] Dominio: **`www.tiendaosamayor.com.ar`** (interno `emuna23.mitiendanube.com`)
-- [ ] 👤 **Confirmar a dónde apunta el callback de la app `32868`** en el Portal de
-      Partners. Si apunta a `mw-micelium.vercel.app`, al reautorizar el token de OSA MAYOR
-      queda guardado en la base de Micelium — sirve para arrancar, pero después hay que
-      moverlo. La alternativa es esperar a que exista su instancia y apuntarlo ahí.
-      **El callback ya está preparado** para recibir una tienda nueva sin romper nada
-      (da de alta la tienda si no existe y no le registra los webhooks de WhatsApp).
+- [x] 👤 **Confirmar a dónde apunta el callback de la app `32868`.** Resuelto 28/08: es una
+      app **propia de OSA MAYOR**, no la de Micelium. Decidido esperar a que exista su
+      instancia (etapa 2) y apuntar el callback ahí directo — ver la nota al inicio de la
+      etapa 2. El callback ya está preparado para recibir una tienda nueva sin romper nada.
 - [ ] 👤 **Elegir el dominio de su instancia** (de ahí sale `PUBLIC_BASE_URL`).
 - [ ] 👤 **Acceso a su cuenta de Google** para el OAuth de la ficha de Business Profile.
       Recién hace falta en la etapa 2.
@@ -181,15 +181,11 @@ Los pasos 1 a 3 **no se pueden reordenar**. El resto sí.
       y eso hace que cualquier rama escriba en la base real. No repetir el error.
 - [ ] 🤝 **Cargar su tienda en `Store`**: id de Tiendanube, token, dominio. Yo preparo la
       inserción, vos la corrés contra su base.
-- [ ] 🤖 **`BASE` en `mic.js` deja de estar fijo** en `guias.infomicelium.com.ar`.
-      **Es el único cambio de código imprescindible de esta etapa**, y no es trivial:
-      `mic.js` es un **archivo estático** en `public/`, así que **no puede leer variables de
-      entorno**. Tres caminos posibles, a decidir al implementar:
-      1. Deducirlo del `src` del propio `<script>` (`document.currentScript.src`) — sin
-         configuración, el motor pega contra donde fue servido. Es el más simple.
-      2. Pasarlo como atributo `data-base` en la etiqueta del script.
-      3. Servir `mic.js` desde una ruta dinámica que inyecte el valor.
-      La opción 1 no necesita tocar la instalación en ninguna de las dos tiendas.
+- [x] 🤖 **`BASE` en `mic.js` deja de estar fijo.** Hecho 28/08: se deduce de
+      `new URL(document.currentScript.src).origin`, sin necesidad de configurar nada en la
+      etiqueta ni en el storefront. Con respaldo al dominio de Micelium si `currentScript`
+      no está disponible. Verificado en Chrome con los cuatro escenarios (Micelium, OSA
+      MAYOR, panel local, sin currentScript) — todos correctos. `tsc` limpio, 230 tests OK.
 - [ ] 👤 **OAuth de Google Business para su ficha** → su `GOOGLE_REVIEWS_REFRESH_TOKEN`,
       `GOOGLE_REVIEWS_ACCOUNT_ID` y `GOOGLE_REVIEWS_LOCATION_ID`. Requiere entrar con su
       cuenta de Google.
