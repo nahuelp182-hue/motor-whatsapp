@@ -59,6 +59,35 @@ despliegue. Acá solo se anota qué existe y dónde.
 > el endpoint de token responde `invalid_grant` (el código de prueba era falso) y no
 > `invalid_client`, que es lo que devolvería si el secret no correspondiera a esa app.
 
+### Hallazgo del 28/08: 6 tablas faltaban del historial de migraciones
+
+Al aplicar las 24 migraciones contra la base nueva de Osamayor, la migración
+`20260727140000_integridad_esquema` falló: referencia `Widget`, `Visitor` y `gads_cache`,
+pero **ninguna migración del repo las crea**. Se repitió con `WidgetLead` y `WidgetEvent`
+(dependen de `Widget` por FK). Las seis existen en Micelium porque se crearon por fuera del
+historial de Prisma en algún momento (a mano o con `db push`) y nunca quedaron registradas
+— nadie lo notó porque la única base que existía ya las tenía.
+
+**Arreglado:** nueva migración `20260727135900_tablas_faltantes_del_historial`, insertada
+en el punto correcto (justo antes de `integridad_esquema`), con el DDL sacado de
+`prisma migrate diff --to-schema` — no escrito a mano, para que coincida exacto con lo que
+Prisma espera. Usa `IF NOT EXISTS` en todo: si esto se aplica alguna vez contra Micelium
+(no debería hacer falta — ver el comentario en el propio archivo), no rompe nada.
+
+**Un segundo problema, distinto:** dos migraciones más (`20260731200000_uso_ia`,
+`20260801120000_messagelog_wamid`) tocan `claude_usage` e `ig_diag` — las **5 tablas que
+`PLAN_ARQUITECTURA.md` (bloque C) ya señalaba como huérfanas del schema**, del bot de
+WhatsApp/IA/Instagram. Osamayor no usa nada de eso. Decisión tomada: esas dos partes se
+**saltearon** en la base de Osamayor (`prisma migrate resolve --applied`, sin ejecutar el
+SQL de esas dos tablas) — pero `messagelog_wamid` también tocaba `MessageLog.wamid`, que
+**sí importa** (la cola de envíos está en el schema), así que esa parte se aplicó a mano
+antes de saltear el resto. **No se tocó el historial de migraciones del repo**: Micelium ya
+tiene esas migraciones aplicadas con su checksum, y no hay que arriesgar eso.
+
+Verificado con Prisma Client real (el mismo adapter `pg` + pooler que usa `lib/prisma.ts`)
+contra el pooler 6543: `Widget`, `Review` y `Store` responden. Migraciones al día
+(`prisma migrate status` → "Database schema is up to date!").
+
 ### Decidido el 28/08: primero la instancia, después la auth
 
 La app `32868` es **propia de OSA MAYOR**, no la de Micelium. Eso permite hacerlo prolijo:
