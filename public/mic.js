@@ -19,13 +19,31 @@
   if (window.__micInit) return;
   window.__micInit = true;
 
-  // Dominio propio, no el de Vercel: mw-micelium.vercel.app queda detrás del desafío
-  // anti-bots de Vercel ante cualquier ráfaga de pedidos, y un desafío que un navegador
-  // resuelve solo NO lo resuelve un fetch entre orígenes. Verificado el 23/07/26: el host
-  // de Vercel devolvía 403 con X-Vercel-Mitigated: challenge mientras el dominio propio
-  // servía todo con 200.
-  var BASE = 'https://guias.infomicelium.com.ar';
   var script = document.currentScript;
+
+  /* ¿Contra qué servidor pide este motor su configuración?
+     Sale del origen desde el que se sirvió ESTE archivo. El mismo mic.js corre en más de
+     una tienda, cada una con su propia instancia y su propia base (ver OSAMAYOR.md): con
+     el dominio escrito acá, el motor de una tienda pediría los widgets de la otra.
+     Deducirlo del propio <script> hace que cada instalación apunte sola a donde
+     corresponde, sin configurar nada en la etiqueta ni en el storefront.
+
+     OJO con el dominio desde el que se sirve: NO puede ser el host de Vercel. Un
+     *.vercel.app queda detrás del desafío anti-bots ante cualquier ráfaga de pedidos, y un
+     desafío que un navegador resuelve solo NO lo resuelve un fetch entre orígenes.
+     Verificado el 23/07/26: el host de Vercel devolvía 403 con X-Vercel-Mitigated:
+     challenge mientras el dominio propio servía todo con 200. Cada instancia necesita su
+     dominio propio.
+
+     El respaldo es el dominio de Micelium: si `currentScript` no está (un navegador viejo,
+     o el script cargado de una forma que no lo expone), el motor sigue funcionando ahí
+     como hasta ahora en vez de quedarse mudo. */
+  var BASE = (function () {
+    try {
+      if (script && script.src) return new URL(script.src).origin;
+    } catch (e) {}
+    return 'https://guias.infomicelium.com.ar';
+  })();
 
   /* Contexto: de dónde salen los widgets que corresponden a esta página.
      En Tiendanube el mismo código se inyecta UNA vez para todo el sitio, así que no puede

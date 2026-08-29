@@ -26,14 +26,15 @@ una decisión, o mirar algo con ojo humano.
 
 ## 📍 Dónde estamos
 
-**Etapa actual: 0 — Antes de tocar nada.** Nada de código escrito todavía.
+**Etapa actual: 1 — Que el motor arranque sin lo de Micelium.** Avanzando; la 0 quedó
+trabada esperando el access token real (ver abajo).
 
-**Progreso:** 0 de 6 etapas cerradas · **3 hechos + 1 a medias, de 42 ítems**
+**Progreso:** 0 de 6 etapas cerradas · **6 hechos + 2 a medias, de 42 ítems**
 
 | Etapa | Qué es | Estado | Falta | De quién |
 |---|---|---|---|---|
-| 0 | Antes de tocar nada | 🟡 1 a medias | 4 (+4 datos) | casi todo 👤 |
-| 1 | Que el motor arranque sin lo de Micelium | ⬜ pendiente | 7 | casi todo 🤖 |
+| 0 | Antes de tocar nada | 🟡 datos sí, token no | 3 | 👤 |
+| 1 | Que el motor arranque sin lo de Micelium | 🟡 2 de 7 | 5 | casi todo 🤖 |
 | 2 | Su instancia, con su dominio | ⬜ pendiente | 10 | mitad y mitad |
 | 3 | Instalar en su tienda | ⬜ pendiente | 6 | casi todo 🤖 |
 | 4 | Respaldos y avisos | 🟡 2 de 10 | 8 | casi todo 👤 |
@@ -75,11 +76,20 @@ porque hay un pendiente heredado que puede romper la base nueva.
       aplicaron** y el aviso del plan quedó viejo. Riesgo bajo, no bloqueante.
       **Para cerrarlo del todo:** `npx prisma migrate status` con la `DATABASE_URL` de
       producción. No está en el disco (no hay `.env`), así que lo tenés que correr vos.
-- [ ] 👤 **Datos de la tienda**, para completar la ficha de `OSAMAYOR.md`:
-      - [ ] Nombre comercial
-      - [ ] ID de tienda en Tiendanube
-      - [ ] Token de API de Tiendanube
-      - [ ] Dominio del storefront
+- [~] 👤 **Datos de la tienda.** Recibidos y verificados el 28/08 — están en `OSAMAYOR.md`:
+      - [x] Nombre comercial: **OSA MAYOR**
+      - [x] ID de tienda: **`3224928`** (sacado de `LS.store` del storefront; el `32868`
+            que circuló es el id de la **app**, no de la tienda)
+      - [ ] **Access token: FALTA.** El valor de 48 caracteres que llegó es el *client
+            secret* de la app, no un access token (los de tienda son 40 hex; da 401).
+            No se copia de ningún panel: **sale del flujo OAuth** al instalar la app.
+      - [x] Dominio: **`www.tiendaosamayor.com.ar`** (interno `emuna23.mitiendanube.com`)
+- [ ] 👤 **Confirmar a dónde apunta el callback de la app `32868`** en el Portal de
+      Partners. Si apunta a `mw-micelium.vercel.app`, al reautorizar el token de OSA MAYOR
+      queda guardado en la base de Micelium — sirve para arrancar, pero después hay que
+      moverlo. La alternativa es esperar a que exista su instancia y apuntarlo ahí.
+      **El callback ya está preparado** para recibir una tienda nueva sin romper nada
+      (da de alta la tienda si no existe y no le registra los webhooks de WhatsApp).
 - [ ] 👤 **Elegir el dominio de su instancia** (de ahí sale `PUBLIC_BASE_URL`).
 - [ ] 👤 **Acceso a su cuenta de Google** para el OAuth de la ficha de Business Profile.
       Recién hace falta en la etapa 2.
@@ -132,6 +142,32 @@ mínimo. Igual **toca código compartido**: rama aparte y 230 tests en verde ant
 ## Etapa 2 — Su instancia, con su dominio
 
 Casi todo configuración. Un solo cambio de código imprescindible.
+
+> **Decidido el 28/08: esta etapa va ANTES de completar la etapa 0.** La app `32868` es
+> propia de OSA MAYOR, así que su callback puede apuntar directo a la instancia de ella y
+> el token nace donde tiene que vivir. Autorizar antes obligaría a guardarlo en la base de
+> Micelium y después mudarlo.
+
+### El orden exacto, y por qué importa
+
+Los pasos 1 a 3 **no se pueden reordenar**. El resto sí.
+
+1. **Crear la base** (Supabase, proyecto nuevo). Guardar las dos cadenas de conexión: la
+   del pooler (6543) para el runtime y la directa (5432) para migraciones.
+2. **Aplicar las 24 migraciones** con `DATABASE_URL` apuntando a la **directa**:
+   `npx prisma migrate deploy`.
+   **Antes que el deploy**, no después: Prisma hace `SELECT` de todas las columnas del
+   modelo, así que una app desplegada contra una base vacía se cae en la primera consulta.
+3. **Crear el deploy en Vercel** desde este mismo repo, rama `master`, con las variables de
+   `.env.osamayor.ejemplo`. `TN_ACCESS_TOKEN` queda **vacío** por ahora: lo va a escribir
+   el callback en el paso 6.
+4. **Conectar Blob** al proyecto nuevo (para las fotos de reseñas).
+5. **Apuntar el callback de la app `32868`** en el Portal de Partners a
+   `https://<su-dominio>/api/auth/tiendanube/callback`.
+6. **Autorizar la app** entrando a la URL de instalación. El callback da de alta la tienda
+   en `Store` y guarda el token. **Verificar que la respuesta traiga `"creada": true`** —
+   si dice `false` es que la tienda ya existía, y si no aparece el campo, el deploy es
+   viejo y no tiene el arreglo del callback.
 
 - [ ] 👤 **Base de datos nueva.** Separada de la de Micelium. Se crea desde el dashboard de
       Supabase; pasame los datos de conexión cuando esté.

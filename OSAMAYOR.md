@@ -39,7 +39,7 @@ despliegue. Acá solo se anota qué existe y dónde.
 | Dominio del storefront | **`www.tiendaosamayor.com.ar`** |
 | Dominio interno TN | `emuna23.mitiendanube.com` |
 | Cuenta / mail | `info.osamayor20@gmail.com` |
-| App de Tiendanube | ID **`32868`**, ya instalada en la tienda |
+| App de Tiendanube | ID **`32868`** — app **propia de OSA MAYOR**, distinta a la de Micelium. Ya instalada en la tienda. |
 | GA4 | `G-KEXLLEL92E` (ya configurado en el storefront) |
 | Dominio de la instancia | _(pendiente)_ |
 | Base de datos | _(pendiente)_ |
@@ -54,6 +54,20 @@ despliegue. Acá solo se anota qué existe y dónde.
 > **client secret** de la app, no un access token (los de tienda son 40 hex). Un access
 > token no se copia de ningún lado: sale del flujo OAuth cuando la app se instala. Ver la
 > etapa 0 de la agenda.
+>
+> **Verificado el 28/08:** el par `client_id=32868` + ese client secret **es válido** —
+> el endpoint de token responde `invalid_grant` (el código de prueba era falso) y no
+> `invalid_client`, que es lo que devolvería si el secret no correspondiera a esa app.
+
+### Decidido el 28/08: primero la instancia, después la auth
+
+La app `32868` es **propia de OSA MAYOR**, no la de Micelium. Eso permite hacerlo prolijo:
+su callback se apunta directo a la instancia de ella, y el token nace donde tiene que vivir.
+
+Consecuencia en el orden de trabajo: **la etapa 2 (crear su instancia) va ANTES de
+completar la etapa 0 (el access token)**. Autorizar antes obligaría a guardar el token en
+la base de Micelium y después mudarlo, que es trabajo al pedo y una ventana donde el token
+de una tienda ajena vive en la base equivocada.
 
 ---
 
