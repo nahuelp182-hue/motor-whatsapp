@@ -3,6 +3,12 @@
 GPS del proyecto: dónde estamos, qué falta, y **quién tiene que hacer cada cosa**. El
 contexto completo está en `OSAMAYOR.md`.
 
+> **Versión interactiva (la que mira Nahuel):**
+> https://claude.ai/code/artifact/21262aca-987b-4299-9c20-3662b0dee45d
+> Casillas tildables, barra de progreso y filtro por responsable. El progreso se guarda en
+> el navegador de él, así que **este archivo sigue siendo la fuente de verdad**: cuando algo
+> se completa de verdad, se tilda ACÁ y se republica la página para que no diverjan.
+
 **Casillas:** `[ ]` pendiente · `[x]` hecho · `[~]` a medias (con la razón al lado) ·
 `[!]` bloqueado esperando algo de Nahuel.
 
@@ -92,18 +98,29 @@ porque hay un pendiente heredado que puede romper la base nueva.
 El repo tiene 29 rutas de API y ~60 variables. Su instancia necesita widgets y reseñas.
 Hay que lograr que **lo no configurado no exista**, en vez de existir roto.
 
-Esta etapa **toca código compartido**: rama aparte y los 21 tests en verde antes de mezclar.
+**Revisado el 28/08 — el trabajo es mucho menor de lo que parecía.** Tres hallazgos:
+
+1. **`vercel.json` tiene `"crons": []`.** Vercel no dispara ninguno de los 15 crons: los
+   llama el VPS por `curl` contra `mw-micelium.vercel.app`. En la instancia de ella
+   **nunca se van a ejecutar**, porque nadie los va a llamar. No hay que desactivarlos.
+2. **`chequearCron` falla cerrado**: sin `CRON_SECRET` devuelve 503. Una ruta de cron
+   colgada en la instancia nueva no es una puerta abierta.
+3. **Los tres webhooks validan firma** (Instagram, Tiendanube, WhatsApp), y el de
+   Tiendanube devuelve 503 en producción si falta el secreto.
+
+Queda entonces poco: que el arranque no dependa de lo que no está, y dejar escrito el
+mínimo. Igual **toca código compartido**: rama aparte y 230 tests en verde antes de mezclar.
 
 - [ ] 🤖 Rama de trabajo (`osamayor-instancia` o similar).
-- [ ] 🤖 **Inventariar el mínimo real** de widgets + reseñas. Punto de partida en la tabla de
-      variables de `OSAMAYOR.md`; confirmar contra el código, no contra esa tabla.
-- [ ] 🤖 **Hacer opcional lo que depende de Micelium.** Las rutas y crons de WhatsApp, ML,
-      Ads, CRM y apicultura **no se registran** si falta su configuración.
-      **Criterio:** ausente es mejor que presente y roto.
+- [x] 🤖 **Inventariar el mínimo real.** Hecho 28/08: son ~12 variables, contra las ~60 del
+      repo. La tabla está en `OSAMAYOR.md`, verificada contra el código.
+- [x] 🤖 **Verificar qué se rompe sin lo de Micelium.** Hecho 28/08: nada crítico. Los `!`
+      de TypeScript en env vars no explotan en runtime (son solo tipado), los crons no se
+      disparan solos y los webhooks fallan cerrado. Ver los tres hallazgos de arriba.
 - [ ] 🤖 `.env.ejemplo` con el mínimo para una instancia de widgets, comentado.
 - [ ] 🤖 **Probar el arranque en limpio**: base vacía y solo las variables mínimas. Que
       levante sin errores.
-- [ ] 🤖 `npm test` en verde (21 tests).
+- [ ] 🤖 `npm test` en verde (230 tests en 20 archivos).
 - [ ] 🤝 Verificar que **la instancia de Micelium sigue idéntica**. Es el requisito duro del
       proyecto. Yo reviso el código; **vos confirmás en el sitio real** antes de mezclar.
 
