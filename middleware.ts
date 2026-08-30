@@ -67,9 +67,10 @@ const PREFIJOS_MARCA: readonly string[] | null = MARCA.secciones === null
       // es justamente lo que esta instancia sí administra.
       '/api/widgets',
       '/api/resenas',
-      // Infraestructura común, no específica de una tienda.
-      '/api/auth',
-      '/api/tiendanube',
+      // NOTA: '/api/auth' y '/api/tiendanube' NO hacen falta acá: '/api/auth' ya está en
+      // API_ABIERTAS (se resuelve antes, sin pasar por este chequeo) y '/api/tiendanube'
+      // como prefijo no existe — lo real es /api/auth/tiendanube y /api/webhooks/tiendanube,
+      // ambos ya cubiertos por sus propios prefijos en API_ABIERTAS.
     ]
 
 function permitidoParaLaMarca(pathname: string): boolean {
@@ -114,7 +115,14 @@ export async function middleware(request: NextRequest) {
   // Área privada del CLIENTE: identidad y cookie propias, separadas del dashboard interno.
   // Sin sesión de cliente → a /acceso (no al login del panel). El secreto de firma es el
   // mismo del server; solo se usa para integridad de la cookie, no da acceso al dashboard.
+  //
+  // Es funcionalidad propia de Micelium (guías para quien ya compró la incubadora): en una
+  // instancia acotada como Osamayor no hay tal área, así que ni el login de cliente debe
+  // verse. 404 y no redirect a /acceso: para esta instancia la sección no existe.
   if (pathname === '/mi-equipo' || pathname.startsWith('/mi-equipo/')) {
+    if (MARCA.secciones !== null) {
+      return NextResponse.rewrite(new URL('/404-marca', request.url), { status: 404 })
+    }
     const secreto = process.env.DASHBOARD_PASSWORD
     const cli = secreto
       ? await verificarSesionCliente(request.cookies.get(COOKIE_CLIENTE_NOMBRE)?.value, secreto)
