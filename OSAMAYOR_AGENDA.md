@@ -305,7 +305,10 @@ cerrado porque después ya hay reseñas y fotos de clientes reales adentro.
 
 El punto flojo de esta arquitectura es humano. **No es opcional.**
 
-- [ ] 👤 Su despliegue sale de la **misma rama**, automático. Se configura en Vercel.
+- [x] 🤖 Su despliegue sale de la **misma rama**, automático. **Ya estaba configurado** y se
+      comprobó en vivo el 30/08: un push a `master` levantó build en las dos instancias sin
+      tocar nada, y el `mic.js` nuevo apareció servido tanto en `osamayor-nine.vercel.app`
+      como en `mw-micelium.vercel.app`. Osamayor tarda ~1 min, Micelium ~3.
 - [x] 🤖 Anotar en el `CLAUDE.md` del repo que hay **dos instancias** y cuál es cuál.
       Hecho 28/08/2026, junto con la creación de esta agenda.
 - [ ] 🤖 Una forma de **ver qué versión corre cada una**, para notar la deriva antes de que
