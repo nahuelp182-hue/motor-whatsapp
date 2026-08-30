@@ -333,7 +333,10 @@ export default function DashboardPage() {
 
       {!loading && s && (
         <>
-          {/* ── ROAS Global del negocio — pulso rápido del período ─────── */}
+          {/* ══════════════════════════════════════════════════════════
+              RUBRO 1 — Resultado del negocio. Siempre abierto: es lo
+              que se mira todos los días en 5 segundos.
+              ══════════════════════════════════════════════════════════ */}
           <GlobalRoasGauge
             roasGlobal={s.roasGlobal}
             totalRevenue={s.totalRevenue}
@@ -341,7 +344,6 @@ export default function DashboardPage() {
             googleSpend={s.googleSpend}
           />
 
-          {/* ── KPI row ─────────────────────────────────────────────── */}
           {monthly?.mom && (
             <p className="text-[10px] text-[var(--pnl-text-3)]">
               ↕ comparando <span className="font-mono text-[var(--pnl-text-2)]">{monthly.mom.curMonth}</span> vs <span className="font-mono text-[var(--pnl-text-2)]">{monthly.mom.prevMonth}</span>
@@ -368,8 +370,7 @@ export default function DashboardPage() {
               tip="Personas únicas que vieron al menos un anuncio tuyo en el período. A diferencia de impresiones, no cuenta la misma persona dos veces." />
           </div>
 
-          {/* ── Net revenue highlight ───────────────────────────────── */}
-          <div className="rounded-2xl border p-5 mb-5 flex flex-col sm:flex-row sm:items-center gap-4"
+          <div className="rounded-2xl border p-5 flex flex-col sm:flex-row sm:items-center gap-4"
             style={{ borderColor: 'color-mix(in srgb, var(--pnl-amber) 20%, transparent)', background: 'linear-gradient(to right, color-mix(in srgb, var(--pnl-amber) 10%, transparent), transparent)' }}>
             <div className="flex-1">
               <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-1">Resultado del período</p>
@@ -398,230 +399,234 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ── Indicador 7 días ────────────────────────────────────── */}
-          {data?.trend7d && (
-            <div className="mb-5">
-              <Trend7d trend={data.trend7d} />
-            </div>
-          )}
+          {data?.trend7d && <Trend7d trend={data.trend7d} />}
 
-          {/* ── Cadencia de ventas ──────────────────────────────────── */}
-          <div className="mb-5">
+          {/* ══════════════════════════════════════════════════════════
+              RUBRO 2 — Ventas y cadencia
+              ══════════════════════════════════════════════════════════ */}
+          <Rubro
+            n="02"
+            titulo="Ventas y cadencia"
+            resumen={data?.trend7d ? `7d ${data.trend7d.delta >= 0 ? '+' : ''}${data.trend7d.delta}% · ${tnOrders} órdenes en el período` : `${tnOrders} órdenes en el período`}
+          >
             <SalesCadence key={`${since}-${until}`} since={since} until={until} acHex={AC_HEX} />
-          </div>
 
-          {/* ══ EMBUDO DE CONVERSIÓN ═════════════════════════════════ */}
-          <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6 mb-5">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] flex items-center">
-                Embudo de conversión
-                <Ayuda>Dos capas: (1) Tráfico Meta Ads = Alcance y Clicks, que son 100% de la publicidad. (2) Negocio total = Compras y Recompras, que incluyen TODOS los canales (Meta + orgánico + directo + Google). El salto entre clicks y compras NO es la conversión de Meta: solo una parte de las compras vino de Meta (se indica el %). La conversión real de Meta está en el benchmark 'CVR Meta' a la derecha.</Ayuda>
-              </h3>
-              <div className="flex flex-col items-end leading-tight">
-                <span className="text-[10px] text-[var(--pnl-text-3)]">{since} → {until}</span>
-                {prevPeriod && (() => {
-                  const pr = prevRange(since, until)
-                  return <span className="text-[9px] text-[var(--pnl-text-3)]">Δ vs {pr.since} → {pr.until}</span>
-                })()}
-              </div>
-            </div>
-            {(() => {
-              const metaCh = data?.channels?.find(c => c.key === 'meta_ads')
-              return (
-                <FunnelViz
-                  reach={s.reach}
-                  clicks={s.clicks}
-                  orders={tnOrders}
-                  repeats={monthly?.repeatCount ?? 0}
-                  revenue={tnRevenue}
-                  avgTicket={tnAvgOrder}
-                  metaOrders={metaCh?.orders ?? 0}
-                  metaRevenue={metaCh?.revenue ?? 0}
-                  prevReach={prevPeriod?.reach}
-                  prevClicks={prevPeriod?.clicks}
-                  prevOrders={prevPeriod?.orders}
-                />
-              )
-            })()}
-          </div>
-
-          {/* ── Main chart ──────────────────────────────────────────── */}
-          <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6 mb-5">
-            <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-              <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">
-                Evolución del período
-              </h3>
-              <div className="flex gap-1">
-                {(Object.keys(chartConfig) as (keyof typeof chartConfig)[]).map(k => (
-                  <button key={k} onClick={() => setChartView(k)}
-                    className={btnBase} style={btnSty(chartView === k)}>
-                    {chartConfig[k].label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {mergedTimeline.length === 0 ? (
-              <div className="h-[220px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
-            ) : (
-              <ChartErrorBoundary height={220}>
-                <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%"   stopColor={cc.color} stopOpacity={0.45} />
-                        <stop offset="45%"  stopColor={cc.color} stopOpacity={0.12} />
-                        <stop offset="100%" stopColor={cc.color} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} stroke={cGrid} />
-                    <XAxis dataKey="date" tick={cTick}
-                      tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
-                      interval={Math.max(0, Math.floor(mergedTimeline.length / 12))} />
-                    <YAxis tick={cTick}
-                      tickFormatter={(v:number) => v>999?`$${(v/1000).toFixed(0)}k`:String(v)}
-                      axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: `${cc.color}40`, strokeWidth: 1 }} />
-                    <Area type="monotone" dataKey={cc.key} name={cc.label}
-                      stroke={cc.color} strokeWidth={2.5}
-                      fill="url(#areaGrad)" dot={false}
-                      activeDot={{ r: 5, fill: cc.color, stroke: '#fff', strokeWidth: 1.5 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartErrorBoundary>
-            )}
-          </div>
-
-          {/* ── Revenue vs Spend ─────────────────────────────────────── */}
-          <div className="mb-5">
             <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
-              <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5">Ingresos TN vs Gasto Meta · {since} → {until}</h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] flex items-center">
+                  Embudo de conversión
+                  <Ayuda>{"Dos capas: (1) Tráfico Meta Ads = Alcance y Clicks, que son 100% de la publicidad. (2) Negocio total = Compras y Recompras, que incluyen TODOS los canales (Meta + orgánico + directo + Google). El salto entre clicks y compras NO es la conversión de Meta: solo una parte de las compras vino de Meta (se indica el %). La conversión real de Meta está en el benchmark 'CVR Meta' a la derecha."}</Ayuda>
+                </h3>
+                <div className="flex flex-col items-end leading-tight">
+                  <span className="text-[10px] text-[var(--pnl-text-3)]">{since} → {until}</span>
+                  {prevPeriod && (() => {
+                    const pr = prevRange(since, until)
+                    return <span className="text-[9px] text-[var(--pnl-text-3)]">Δ vs {pr.since} → {pr.until}</span>
+                  })()}
+                </div>
+              </div>
+              {(() => {
+                const metaCh = data?.channels?.find(c => c.key === 'meta_ads')
+                return (
+                  <FunnelViz
+                    reach={s.reach}
+                    clicks={s.clicks}
+                    orders={tnOrders}
+                    repeats={monthly?.repeatCount ?? 0}
+                    revenue={tnRevenue}
+                    avgTicket={tnAvgOrder}
+                    metaOrders={metaCh?.orders ?? 0}
+                    metaRevenue={metaCh?.revenue ?? 0}
+                    prevReach={prevPeriod?.reach}
+                    prevClicks={prevPeriod?.clicks}
+                    prevOrders={prevPeriod?.orders}
+                  />
+                )
+              })()}
+            </div>
+
+            <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+              <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">
+                  Evolución del período
+                </h3>
+                <div className="flex gap-1">
+                  {(Object.keys(chartConfig) as (keyof typeof chartConfig)[]).map(k => (
+                    <button key={k} onClick={() => setChartView(k)}
+                      className={btnBase} style={btnSty(chartView === k)}>
+                      {chartConfig[k].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {mergedTimeline.length === 0 ? (
-                <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
+                <div className="h-[220px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
               ) : (
-                <ChartErrorBoundary height={180}>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barGap={2}>
+                <ChartErrorBoundary height={220}>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                       <defs>
-                        <linearGradient id="barRev" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%"   stopColor={AC_HEX} stopOpacity={0.95} />
-                          <stop offset="100%" stopColor={AC_HEX} stopOpacity={0.3} />
-                        </linearGradient>
-                        <linearGradient id="barSpend" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%"   stopColor="var(--pnl-lilac-soft)" stopOpacity={0.9} />
-                          <stop offset="100%" stopColor="var(--pnl-lilac)" stopOpacity={0.25} />
+                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%"   stopColor={cc.color} stopOpacity={0.45} />
+                          <stop offset="45%"  stopColor={cc.color} stopOpacity={0.12} />
+                          <stop offset="100%" stopColor={cc.color} stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid vertical={false} stroke={cGrid} />
                       <XAxis dataKey="date" tick={cTick}
                         tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
-                        interval={Math.max(0, Math.floor(mergedTimeline.length / 10))} />
+                        interval={Math.max(0, Math.floor(mergedTimeline.length / 12))} />
                       <YAxis tick={cTick}
-                        tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
+                        tickFormatter={(v:number) => v>999?`$${(v/1000).toFixed(0)}k`:String(v)}
                         axisLine={false} tickLine={false} />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--pnl-panel-2)' }} />
-                      <Bar dataKey="revenue" name="Ingresos TN" fill="url(#barRev)"   radius={[3,3,0,0]} />
-                      <Bar dataKey="spend"   name="Gasto Meta"  fill="url(#barSpend)" radius={[3,3,0,0]} />
-                    </BarChart>
+                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: `${cc.color}40`, strokeWidth: 1 }} />
+                      <Area type="monotone" dataKey={cc.key} name={cc.label}
+                        stroke={cc.color} strokeWidth={2.5}
+                        fill="url(#areaGrad)" dot={false}
+                        activeDot={{ r: 5, fill: cc.color, stroke: '#fff', strokeWidth: 1.5 }} />
+                    </AreaChart>
                   </ResponsiveContainer>
                 </ChartErrorBoundary>
               )}
             </div>
-          </div>
+          </Rubro>
 
-          {/* ── Tráfico Meta ─────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+          {/* ══════════════════════════════════════════════════════════
+              RUBRO 3 — Publicidad y tráfico. Pestañas: Meta / Atribución / Curiosos
+              ══════════════════════════════════════════════════════════ */}
+          <Rubro
+            n="03"
+            titulo="Publicidad y tráfico"
+            resumen={`ROAS Meta ${roas.toFixed(1)}x · ${NUM(s.clicks)} clicks · ${NUM(s.reach)} alcance`}
+          >
+            <Pestanas
+              activa={tabPublicidad}
+              onCambiar={id => setTabPublicidad(id as typeof tabPublicidad)}
+              tabs={[
+                { id: 'meta', label: 'Meta Ads' },
+                { id: 'atribucion', label: 'Atribución por canal' },
+                { id: 'curiosos', label: 'Curiosos' },
+              ]}
+            />
 
-            {/* Clicks por día */}
-            <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">Tráfico Meta Ads / día</h3>
-                <span className="text-xs font-bold text-[var(--pnl-green-text)]">{NUM(s.clicks)} clicks</span>
-              </div>
-              {tl.length === 0 ? (
-                <div className="h-[150px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
-              ) : (
-                <ChartErrorBoundary height={150}>
-                  <ResponsiveContainer width="100%" height={150}>
-                    <LineChart data={tl} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                      <CartesianGrid vertical={false} stroke={cGrid2} />
-                      <XAxis dataKey="date" tick={cTick2}
-                        tickFormatter={(v:string)=>v.slice(5)} axisLine={false} tickLine={false}
-                        interval={Math.max(0, Math.floor(tl.length/8))} />
-                      <YAxis tick={cTick2}
-                        axisLine={false} tickLine={false} />
-                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'color-mix(in srgb, var(--pnl-green) 30%, transparent)', strokeWidth: 1 }} />
-                      <Line type="monotone" dataKey="clicks" name="Clicks"
-                        stroke="var(--pnl-green)" strokeWidth={2.5} dot={false}
-                        activeDot={{ r: 4, fill: 'var(--pnl-green)', stroke: '#fff', strokeWidth: 1.5 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </ChartErrorBoundary>
-              )}
-              <div className="mt-3 pt-3 border-t border-[var(--pnl-hair)] flex justify-between text-[10px] text-[var(--pnl-text-3)]">
-                <span>Impresiones totales</span>
-                <span className="text-[var(--pnl-text-3)]">{NUM(s.impressions)}</span>
-              </div>
-            </div>
+            {tabPublicidad === 'meta' && (
+              <>
+                <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+                  <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5">Ingresos TN vs Gasto Meta · {since} → {until}</h3>
+                  {mergedTimeline.length === 0 ? (
+                    <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
+                  ) : (
+                    <ChartErrorBoundary height={180}>
+                      <ResponsiveContainer width="100%" height={180}>
+                        <BarChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barGap={2}>
+                          <defs>
+                            <linearGradient id="barRev" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%"   stopColor={AC_HEX} stopOpacity={0.95} />
+                              <stop offset="100%" stopColor={AC_HEX} stopOpacity={0.3} />
+                            </linearGradient>
+                            <linearGradient id="barSpend" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%"   stopColor="var(--pnl-lilac-soft)" stopOpacity={0.9} />
+                              <stop offset="100%" stopColor="var(--pnl-lilac)" stopOpacity={0.25} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid vertical={false} stroke={cGrid} />
+                          <XAxis dataKey="date" tick={cTick}
+                            tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
+                            interval={Math.max(0, Math.floor(mergedTimeline.length / 10))} />
+                          <YAxis tick={cTick}
+                            tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
+                            axisLine={false} tickLine={false} />
+                          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--pnl-panel-2)' }} />
+                          <Bar dataKey="revenue" name="Ingresos TN" fill="url(#barRev)"   radius={[3,3,0,0]} />
+                          <Bar dataKey="spend"   name="Gasto Meta"  fill="url(#barSpend)" radius={[3,3,0,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartErrorBoundary>
+                  )}
+                </div>
 
-            {/* Fuentes de tráfico — revenue real por canal, ver AttributionSection abajo */}
-            <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
-              <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-4">Fuentes de tráfico (órdenes)</h3>
-              <div className="space-y-3">
-                {(data?.channels ?? []).filter(c => c.orders > 0).map(c => {
-                  const totOrders = (data?.channels ?? []).reduce((s2, x) => s2 + x.orders, 0)
-                  const pct = totOrders > 0 ? (c.orders / totOrders) * 100 : 0
-                  return (
-                    <div key={c.key}>
-                      <div className="flex justify-between text-xs mb-1.5">
-                        <span className="text-[var(--pnl-text-2)] flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.color }} />{c.label}
-                        </span>
-                        <span className="text-[var(--pnl-text)] font-semibold">{c.orders} órdenes ({pct.toFixed(0)}%)</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-[var(--pnl-track)] overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${pct}%`, background: c.color, opacity: 0.7 }} />
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+                    <div className="flex items-center justify-between mb-5">
+                      <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">Tráfico Meta Ads / día</h3>
+                      <span className="text-xs font-bold text-[var(--pnl-green-text)]">{NUM(s.clicks)} clicks</span>
                     </div>
-                  )
-                })}
-              </div>
-              <div className="mt-4 pt-4 border-t border-[var(--pnl-hair)] rounded-xl bg-[var(--pnl-panel)] p-3">
-                <p className="text-[10px] text-[var(--pnl-text-2)] leading-relaxed">
-                  Clasificación por utm/fbclid capturado por Tiendanube al momento del click. Detalle y ROAS real abajo.
-                </p>
-              </div>
-            </div>
-          </div>
+                    {tl.length === 0 ? (
+                      <div className="h-[150px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
+                    ) : (
+                      <ChartErrorBoundary height={150}>
+                        <ResponsiveContainer width="100%" height={150}>
+                          <LineChart data={tl} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                            <CartesianGrid vertical={false} stroke={cGrid2} />
+                            <XAxis dataKey="date" tick={cTick2}
+                              tickFormatter={(v:string)=>v.slice(5)} axisLine={false} tickLine={false}
+                              interval={Math.max(0, Math.floor(tl.length/8))} />
+                            <YAxis tick={cTick2}
+                              axisLine={false} tickLine={false} />
+                            <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'color-mix(in srgb, var(--pnl-green) 30%, transparent)', strokeWidth: 1 }} />
+                            <Line type="monotone" dataKey="clicks" name="Clicks"
+                              stroke="var(--pnl-green)" strokeWidth={2.5} dot={false}
+                              activeDot={{ r: 4, fill: 'var(--pnl-green)', stroke: '#fff', strokeWidth: 1.5 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </ChartErrorBoundary>
+                    )}
+                    <div className="mt-3 pt-3 border-t border-[var(--pnl-hair)] flex justify-between text-[10px] text-[var(--pnl-text-3)]">
+                      <span>Impresiones totales</span>
+                      <span className="text-[var(--pnl-text-3)]">{NUM(s.impressions)}</span>
+                    </div>
+                  </div>
 
-          {/* ── De dónde viene la gente: revenue real por canal + ROAS Meta real ── */}
-          {data && (
-            <div className="mb-5">
+                  <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+                    <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-4">Fuentes de tráfico (órdenes)</h3>
+                    <div className="space-y-3">
+                      {(data?.channels ?? []).filter(c => c.orders > 0).map(c => {
+                        const totOrders = (data?.channels ?? []).reduce((s2, x) => s2 + x.orders, 0)
+                        const pct = totOrders > 0 ? (c.orders / totOrders) * 100 : 0
+                        return (
+                          <div key={c.key}>
+                            <div className="flex justify-between text-xs mb-1.5">
+                              <span className="text-[var(--pnl-text-2)] flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.color }} />{c.label}
+                              </span>
+                              <span className="text-[var(--pnl-text)] font-semibold">{c.orders} órdenes ({pct.toFixed(0)}%)</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-[var(--pnl-track)] overflow-hidden">
+                              <div className="h-full rounded-full transition-all duration-500"
+                                style={{ width: `${pct}%`, background: c.color, opacity: 0.7 }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-[var(--pnl-hair)] rounded-xl bg-[var(--pnl-panel)] p-3">
+                      <p className="text-[10px] text-[var(--pnl-text-2)] leading-relaxed">
+                        Clasificación por utm/fbclid capturado por Tiendanube al momento del click. Detalle y ROAS real en la pestaña Atribución.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {tabPublicidad === 'atribucion' && data && (
               <AttributionSection
                 channels={data.channels ?? []}
                 timeline={data.timeline}
                 summary={{ metaSpend: s.metaSpend, roasMetaReal: s.roasMetaReal, roasBlended: s.roasBlended, cacMetaReal: s.cacMetaReal }}
                 since={since} until={until} acHex={AC_HEX}
               />
-            </div>
-          )}
+            )}
 
-          {/* ── Curiosos: cohortes de visitantes por canal ───────────── */}
-          <div className="mb-5">
-            <CuriososSection acHex={AC_HEX} />
-          </div>
+            {tabPublicidad === 'curiosos' && <CuriososSection acHex={AC_HEX} />}
 
-          {/* ── Bottom: LTV ──────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 gap-4 mb-5">
             <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5 md:max-w-md">
-              {/* Título con tooltip */}
               <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-3)] mb-4 flex items-center">
                 LTV / CAC ratio
                 <Ayuda>Mide cuántas veces el valor de vida de un cliente supera lo que costó conseguirlo. Objetivo ≥3x: si gastás $10.000 en ads por cliente, ese cliente debería generar al menos $30.000 en total. Por debajo de 1x estás perdiendo dinero en publicidad.</Ayuda>
               </p>
 
-              {/* Ratio principal */}
               {(() => {
                 const ratio = cac > 0 ? s.ltv / cac : 0
                 const pct   = Math.min(100, (ratio / 5) * 100)
@@ -635,7 +640,6 @@ export default function DashboardPage() {
                       <p className="text-[10px] text-[var(--pnl-text-3)] mb-1">objetivo ≥3x</p>
                     </div>
 
-                    {/* Barra de progreso */}
                     <div className="w-full h-2 rounded-full bg-[var(--pnl-track)] overflow-hidden mb-3">
                       <div className="h-full rounded-full transition-all duration-700"
                         style={{
@@ -648,7 +652,6 @@ export default function DashboardPage() {
                         }} />
                     </div>
 
-                    {/* LTV y CAC como valores separados */}
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--pnl-hair)]">
                       <div>
                         <p className="text-[9px] text-[var(--pnl-text-3)] uppercase tracking-wider mb-0.5 flex items-center gap-1">
@@ -669,336 +672,338 @@ export default function DashboardPage() {
                 )
               })()}
             </div>
-          </div>
+          </Rubro>
 
-          {/* ══ SECCIÓN VENTAS POR PRODUCTO ══════════════════════════ */}
-          <div className="mb-2">
-            <div className="flex items-center gap-3 mb-4">
-              <h2 className="text-[10px] uppercase tracking-[0.2em] text-[var(--pnl-text-2)]">Ventas por producto</h2>
-              {selectedProduct && (
-                <button onClick={() => setSelectedProduct(null)}
-                  className="text-[10px] rounded-lg px-2 py-0.5 transition-colors border"
-                  style={{ color: 'var(--pnl-amber)', borderColor: 'color-mix(in srgb, var(--pnl-amber) 25%, transparent)' }}>
-                  ✕ limpiar filtro
-                </button>
-              )}
+          {/* ══════════════════════════════════════════════════════════
+              RUBRO 4 — Producto y pagos
+              ══════════════════════════════════════════════════════════ */}
+          <Rubro
+            n="04"
+            titulo="Producto y pagos"
+            resumen={`${ARS(ordersData?.summary.totalRevenue ?? 0)} · ${(ordersData?.categories ?? []).length} categorías`}
+          >
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <h3 className="text-[12px] font-semibold text-[var(--pnl-text-2)]">Ventas por producto</h3>
+                {selectedProduct && (
+                  <button onClick={() => setSelectedProduct(null)}
+                    className="text-[10px] rounded-lg px-2 py-0.5 transition-colors border"
+                    style={{ color: 'var(--pnl-amber)', borderColor: 'color-mix(in srgb, var(--pnl-amber) 25%, transparent)' }}>
+                    ✕ limpiar filtro
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-1 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">
+                      Por categoría
+                    </p>
+                    {selectedProduct && (
+                      <button onClick={() => setSelectedProduct(null)}
+                        className="text-[10px] rounded-lg px-2 py-0.5 transition-colors border"
+                    style={{ color: 'var(--pnl-amber)', borderColor: 'color-mix(in srgb, var(--pnl-amber) 25%, transparent)' }}>
+                        ✕ limpiar
+                      </button>
+                    )}
+                  </div>
+                  {ordersLoading
+                    ? <div className="text-[var(--pnl-text-3)] text-xs py-8 text-center">Cargando...</div>
+                    : <CategoryAccordion
+                        categories={ordersData?.categories ?? []}
+                        totalRevenue={ordersData?.summary.totalRevenue ?? 0}
+                        selectedProduct={selectedProduct}
+                        onSelectProduct={setSelectedProduct}
+                      />
+                  }
+                </div>
+
+                <div className="lg:col-span-2 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
+                  <div className="flex items-baseline justify-between mb-4">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-3)]">
+                      {selectedProduct ? `Ingresos — ${selectedProduct.slice(0,30)}…` : 'Ingresos totales por día'}
+                    </p>
+                    <span className="text-xs font-mono font-bold" style={{ color: 'var(--pnl-amber)' }}>
+                      {ARS(ordersData?.summary.totalRevenue ?? 0)}
+                    </span>
+                  </div>
+                  {(ordersData?.timeline ?? []).length === 0 ? (
+                    <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
+                  ) : (
+                    <ChartErrorBoundary height={180}>
+                      <ResponsiveContainer width="100%" height={180}>
+                        <AreaChart
+                          data={ordersData?.timeline ?? []}
+                          margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+                        >
+                          <defs>
+                            <linearGradient id="prodGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%"   stopColor={AC_HEX} stopOpacity={0.4} />
+                              <stop offset="100%" stopColor={AC_HEX} stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid vertical={false} stroke={cGrid2} />
+                          <XAxis dataKey="date" tick={cTick2}
+                            tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
+                            interval={Math.max(0, Math.floor((ordersData?.timeline.length??1)/10))} />
+                          <YAxis tick={cTick2}
+                            tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
+                            axisLine={false} tickLine={false} />
+                          <Tooltip
+                            contentStyle={{ background:'var(--pnl-panel)', border:`1px solid ${AC_HEX}33`, borderRadius:10, fontSize:11 }}
+                            formatter={(v:unknown) => [ARS(Number(v)), 'Ingresos']}
+                            cursor={{ stroke:`${AC_HEX}4d`, strokeWidth:1 }}
+                          />
+                          <Area type="monotone" dataKey="revenue" stroke={AC_HEX} strokeWidth={2}
+                            fill="url(#prodGrad)" dot={false}
+                            activeDot={{ r:3, fill:'var(--pnl-amber)', strokeWidth:0 }} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </ChartErrorBoundary>
+                  )}
+                  <div className="mt-3 pt-3 border-t border-[var(--pnl-hair)] flex justify-between text-[10px] text-[var(--pnl-text-3)]">
+                    <span>Ticket promedio</span>
+                    <span className="font-mono text-[var(--pnl-text-3)]">{ARS(ordersData?.summary.avgOrderValue ?? 0)}</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-              {/* Categorías con acordeón */}
-              <div className="lg:col-span-1 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">
-                    Por categoría
+            <div>
+              <h3 className="text-[12px] font-semibold text-[var(--pnl-text-2)] mb-4">Métodos de pago</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-3)] mb-4">
+                    {selectedProduct ? `Filtrado: ${selectedProduct.slice(0,20)}…` : 'Distribución general'}
                   </p>
-                  {selectedProduct && (
-                    <button onClick={() => setSelectedProduct(null)}
-                      className="text-[10px] rounded-lg px-2 py-0.5 transition-colors border"
-                  style={{ color: 'var(--pnl-amber)', borderColor: 'color-mix(in srgb, var(--pnl-amber) 25%, transparent)' }}>
-                      ✕ limpiar
-                    </button>
+                  {ordersLoading
+                    ? <div className="text-[var(--pnl-text-3)] text-xs py-16 text-center">Cargando...</div>
+                    : <ChartErrorBoundary height={160}><PaymentDonut data={ordersData?.payments ?? []} /></ChartErrorBoundary>
+                  }
+                </div>
+
+                <div className="lg:col-span-2 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-3)] mb-4">Detalle por método</p>
+                  {ordersLoading
+                    ? <div className="text-[var(--pnl-text-3)] text-xs py-8 text-center">Cargando...</div>
+                    : <div className="space-y-1">
+                        <div className="grid grid-cols-4 text-[10px] uppercase tracking-widest text-[var(--pnl-text-3)] px-3 pb-2 border-b border-[var(--pnl-hair)]">
+                          <span className="col-span-2">Método</span>
+                          <span className="text-right">Órdenes</span>
+                          <span className="text-right">Total</span>
+                        </div>
+                        {(ordersData?.payments ?? []).map(p => (
+                          <div key={p.label}
+                            className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 hover:bg-[var(--pnl-panel-2)] transition-colors group">
+                            <div className="col-span-2 flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
+                              <span className="text-[11px] text-[var(--pnl-text)] truncate">{p.label}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[11px] font-mono text-[var(--pnl-text-3)]">{p.count}</span>
+                              <span className="text-[10px] text-[var(--pnl-text-3)] ml-1">({p.pct}%)</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[11px] font-mono text-[var(--pnl-text)]">{ARS(p.revenue)}</span>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 border-t border-[var(--pnl-hair)] mt-1 pt-3">
+                          <div className="col-span-2 text-[11px] text-[var(--pnl-text-3)] font-medium">Total período</div>
+                          <div className="text-right text-[11px] font-mono text-[var(--pnl-text-3)]">
+                            {(ordersData?.payments ?? []).reduce((s,p)=>s+p.count,0)}
+                          </div>
+                          <div className="text-right text-[11px] font-mono font-semibold" style={{ color: 'var(--pnl-amber)' }}>
+                            {ARS((ordersData?.payments ?? []).reduce((s,p)=>s+p.revenue,0))}
+                          </div>
+                        </div>
+                      </div>
+                  }
+                </div>
+              </div>
+            </div>
+          </Rubro>
+
+          {/* ══════════════════════════════════════════════════════════
+              RUBRO 5 — Rendimiento técnico y canales externos.
+              Pestañas: Canales digitales (Google/Clarity/GA4) / Gasto Claude
+              ══════════════════════════════════════════════════════════ */}
+          <Rubro
+            n="05"
+            titulo="Rendimiento técnico y canales"
+            resumen={usage ? `Bots: $${usage.totalCost?.toFixed(2) ?? '0.00'} · 30d` : 'Google Ads, Clarity, GA4 y gasto de bots'}
+          >
+            <Pestanas
+              activa={tabTecnico}
+              onCambiar={id => setTabTecnico(id as typeof tabTecnico)}
+              tabs={[
+                { id: 'canales', label: 'Canales digitales' },
+                { id: 'claude', label: 'Gasto Claude' },
+              ]}
+            />
+
+            {tabTecnico === 'canales' && (
+              <PerformanceSection since={since} until={until} acHex={AC_HEX} />
+            )}
+
+            {tabTecnico === 'claude' && (
+              <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+                <div className="flex items-baseline justify-between mb-5 flex-wrap gap-2">
+                  <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] flex items-center">
+                    Costo diario por canal · últimos 30 días
+                    <Ayuda>Tokens consumidos por los asistentes de Instagram y WhatsApp, convertidos a USD (Haiku 4.5). Se registra en cada respuesta del bot. WhatsApp aparece cuando el bridge esté reconectado.</Ayuda>
+                  </h3>
+                  {usage && (
+                    <span className="text-[10px] font-mono text-[var(--pnl-text-3)]">
+                      total 30d <span className="text-[var(--pnl-green-text)] font-semibold">${usage.totalCost?.toFixed(2) ?? '0.00'}</span>
+                      <span className="text-[var(--pnl-text-3)]"> · {usage.totalCalls ?? 0} respuestas</span>
+                    </span>
                   )}
                 </div>
-                {ordersLoading
-                  ? <div className="text-[var(--pnl-text-3)] text-xs py-8 text-center">Cargando...</div>
-                  : <CategoryAccordion
-                      categories={ordersData?.categories ?? []}
-                      totalRevenue={ordersData?.summary.totalRevenue ?? 0}
-                      selectedProduct={selectedProduct}
-                      onSelectProduct={setSelectedProduct}
-                    />
+                {usage && usage.series?.length
+                  ? <ChartErrorBoundary height={200}><ClaudeUsageChart data={usage.series} /></ChartErrorBoundary>
+                  : <div className="h-[200px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">
+                      {usage ? 'Sin consumo registrado todavía' : 'Cargando...'}
+                    </div>
+                }
+                <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">Prompt caching activo: la base de conocimiento se cachea (~$0.10/M vs $1/M) → costo real muy bajo por respuesta.</p>
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center gap-3 mb-5">
+                <h3 className="text-[12px] font-semibold text-[var(--pnl-text-2)]">Análisis histórico — últimos 12 meses</h3>
+                {monthlyLoading && <span className="text-[10px] text-[var(--pnl-text-3)] animate-pulse">cargando...</span>}
+              </div>
+
+              <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6 mb-4">
+                <div className="flex items-baseline justify-between mb-5">
+                  <h4 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">Ingresos · Gasto Meta · Neto mensual</h4>
+                  {monthly && (
+                    <span className="text-[10px] font-mono text-[var(--pnl-text-3)]">
+                      acum. {ARS(monthly.series.reduce((s,m)=>s+m.revenue,0))}
+                    </span>
+                  )}
+                </div>
+                {monthly
+                  ? <MonthlyRevenueChart data={monthly.series} />
+                  : <div className="h-[220px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
                 }
               </div>
 
-              {/* Timeline filtrada por producto */}
-              <div className="lg:col-span-2 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
-                <div className="flex items-baseline justify-between mb-4">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-3)]">
-                    {selectedProduct ? `Ingresos — ${selectedProduct.slice(0,30)}…` : 'Ingresos totales por día'}
-                  </p>
-                  <span className="text-xs font-mono font-bold" style={{ color: 'var(--pnl-amber)' }}>
-                    {ARS(ordersData?.summary.totalRevenue ?? 0)}
-                  </span>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+                  <h4 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5 flex items-center">ROAS y CAC mensual<Ayuda>ROAS mide el retorno de la inversión publicitaria. CAC es cuánto cuesta adquirir cada cliente nuevo. Si el ROAS baja o el CAC sube mes a mes, los anuncios están perdiendo eficiencia.</Ayuda></h4>
+                  {monthly
+                    ? <RoasCacChart data={monthly.series} />
+                    : <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
+                  }
+                  <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">ROAS baja = Meta se encarece · CAC sube = cuesta más adquirir cada cliente</p>
                 </div>
-                {(ordersData?.timeline ?? []).length === 0 ? (
-                  <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
-                ) : (
-                  <ChartErrorBoundary height={180}>
-                    <ResponsiveContainer width="100%" height={180}>
-                      <AreaChart
-                        data={ordersData?.timeline ?? []}
-                        margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
-                      >
-                        <defs>
-                          <linearGradient id="prodGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%"   stopColor={AC_HEX} stopOpacity={0.4} />
-                            <stop offset="100%" stopColor={AC_HEX} stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid vertical={false} stroke={cGrid2} />
-                        <XAxis dataKey="date" tick={cTick2}
-                          tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
-                          interval={Math.max(0, Math.floor((ordersData?.timeline.length??1)/10))} />
-                        <YAxis tick={cTick2}
-                          tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
-                          axisLine={false} tickLine={false} />
-                        <Tooltip
-                          contentStyle={{ background:'var(--pnl-panel)', border:`1px solid ${AC_HEX}33`, borderRadius:10, fontSize:11 }}
-                          formatter={(v:unknown) => [ARS(Number(v)), 'Ingresos']}
-                          cursor={{ stroke:`${AC_HEX}4d`, strokeWidth:1 }}
-                        />
-                        <Area type="monotone" dataKey="revenue" stroke={AC_HEX} strokeWidth={2}
-                          fill="url(#prodGrad)" dot={false}
-                          activeDot={{ r:3, fill:'var(--pnl-amber)', strokeWidth:0 }} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </ChartErrorBoundary>
-                )}
-                {/* Ticket promedio */}
-                <div className="mt-3 pt-3 border-t border-[var(--pnl-hair)] flex justify-between text-[10px] text-[var(--pnl-text-3)]">
-                  <span>Ticket promedio</span>
-                  <span className="font-mono text-[var(--pnl-text-3)]">{ARS(ordersData?.summary.avgOrderValue ?? 0)}</span>
+
+                <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+                  <h4 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5 flex items-center">Ticket y volumen<Ayuda>Ticket promedio = valor promedio por orden. Órdenes = cantidad de ventas. Si el ticket sube sin más órdenes, estás vendiendo productos más caros. Si suben las órdenes, hay más demanda.</Ayuda></h4>
+                  {monthly
+                    ? <AvgTicketChart data={monthly.series} />
+                    : <div className="h-[160px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
+                  }
+                  <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">Ticket baja + órdenes suben = ventas más accesibles · Ticket sube = clientes de mayor valor</p>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* ══ SECCIÓN MÉTODOS DE PAGO ══════════════════════════════ */}
-          <div>
-            <h2 className="text-[10px] uppercase tracking-[0.2em] text-[var(--pnl-text-2)] mb-4">Métodos de pago</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-              {/* Donut */}
-              <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-3)] mb-4">
-                  {selectedProduct ? `Filtrado: ${selectedProduct.slice(0,20)}…` : 'Distribución general'}
-                </p>
-                {ordersLoading
-                  ? <div className="text-[var(--pnl-text-3)] text-xs py-16 text-center">Cargando...</div>
-                  : <ChartErrorBoundary height={160}><PaymentDonut data={ordersData?.payments ?? []} /></ChartErrorBoundary>
-                }
-              </div>
-
-              {/* Tabla detalle */}
-              <div className="lg:col-span-2 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-3)] mb-4">Detalle por método</p>
-                {ordersLoading
-                  ? <div className="text-[var(--pnl-text-3)] text-xs py-8 text-center">Cargando...</div>
-                  : <div className="space-y-1">
-                      {/* Header */}
-                      <div className="grid grid-cols-4 text-[10px] uppercase tracking-widest text-[var(--pnl-text-3)] px-3 pb-2 border-b border-[var(--pnl-hair)]">
-                        <span className="col-span-2">Método</span>
-                        <span className="text-right">Órdenes</span>
-                        <span className="text-right">Total</span>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+                  <h4 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-4 flex items-center">Tasa de recompra<Ayuda>% de clientes únicos que compraron en dos o más meses distintos. Un número alto indica fidelidad y reduce la dependencia de publicidad para generar ventas. Saludable: ≥20%.</Ayuda></h4>
+                  {monthly ? (
+                    <>
+                      <div className="flex items-end gap-2 mb-3">
+                        <p className={`text-3xl font-bold font-mono ${monthly.repeatRate >= 20 ? 'text-[var(--pnl-green-text)]' : monthly.repeatRate >= 10 ? 'text-[var(--pnl-amber)]' : 'text-[var(--pnl-red-text)]'}`}>
+                          {monthly.repeatRate}%
+                        </p>
+                        <p className="text-[10px] text-[var(--pnl-text-3)] mb-1">de clientes únicos</p>
                       </div>
-                      {(ordersData?.payments ?? []).map(p => (
-                        <div key={p.label}
-                          className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 hover:bg-[var(--pnl-panel-2)] transition-colors group">
-                          <div className="col-span-2 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
-                            <span className="text-[11px] text-[var(--pnl-text)] truncate">{p.label}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[11px] font-mono text-[var(--pnl-text-3)]">{p.count}</span>
-                            <span className="text-[10px] text-[var(--pnl-text-3)] ml-1">({p.pct}%)</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[11px] font-mono text-[var(--pnl-text)]">{ARS(p.revenue)}</span>
-                          </div>
+                      <div className="w-full h-1.5 rounded-full bg-[var(--pnl-track)] overflow-hidden mb-3">
+                        <div className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${Math.min(100, monthly.repeatRate * 2)}%`,
+                            background: monthly.repeatRate >= 20 ? 'linear-gradient(90deg,var(--pnl-green),var(--pnl-green-text))'
+                                      : monthly.repeatRate >= 10 ? 'linear-gradient(90deg,var(--pnl-amber),var(--pnl-amber-soft))'
+                                      : 'linear-gradient(90deg,var(--pnl-red),var(--pnl-red-text))',
+                          }} />
+                      </div>
+                      <div className="space-y-1.5 text-[11px]">
+                        <div className="flex justify-between">
+                          <span className="text-[var(--pnl-text-3)]">Compraron 2+ meses</span>
+                          <span className="font-mono text-[var(--pnl-text)]">{monthly.repeatCount}</span>
                         </div>
-                      ))}
-                      {/* Total */}
-                      <div className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 border-t border-[var(--pnl-hair)] mt-1 pt-3">
-                        <div className="col-span-2 text-[11px] text-[var(--pnl-text-3)] font-medium">Total período</div>
-                        <div className="text-right text-[11px] font-mono text-[var(--pnl-text-3)]">
-                          {(ordersData?.payments ?? []).reduce((s,p)=>s+p.count,0)}
+                        <div className="flex justify-between">
+                          <span className="text-[var(--pnl-text-3)]">Clientes únicos totales</span>
+                          <span className="font-mono text-[var(--pnl-text)]">{monthly.totalUnique}</span>
                         </div>
-                        <div className="text-right text-[11px] font-mono font-semibold" style={{ color: 'var(--pnl-amber)' }}>
-                          {ARS((ordersData?.payments ?? []).reduce((s,p)=>s+p.revenue,0))}
+                        <div className="flex justify-between pt-1 border-t border-[var(--pnl-hair)]">
+                          <span className="text-[var(--pnl-text-3)] text-[9px]">Objetivo saludable</span>
+                          <span className="text-[var(--pnl-text-3)] text-[9px]">≥ 20%</span>
                         </div>
                       </div>
-                    </div>
-                }
+                    </>
+                  ) : <div className="h-24 flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>}
+                </div>
+
+                <div className="lg:col-span-2 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6 overflow-x-auto">
+                  <h4 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-4">Resumen por mes</h4>
+                  {monthly ? (
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="text-[9px] uppercase tracking-widest text-[var(--pnl-text-3)] border-b border-[var(--pnl-hair)]">
+                          <th className="text-left pb-2 font-medium">Mes</th>
+                          <th className="text-right pb-2 font-medium">Ingresos</th>
+                          <th className="text-right pb-2 font-medium">Meta</th>
+                          <th className="text-right pb-2 font-medium">Neto</th>
+                          <th className="text-right pb-2 font-medium">ROAS Meta</th>
+                          <th className="text-right pb-2 font-medium">ROAS Negocio</th>
+                          <th className="text-right pb-2 font-medium">Rev. Meta</th>
+                          <th className="text-right pb-2 font-medium">Rev. Org.+Ciego</th>
+                          <th className="text-right pb-2 font-medium">Órd.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...monthly.series].reverse().map((m, i) => {
+                          const isCurrent = i === 0
+                          return (
+                            <tr key={m.key}
+                              className="border-b border-[var(--pnl-hair)]"
+                              style={isCurrent ? { background: 'color-mix(in srgb, var(--pnl-amber) 6%, transparent)' } : undefined}>
+                              <td className="py-2 font-mono"
+                                style={{ color: isCurrent ? 'var(--pnl-amber)' : 'var(--pnl-text-2)' }}>
+                                {m.label} {isCurrent && <span className="text-[9px]" style={{ color: 'color-mix(in srgb, var(--pnl-amber) 65%, transparent)' }}>← actual</span>}
+                              </td>
+                              <td className="py-2 text-right font-mono text-[var(--pnl-text)]">{ARS(m.revenue)}</td>
+                              <td className="py-2 text-right font-mono text-[var(--pnl-text-3)]">{ARS(m.spend)}</td>
+                              <td className={`py-2 text-right font-mono font-semibold ${m.net >= 0 ? 'text-[var(--pnl-green-text)]' : 'text-[var(--pnl-red-text)]'}`}>
+                                {ARS(m.net)}
+                              </td>
+                              <td className={`py-2 text-right font-mono ${m.roas >= 3 ? 'text-[var(--pnl-green-text)]' : m.roas > 0 ? 'text-[var(--pnl-amber)]' : 'text-[var(--pnl-text-3)]'}`}
+                                title="Revenue confirmado Meta (utm/fbclid) / gasto Meta -- ver lib/attribution.ts">
+                                {m.roas > 0 ? `${m.roas}x` : '—'}
+                              </td>
+                              <td className={`py-2 text-right font-mono ${m.roasBlended >= 3 ? 'text-[var(--pnl-green-text)]' : m.roasBlended > 0 ? 'text-[var(--pnl-amber)]' : 'text-[var(--pnl-text-3)]'}`}
+                                title="Ingresos totales TN / gasto Meta -- mezcla venta orgánica, sirve para ver salud general del negocio, NO para decidir presupuesto de ads.">
+                                {m.roasBlended > 0 ? `${m.roasBlended}x` : '—'}
+                              </td>
+                              <td className="py-2 text-right font-mono text-[var(--pnl-amber)]">{ARS(m.metaRevenue)}</td>
+                              <td className="py-2 text-right font-mono text-[var(--pnl-green-text)]">{ARS(m.orgCiegoRevenue)}</td>
+                              <td className="py-2 text-right font-mono text-[var(--pnl-text-2)]">{m.orders || '—'}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  ) : <div className="h-40 flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>}
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* ══ RENDIMIENTO DE CANALES ══════════════════════════════ */}
-          <div className="mt-8 mb-8">
-            <div className="flex items-center gap-3 mb-5">
-              <h2 className="text-[10px] uppercase tracking-[0.2em] text-[var(--pnl-text-3)]">Rendimiento de canales digitales</h2>
-            </div>
-            <PerformanceSection since={since} until={until} acHex={AC_HEX} />
-          </div>
-
-          {/* ══ GASTO CLAUDE (bots IG + WhatsApp) ════════════════════ */}
-          <div className="mt-8">
-            <div className="flex items-center gap-3 mb-5">
-              <h2 className="text-[10px] uppercase tracking-[0.2em] text-[var(--pnl-text-3)]">Gasto de los bots (Claude API)</h2>
-            </div>
-            <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
-              <div className="flex items-baseline justify-between mb-5 flex-wrap gap-2">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] flex items-center">
-                  Costo diario por canal · últimos 30 días
-                  <Ayuda>Tokens consumidos por los asistentes de Instagram y WhatsApp, convertidos a USD (Haiku 4.5). Se registra en cada respuesta del bot. WhatsApp aparece cuando el bridge esté reconectado.</Ayuda>
-                </h3>
-                {usage && (
-                  <span className="text-[10px] font-mono text-[var(--pnl-text-3)]">
-                    total 30d <span className="text-[var(--pnl-green-text)] font-semibold">${usage.totalCost?.toFixed(2) ?? '0.00'}</span>
-                    <span className="text-[var(--pnl-text-3)]"> · {usage.totalCalls ?? 0} respuestas</span>
-                  </span>
-                )}
-              </div>
-              {usage && usage.series?.length
-                ? <ChartErrorBoundary height={200}><ClaudeUsageChart data={usage.series} /></ChartErrorBoundary>
-                : <div className="h-[200px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">
-                    {usage ? 'Sin consumo registrado todavía' : 'Cargando...'}
-                  </div>
-              }
-              <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">Prompt caching activo: la base de conocimiento se cachea (~$0.10/M vs $1/M) → costo real muy bajo por respuesta.</p>
-            </div>
-          </div>
-
-          {/* ══ SECCIÓN HISTÓRICO MENSUAL ════════════════════════════ */}
-          <div className="mt-8">
-            <div className="flex items-center gap-3 mb-5">
-              <h2 className="text-[10px] uppercase tracking-[0.2em] text-[var(--pnl-text-3)]">Análisis histórico — últimos 12 meses</h2>
-              {monthlyLoading && <span className="text-[10px] text-[var(--pnl-text-3)] animate-pulse">cargando...</span>}
-            </div>
-
-            {/* ── Gráfico 12 meses Revenue / Spend / Neto ── */}
-            <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6 mb-4">
-              <div className="flex items-baseline justify-between mb-5">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">Ingresos · Gasto Meta · Neto mensual</h3>
-                {monthly && (
-                  <span className="text-[10px] font-mono text-[var(--pnl-text-3)]">
-                    acum. {ARS(monthly.series.reduce((s,m)=>s+m.revenue,0))}
-                  </span>
-                )}
-              </div>
-              {monthly
-                ? <ChartErrorBoundary height={220}><MonthlyRevenueChart data={monthly.series} /></ChartErrorBoundary>
-                : <div className="h-[220px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
-              }
-            </div>
-
-            {/* ── ROAS + CAC trend | Ticket + Órdenes ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-
-              <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5 flex items-center">ROAS y CAC mensual<Ayuda>ROAS mide el retorno de la inversión publicitaria. CAC es cuánto cuesta adquirir cada cliente nuevo. Si el ROAS baja o el CAC sube mes a mes, los anuncios están perdiendo eficiencia.</Ayuda></h3>
-                {monthly
-                  ? <ChartErrorBoundary height={180}><RoasCacChart data={monthly.series} /></ChartErrorBoundary>
-                  : <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
-                }
-                <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">ROAS baja = Meta se encarece · CAC sube = cuesta más adquirir cada cliente</p>
-              </div>
-
-              <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5 flex items-center">Ticket y volumen<Ayuda>Ticket promedio = valor promedio por orden. Órdenes = cantidad de ventas. Si el ticket sube sin más órdenes, estás vendiendo productos más caros. Si suben las órdenes, hay más demanda.</Ayuda></h3>
-                {monthly
-                  ? <ChartErrorBoundary height={160}><AvgTicketChart data={monthly.series} /></ChartErrorBoundary>
-                  : <div className="h-[160px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
-                }
-                <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">Ticket baja + órdenes suben = ventas más accesibles · Ticket sube = clientes de mayor valor</p>
-              </div>
-            </div>
-
-            {/* ── Repeat rate + Resumen mensual tabla ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-              {/* Repeat rate card */}
-              <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-4 flex items-center">Tasa de recompra<Ayuda>% de clientes únicos que compraron en dos o más meses distintos. Un número alto indica fidelidad y reduce la dependencia de publicidad para generar ventas. Saludable: ≥20%.</Ayuda></h3>
-                {monthly ? (
-                  <>
-                    <div className="flex items-end gap-2 mb-3">
-                      <p className={`text-3xl font-bold font-mono ${monthly.repeatRate >= 20 ? 'text-[var(--pnl-green-text)]' : monthly.repeatRate >= 10 ? 'text-[var(--pnl-amber)]' : 'text-[var(--pnl-red-text)]'}`}>
-                        {monthly.repeatRate}%
-                      </p>
-                      <p className="text-[10px] text-[var(--pnl-text-3)] mb-1">de clientes únicos</p>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-[var(--pnl-track)] overflow-hidden mb-3">
-                      <div className="h-full rounded-full transition-all duration-700"
-                        style={{
-                          width: `${Math.min(100, monthly.repeatRate * 2)}%`,
-                          background: monthly.repeatRate >= 20 ? 'linear-gradient(90deg,var(--pnl-green),var(--pnl-green-text))'
-                                    : monthly.repeatRate >= 10 ? 'linear-gradient(90deg,var(--pnl-amber),var(--pnl-amber-soft))'
-                                    : 'linear-gradient(90deg,var(--pnl-red),var(--pnl-red-text))',
-                        }} />
-                    </div>
-                    <div className="space-y-1.5 text-[11px]">
-                      <div className="flex justify-between">
-                        <span className="text-[var(--pnl-text-3)]">Compraron 2+ meses</span>
-                        <span className="font-mono text-[var(--pnl-text)]">{monthly.repeatCount}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[var(--pnl-text-3)]">Clientes únicos totales</span>
-                        <span className="font-mono text-[var(--pnl-text)]">{monthly.totalUnique}</span>
-                      </div>
-                      <div className="flex justify-between pt-1 border-t border-[var(--pnl-hair)]">
-                        <span className="text-[var(--pnl-text-3)] text-[9px]">Objetivo saludable</span>
-                        <span className="text-[var(--pnl-text-3)] text-[9px]">≥ 20%</span>
-                      </div>
-                    </div>
-                  </>
-                ) : <div className="h-24 flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>}
-              </div>
-
-              {/* Tabla mensual resumen */}
-              <div className="lg:col-span-2 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6 overflow-x-auto">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-4">Resumen por mes</h3>
-                {monthly ? (
-                  <table className="w-full text-[11px]">
-                    <thead>
-                      <tr className="text-[9px] uppercase tracking-widest text-[var(--pnl-text-3)] border-b border-[var(--pnl-hair)]">
-                        <th className="text-left pb-2 font-medium">Mes</th>
-                        <th className="text-right pb-2 font-medium">Ingresos</th>
-                        <th className="text-right pb-2 font-medium">Meta</th>
-                        <th className="text-right pb-2 font-medium">Neto</th>
-                        <th className="text-right pb-2 font-medium">ROAS Meta</th>
-                        <th className="text-right pb-2 font-medium">ROAS Negocio</th>
-                        <th className="text-right pb-2 font-medium">Rev. Meta</th>
-                        <th className="text-right pb-2 font-medium">Rev. Org.+Ciego</th>
-                        <th className="text-right pb-2 font-medium">Órd.</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...monthly.series].reverse().map((m, i) => {
-                        const isCurrent = i === 0
-                        return (
-                          <tr key={m.key}
-                            className="border-b border-[var(--pnl-hair)]"
-                            style={isCurrent ? { background: 'color-mix(in srgb, var(--pnl-amber) 6%, transparent)' } : undefined}>
-                            <td className="py-2 font-mono"
-                              style={{ color: isCurrent ? 'var(--pnl-amber)' : 'var(--pnl-text-2)' }}>
-                              {m.label} {isCurrent && <span className="text-[9px]" style={{ color: 'color-mix(in srgb, var(--pnl-amber) 65%, transparent)' }}>← actual</span>}
-                            </td>
-                            <td className="py-2 text-right font-mono text-[var(--pnl-text)]">{ARS(m.revenue)}</td>
-                            <td className="py-2 text-right font-mono text-[var(--pnl-text-3)]">{ARS(m.spend)}</td>
-                            <td className={`py-2 text-right font-mono font-semibold ${m.net >= 0 ? 'text-[var(--pnl-green-text)]' : 'text-[var(--pnl-red-text)]'}`}>
-                              {ARS(m.net)}
-                            </td>
-                            <td className={`py-2 text-right font-mono ${m.roas >= 3 ? 'text-[var(--pnl-green-text)]' : m.roas > 0 ? 'text-[var(--pnl-amber)]' : 'text-[var(--pnl-text-3)]'}`}
-                              title="Revenue confirmado Meta (utm/fbclid) / gasto Meta -- ver lib/attribution.ts">
-                              {m.roas > 0 ? `${m.roas}x` : '—'}
-                            </td>
-                            <td className={`py-2 text-right font-mono ${m.roasBlended >= 3 ? 'text-[var(--pnl-green-text)]' : m.roasBlended > 0 ? 'text-[var(--pnl-amber)]' : 'text-[var(--pnl-text-3)]'}`}
-                              title="Ingresos totales TN / gasto Meta -- mezcla venta orgánica, sirve para ver salud general del negocio, NO para decidir presupuesto de ads.">
-                              {m.roasBlended > 0 ? `${m.roasBlended}x` : '—'}
-                            </td>
-                            <td className="py-2 text-right font-mono text-[var(--pnl-amber)]">{ARS(m.metaRevenue)}</td>
-                            <td className="py-2 text-right font-mono text-[var(--pnl-green-text)]">{ARS(m.orgCiegoRevenue)}</td>
-                            <td className="py-2 text-right font-mono text-[var(--pnl-text-2)]">{m.orders || '—'}</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                ) : <div className="h-40 flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>}
-              </div>
-            </div>
-          </div>
+          </Rubro>
         </>
       )}
     </PanelShell>
