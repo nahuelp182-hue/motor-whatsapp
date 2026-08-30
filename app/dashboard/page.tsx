@@ -11,16 +11,20 @@ import { CategoryAccordion } from '@/components/CategoryAccordion'
 import { Trend7d } from '@/components/Trend7d'
 import { MonthlyRevenueChart, RoasCacChart, AvgTicketChart } from '@/components/MonthlyChart'
 import { ClaudeUsageChart, type UsageDay } from '@/components/ClaudeUsageChart'
-import { HelpTip } from '@/components/HelpTip'
 import { FunnelViz } from '@/components/FunnelViz'
-import { ThemePicker, THEMES, type Theme } from '@/components/ThemePicker'
 import { SalesCadence } from '@/components/SalesCadence'
 import { PerformanceSection } from '@/components/PerformanceSection'
 import { AttributionSection } from '@/components/AttributionSection'
 import { CuriososSection } from '@/components/CuriososSection'
 import { GlobalRoasGauge } from '@/components/GlobalRoasGauge'
-import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern'
-import { SidebarNav } from '@/components/SidebarNav'
+import { PanelShell } from '@/components/PanelShell'
+import { Ayuda } from '@/components/panel/Primitivos'
+
+// Único acento del panel: ámbar. Reemplaza al ThemePicker de 12 temas —
+// nadie lo usaba para elegir salvo un tema, y mantenerlo era 12 paletas a
+// probar por cada cambio futuro. Hex (no var(--pnl-amber)) porque varios
+// componentes concatenan transparencia (`acHex + 'aa'`), inválido sobre var().
+const AC_HEX = '#F5A623'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TimelineDay = {
@@ -106,13 +110,13 @@ const PRESETS = [
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: {name:string;value:number;color:string}[]; label?: string }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl border border-white/10 bg-[#0d0d18]/95 p-3 text-xs shadow-2xl backdrop-blur-md">
-      <p className="text-white/40 mb-2">{label}</p>
+    <div className="rounded-xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-3 text-xs shadow-2xl backdrop-blur-md">
+      <p className="text-[var(--pnl-text-3)] mb-2">{label}</p>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2 mb-1">
           <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-          <span className="text-white/60">{p.name}:</span>
-          <span className="text-white font-semibold">{typeof p.value === 'number' && p.value > 1000 ? ARS(p.value) : NUM(p.value)}</span>
+          <span className="text-[var(--pnl-text-2)]">{p.name}:</span>
+          <span className="text-[var(--pnl-text)] font-semibold">{typeof p.value === 'number' && p.value > 1000 ? ARS(p.value) : NUM(p.value)}</span>
         </div>
       ))}
     </div>
@@ -129,6 +133,12 @@ export default function DashboardPage() {
   const [monthly, setMonthly]         = useState<MonthlyData | null>(null)
   const [prevPeriod, setPrevPeriod]   = useState<{ reach: number; clicks: number; orders: number } | null>(null)
   const [loading, setLoading]         = useState(true)
+  // Distinto de `loading`: el auto-refresh horario (línea ~192) llamaba a la
+  // misma `load()` que la carga inicial, y loading=true desmontaba todo el
+  // contenido (línea ~386) cada vez — el panel se ponía en blanco cada hora
+  // aunque los datos ya estuvieran en pantalla. `refreshing` no gatea el
+  // render: solo cambia el indicador de la barra superior.
+  const [refreshing, setRefreshing]   = useState(false)
   const [ordersLoading, setOrdersLoading] = useState(true)
   const [monthlyLoading, setMonthlyLoading] = useState(true)
   const [error, setError]             = useState<string | null>(null)
@@ -136,14 +146,11 @@ export default function DashboardPage() {
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [usage, setUsage] = useState<{ series: UsageDay[]; totalCost: number; totalCalls: number } | null>(null)
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === 'undefined') return THEMES[0]
-    return THEMES.find(t => t.id === (localStorage.getItem('dash-theme') ?? '')) ?? THEMES[0]
-  })
-  function applyTheme(t: Theme) { setTheme(t); localStorage.setItem('dash-theme', t.id) }
 
-  const load = useCallback(() => {
-    setLoading(true); setOrdersLoading(true); setMonthlyLoading(true); setError(null)
+  const load = useCallback((opts?: { esRefresco?: boolean }) => {
+    if (opts?.esRefresco) setRefreshing(true)
+    else setLoading(true)
+    setOrdersLoading(true); setMonthlyLoading(true); setError(null)
 
     // Carga periódica (depende del rango seleccionado)
     Promise.all([
@@ -156,8 +163,9 @@ export default function DashboardPage() {
       setOrdersData(orders as OrdersData)
       setLastUpdated(new Date())
       setLoading(false)
+      setRefreshing(false)
       setOrdersLoading(false)
-    }).catch((e: Error) => { setError(e.message); setLoading(false); setOrdersLoading(false) })
+    }).catch((e: Error) => { setError(e.message); setLoading(false); setRefreshing(false); setOrdersLoading(false) })
 
     // Período anterior de igual duración (para el delta del embudo, respeta el filtro)
     const pr = prevRange(since, until)
@@ -189,7 +197,7 @@ export default function DashboardPage() {
   useEffect(() => {
     load()
     // Auto-refresh cada 60 minutos
-    const interval = setInterval(load, 60 * 60 * 1000)
+    const interval = setInterval(() => load({ esRefresco: true }), 60 * 60 * 1000)
     return () => clearInterval(interval)
   }, [load])
 
@@ -232,176 +240,111 @@ export default function DashboardPage() {
 
   // ── chart view config
   const chartConfig = {
-    revenue: { key: 'revenue', label: 'Ingresos',   color: theme.acHex },
-    spend:   { key: 'spend',   label: 'Gasto Meta', color: '#818cf8' },
-    clicks:  { key: 'clicks',  label: 'Clicks',     color: '#34d399' },
-    net:     { key: 'net',     label: 'Neto',        color: '#facc15' },
+    revenue: { key: 'revenue', label: 'Ingresos',   color: AC_HEX },
+    spend:   { key: 'spend',   label: 'Gasto Meta', color: 'var(--pnl-lilac)' },
+    clicks:  { key: 'clicks',  label: 'Clicks',     color: 'var(--pnl-green)' },
+    net:     { key: 'net',     label: 'Neto',       color: 'var(--pnl-amber-soft)' },
   }
   const cc = chartConfig[chartView]
 
-  const isLight     = theme.light     ?? false
-  const isGrayscale = theme.grayscale ?? false
-
-  const inputCls  = 'rounded-xl border border-white/10 bg-[#14141c] px-3 py-1.5 text-xs text-white/70 focus:outline-none focus:border-white/20 transition-colors'
-  const btnBase   = 'px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all border'
+  const inputCls  = 'rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] px-3 py-1.5 text-xs text-[var(--pnl-text-2)] focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--pnl-amber)] transition-colors'
+  const btnBase   = 'px-3 py-1.5 rounded-md text-[11px] font-medium transition-all border'
   const btnSty    = (active: boolean): React.CSSProperties => active
-    ? { background: 'rgb(var(--ac) / 0.15)', color: 'rgb(var(--ac) / 0.9)', borderColor: 'rgb(var(--ac) / 0.3)' }
-    : { color: isLight ? 'rgba(15,23,42,0.5)' : 'rgba(255,255,255,0.5)', borderColor: 'transparent' }
-  const acStr     = (alpha: number) => `rgb(var(--ac) / ${alpha})`
+    ? { background: 'color-mix(in srgb, var(--pnl-amber) 15%, transparent)', color: 'var(--pnl-amber)', borderColor: 'color-mix(in srgb, var(--pnl-amber) 30%, transparent)' }
+    : { color: 'var(--pnl-text-3)', borderColor: 'transparent' }
 
-  // ── Colores de charts (dependen del modo claro/oscuro) ──────────────────────
-  const cTick  = { fill: isLight ? 'rgba(15,23,42,0.45)'  : 'rgba(255,255,255,0.5)',  fontSize: 10 }
-  const cTick2 = { fill: isLight ? 'rgba(15,23,42,0.45)'  : 'rgba(255,255,255,0.55)', fontSize: 10 }
-  const cGrid  = isLight ? 'rgba(15,23,42,0.06)' : 'rgba(255,255,255,0.05)'
-  const cGrid2 = isLight ? 'rgba(15,23,42,0.04)' : 'rgba(255,255,255,0.03)'
+  // ── Colores de charts ────────────────────────────────────────────────────
+  const cTick  = { fill: 'var(--pnl-text-3)', fontSize: 10 }
+  const cTick2 = { fill: 'var(--pnl-text-2)', fontSize: 10 }
+  const cGrid  = 'var(--pnl-hair)'
+  const cGrid2 = 'var(--pnl-panel)'
 
   return (
-    <main
-      className="fx-charts fx-holo relative isolate min-h-screen px-5 pb-8 pt-16 font-sans md:px-8 lg:pl-[256px] lg:pt-8"
-      data-light={isLight ? '' : undefined}
-      data-grayscale={isGrayscale ? '' : undefined}
-      style={{
-        '--ac':       theme.ac,
-        '--t-text':   isLight ? '#0f172a'               : '#ffffff',
-        '--t-muted':  isLight ? 'rgba(15,23,42,0.60)'   : 'rgba(255,255,255,0.60)',
-        '--t-dim':    isLight ? 'rgba(15,23,42,0.38)'   : 'rgba(255,255,255,0.38)',
-        '--t-border': isLight ? 'rgba(15,23,42,0.10)'   : 'rgba(255,255,255,0.08)',
-        '--t-card-bg':isLight ? 'rgba(255,255,255,0.7)' : '#111119',
-        color: isLight ? '#0f172a' : 'white',
-        background: isLight
-          ? theme.bg
-          : `radial-gradient(ellipse 90% 40% at 50% -5%, rgb(${theme.ac} / 0.07) 0%, transparent 60%), ${theme.bg}`,
-      } as React.CSSProperties}
+    <PanelShell
+      titulo="Panel de métricas"
+      sub={
+        <div className="flex flex-wrap items-center gap-3">
+          <span>{since} → {until}</span>
+          {s?.metaSpend ? (
+            <>
+              <span className="h-3 w-px bg-[var(--pnl-hair)]" />
+              <span style={{ color: 'var(--pnl-amber)' }}>Meta: {ARS(s.metaSpend)}</span>
+            </>
+          ) : null}
+        </div>
+      }
+      accion={
+        <div className="flex flex-wrap items-center gap-3">
+          {lastUpdated && (
+            <span className={`flex items-center gap-1.5 text-[10px] ${refreshing ? 'text-[var(--pnl-amber)]' : 'text-[var(--pnl-text-3)]'}`}>
+              {refreshing && <span className="size-1.5 rounded-full bg-[var(--pnl-amber)] animate-pulse" />}
+              {refreshing ? 'Actualizando…' : lastUpdated.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}
+            </span>
+          )}
+          <button onClick={() => load()} disabled={loading}
+            className="flex min-h-9 items-center gap-1.5 rounded-md border border-[var(--pnl-hair)] px-2.5 text-[10px] text-[var(--pnl-text-2)] hover:border-[var(--pnl-track)] hover:text-[var(--pnl-text)] transition-all disabled:opacity-30">
+            <span className={loading?'animate-spin inline-block':''}>↻</span> Actualizar
+          </button>
+          <button
+            onClick={async () => {
+              await fetch('/api/auth/logout', { method: 'POST' })
+              window.location.href = '/login'
+            }}
+            className="min-h-9 px-1 text-[10px] text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)] transition-colors"
+            title="Cerrar sesión"
+          >
+            ⎋ Salir
+          </button>
+        </div>
+      }
     >
-      <SidebarNav />
-
-      {/* Ambiente holográfico: grilla animada + auroras difusas. Decorativo puro, detrás del
-          contenido y sin capturar el puntero — no toca la legibilidad de los datos. Solo en
-          modo oscuro; en los temas claros el fondo queda limpio. */}
-      {!isLight && (
-        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <AnimatedGridPattern
-            numSquares={26}
-            maxOpacity={0.05}
-            duration={5}
-            className="absolute inset-x-0 -top-1/4 h-[140%] skew-y-12 text-cyan-300/40 [mask-image:radial-gradient(ellipse_at_top,white,transparent_75%)]"
-          />
-          <div
-            className="absolute -top-40 left-[15%] h-[520px] w-[520px] rounded-full bg-cyan-500/10 blur-[130px]"
-            style={{ animation: 'aurora 11s ease-in-out infinite alternate' }}
-          />
-          <div
-            className="absolute top-24 right-[12%] h-[460px] w-[460px] rounded-full bg-violet-500/10 blur-[130px]"
-            style={{ animation: 'aurora 13s ease-in-out infinite alternate' }}
-          />
-          <div
-            className="absolute bottom-0 left-1/3 h-[420px] w-[420px] rounded-full bg-fuchsia-500/[0.07] blur-[130px]"
-            style={{ animation: 'aurora 15s ease-in-out infinite alternate' }}
-          />
+      {/* ── Controles de fecha ──────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-1">
+          {PRESETS.map(p => (
+            <button key={p.label} onClick={() => applyPreset(p)}
+              className={btnBase} style={btnSty(activePreset === p.label)}>
+              {p.label}
+            </button>
+          ))}
         </div>
-      )}
-
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 mb-7 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.2em] mb-1.5 font-semibold" style={{ color: acStr(0.7) }}>Motor WhatsApp</p>
-          <h1 className="text-[26px] font-bold tracking-tight leading-none">Panel de métricas</h1>
+        <div className="flex items-center gap-1">
+          <input type="date" value={since} max={until}
+            onChange={e => { setSince(e.target.value); setPreset('') }}
+            className={inputCls} />
+          <span className="text-xs text-[var(--pnl-text-3)]">→</span>
+          <input type="date" value={until} min={since} max={localDate()}
+            onChange={e => { setUntil(e.target.value); setPreset('') }}
+            className={inputCls} />
         </div>
-
-        {/* Controles de fecha */}
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* Presets */}
-          <div className="flex gap-1 flex-wrap">
-            {PRESETS.map(p => (
-              <button key={p.label} onClick={() => applyPreset(p)}
-                className={btnBase} style={btnSty(activePreset === p.label)}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Rango custom */}
-          <div className="flex items-center gap-1">
-            <input type="date" value={since} max={until}
-              onChange={e => { setSince(e.target.value); setPreset('') }}
-              className={inputCls} />
-            <span className="text-white/50 text-xs">→</span>
-            <input type="date" value={until} min={since} max={localDate()}
-              onChange={e => { setUntil(e.target.value); setPreset('') }}
-              className={inputCls} />
-          </div>
-
-          {/* Theme picker */}
-          <ThemePicker current={theme.id} onChange={applyTheme} />
-        </div>
-      </div>
-
-      {/* ── Wrapper de contenido — filtro grayscale para temas B&N ─── */}
-      <div style={isGrayscale ? { filter: 'saturate(0) contrast(1.05)' } : undefined}>
-
-      {/* ── Period label + last updated ─────────────────────────────── */}
-      <div className="flex items-center justify-between mb-5">
-      <div className="flex items-center gap-3">
-        <span className="text-[10px] uppercase tracking-[0.18em] text-white/50">
-          {since} → {until}
-        </span>
-        {s?.metaSpend ? (
-          <><span className="w-px h-3 bg-white/10" />
-          <span className="text-[10px]" style={{ color: acStr(0.5) }}>Meta: {ARS(s.metaSpend)}</span></>
-        ) : null}
-      </div>
-      {/* Refresh */}
-      <div className="flex items-center gap-3">
-        {lastUpdated && (
-          <span className="text-[10px] text-white/15">
-            {lastUpdated.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}
-          </span>
-        )}
-        <button onClick={load} disabled={loading}
-          className="flex items-center gap-1.5 text-[10px] text-white/55 hover:text-white/60 border border-white/10 hover:border-white/20 rounded-lg px-2.5 py-1 transition-all disabled:opacity-30">
-          <span className={loading?'animate-spin inline-block':''}>↻</span> Actualizar
-        </button>
-        <button
-          onClick={async () => {
-            await fetch('/api/auth/logout', { method: 'POST' })
-            window.location.href = '/login'
-          }}
-          className="text-[10px] text-white/25 hover:text-white/50 transition-colors px-1"
-          title="Cerrar sesión"
-        >
-          ⎋ Salir
-        </button>
-      </div>
       </div>
 
       {loading && (
         <div className="flex items-center justify-center py-32 gap-2">
           {[0,150,300].map(d=>(
-            <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: 'rgb(var(--ac))', animationDelay:`${d}ms` }} />
+            <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: 'var(--pnl-amber)', animationDelay:`${d}ms` }} />
           ))}
         </div>
       )}
-      {error && <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-red-400/80 text-xs font-mono">{error}</div>}
+      {error && <div className="rounded-md border border-[var(--pnl-red)] bg-[color-mix(in_srgb,var(--pnl-red)_8%,transparent)] p-4 text-[var(--pnl-red-text)] text-xs font-mono">{error}</div>}
 
       {!loading && s && (
         <>
           {/* ── ROAS Global del negocio — pulso rápido del período ─────── */}
-          <div className="mb-5">
-            <GlobalRoasGauge
-              roasGlobal={s.roasGlobal}
-              totalRevenue={s.totalRevenue}
-              metaSpend={s.metaSpend}
-              googleSpend={s.googleSpend}
-            />
-          </div>
+          <GlobalRoasGauge
+            roasGlobal={s.roasGlobal}
+            totalRevenue={s.totalRevenue}
+            metaSpend={s.metaSpend}
+            googleSpend={s.googleSpend}
+          />
 
           {/* ── KPI row ─────────────────────────────────────────────── */}
           {monthly?.mom && (
-            <p className="text-[10px] text-white/25 mb-3">
-              ↕ comparando <span className="text-white/40 font-mono">{monthly.mom.curMonth}</span> vs <span className="text-white/40 font-mono">{monthly.mom.prevMonth}</span>
+            <p className="text-[10px] text-[var(--pnl-text-3)]">
+              ↕ comparando <span className="font-mono text-[var(--pnl-text-2)]">{monthly.mom.curMonth}</span> vs <span className="font-mono text-[var(--pnl-text-2)]">{monthly.mom.prevMonth}</span>
             </p>
           )}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-9 gap-3 mb-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
             <MetricCard label="Ingresos brutos"  value={ARS(tnRevenue)}        sub={`${tnOrders} órdenes`}               mom={monthly?.mom.revenue}   sparkData={mergedTimeline.map(d=>d.revenue)}
               tip="Total facturado en el período según órdenes pagadas en Tiendanube. No descuenta costos." />
             <MetricCard label="Gasto Meta"        value={ARS(s.metaSpend)}      sub="período seleccionado"               mom={monthly?.mom.spend}     momInvert
@@ -424,30 +367,30 @@ export default function DashboardPage() {
 
           {/* ── Net revenue highlight ───────────────────────────────── */}
           <div className="rounded-2xl border p-5 mb-5 flex flex-col sm:flex-row sm:items-center gap-4"
-            style={{ borderColor: acStr(0.15), background: `linear-gradient(to right, rgb(var(--ac) / 0.08), transparent)` }}>
+            style={{ borderColor: 'color-mix(in srgb, var(--pnl-amber) 20%, transparent)', background: 'linear-gradient(to right, color-mix(in srgb, var(--pnl-amber) 10%, transparent), transparent)' }}>
             <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-white/60 mb-1">Resultado del período</p>
-              <p className="text-3xl font-bold font-mono" style={{ color: netRev >= 0 ? 'rgb(var(--ac))' : '#f87171' }}>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-1">Resultado del período</p>
+              <p className="text-3xl font-bold font-mono" style={{ color: netRev >= 0 ? 'var(--pnl-amber)' : 'var(--pnl-red)' }}>
                 {ARS(netRev)}
               </p>
-              <p className="text-xs text-white/50 mt-1">
+              <p className="text-xs text-[var(--pnl-text-3)] mt-1">
                 {ARS(tnRevenue)} ingresos ({tnOrders} órd.) − {ARS(s.metaSpend)} ads
               </p>
             </div>
             <div className="flex gap-6 text-center">
               <div>
-                <p className="text-lg font-bold font-mono text-white">{roas.toFixed(2)}x</p>
-                <p className="text-[10px] text-white/50">ROAS</p>
+                <p className="text-lg font-bold font-mono text-[var(--pnl-text)]">{roas.toFixed(2)}x</p>
+                <p className="text-[10px] text-[var(--pnl-text-3)]">ROAS</p>
               </div>
               <div>
-                <p className="text-lg font-bold font-mono text-white">{ARS(cac)}</p>
-                <p className="text-[10px] text-white/50">CAC</p>
+                <p className="text-lg font-bold font-mono text-[var(--pnl-text)]">{ARS(cac)}</p>
+                <p className="text-[10px] text-[var(--pnl-text-3)]">CAC</p>
               </div>
               <div>
-                <p className={`text-lg font-bold font-mono ${(s.ltv/cac)>=3?'text-emerald-400':'text-orange-400'}`}>
+                <p className={`text-lg font-bold font-mono ${(s.ltv/cac)>=3?'text-[var(--pnl-green-text)]':'text-[var(--pnl-amber)]'}`}>
                   {cac>0?(s.ltv/cac).toFixed(1):'-'}x
                 </p>
-                <p className="text-[10px] text-white/50">LTV/CAC</p>
+                <p className="text-[10px] text-[var(--pnl-text-3)]">LTV/CAC</p>
               </div>
             </div>
           </div>
@@ -461,21 +404,21 @@ export default function DashboardPage() {
 
           {/* ── Cadencia de ventas ──────────────────────────────────── */}
           <div className="mb-5">
-            <SalesCadence key={`${since}-${until}`} since={since} until={until} acHex={theme.acHex} />
+            <SalesCadence key={`${since}-${until}`} since={since} until={until} acHex={AC_HEX} />
           </div>
 
           {/* ══ EMBUDO DE CONVERSIÓN ═════════════════════════════════ */}
-          <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 mb-5">
+          <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6 mb-5">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 flex items-center">
+              <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] flex items-center">
                 Embudo de conversión
-                <HelpTip text="Dos capas: (1) Tráfico Meta Ads = Alcance y Clicks, que son 100% de la publicidad. (2) Negocio total = Compras y Recompras, que incluyen TODOS los canales (Meta + orgánico + directo + Google). El salto entre clicks y compras NO es la conversión de Meta: solo una parte de las compras vino de Meta (se indica el %). La conversión real de Meta está en el benchmark 'CVR Meta' a la derecha." />
+                <Ayuda>Dos capas: (1) Tráfico Meta Ads = Alcance y Clicks, que son 100% de la publicidad. (2) Negocio total = Compras y Recompras, que incluyen TODOS los canales (Meta + orgánico + directo + Google). El salto entre clicks y compras NO es la conversión de Meta: solo una parte de las compras vino de Meta (se indica el %). La conversión real de Meta está en el benchmark 'CVR Meta' a la derecha.</Ayuda>
               </h3>
               <div className="flex flex-col items-end leading-tight">
-                <span className="text-[10px] text-white/25">{since} → {until}</span>
+                <span className="text-[10px] text-[var(--pnl-text-3)]">{since} → {until}</span>
                 {prevPeriod && (() => {
                   const pr = prevRange(since, until)
-                  return <span className="text-[9px] text-white/15">Δ vs {pr.since} → {pr.until}</span>
+                  return <span className="text-[9px] text-[var(--pnl-text-3)]">Δ vs {pr.since} → {pr.until}</span>
                 })()}
               </div>
             </div>
@@ -494,16 +437,15 @@ export default function DashboardPage() {
                   prevReach={prevPeriod?.reach}
                   prevClicks={prevPeriod?.clicks}
                   prevOrders={prevPeriod?.orders}
-                  grayscale={isGrayscale}
                 />
               )
             })()}
           </div>
 
           {/* ── Main chart ──────────────────────────────────────────── */}
-          <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 mb-5">
+          <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6 mb-5">
             <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-              <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/60">
+              <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">
                 Evolución del período
               </h3>
               <div className="flex gap-1">
@@ -543,18 +485,18 @@ export default function DashboardPage() {
 
           {/* ── Revenue vs Spend ─────────────────────────────────────── */}
           <div className="mb-5">
-            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
-              <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/60 mb-5">Ingresos TN vs Gasto Meta · {since} → {until}</h3>
+            <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+              <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5">Ingresos TN vs Gasto Meta · {since} → {until}</h3>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barGap={2}>
                   <defs>
                     <linearGradient id="barRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%"   stopColor={theme.acHex} stopOpacity={0.95} />
-                      <stop offset="100%" stopColor={theme.acHex} stopOpacity={0.3} />
+                      <stop offset="0%"   stopColor={AC_HEX} stopOpacity={0.95} />
+                      <stop offset="100%" stopColor={AC_HEX} stopOpacity={0.3} />
                     </linearGradient>
                     <linearGradient id="barSpend" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%"   stopColor="#a78bfa" stopOpacity={0.9} />
-                      <stop offset="100%" stopColor="#818cf8" stopOpacity={0.25} />
+                      <stop offset="0%"   stopColor="var(--pnl-lilac-soft)" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="var(--pnl-lilac)" stopOpacity={0.25} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid vertical={false} stroke={cGrid} />
@@ -564,7 +506,7 @@ export default function DashboardPage() {
                   <YAxis tick={cTick}
                     tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
                     axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--pnl-panel-2)' }} />
                   <Bar dataKey="revenue" name="Ingresos TN" fill="url(#barRev)"   radius={[3,3,0,0]} />
                   <Bar dataKey="spend"   name="Gasto Meta"  fill="url(#barSpend)" radius={[3,3,0,0]} />
                 </BarChart>
@@ -576,10 +518,10 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
 
             {/* Clicks por día */}
-            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
+            <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55">Tráfico Meta Ads / día</h3>
-                <span className="text-xs font-bold text-emerald-400">{NUM(s.clicks)} clicks</span>
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">Tráfico Meta Ads / día</h3>
+                <span className="text-xs font-bold text-[var(--pnl-green-text)]">{NUM(s.clicks)} clicks</span>
               </div>
               <ResponsiveContainer width="100%" height={150}>
                 <LineChart data={tl} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -589,21 +531,21 @@ export default function DashboardPage() {
                     interval={Math.max(0, Math.floor(tl.length/8))} />
                   <YAxis tick={cTick2}
                     axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(52,211,153,0.3)', strokeWidth: 1 }} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'color-mix(in srgb, var(--pnl-green) 30%, transparent)', strokeWidth: 1 }} />
                   <Line type="monotone" dataKey="clicks" name="Clicks"
-                    stroke="#34d399" strokeWidth={2.5} dot={false}
-                    activeDot={{ r: 4, fill: '#34d399', stroke: '#fff', strokeWidth: 1.5 }} />
+                    stroke="var(--pnl-green)" strokeWidth={2.5} dot={false}
+                    activeDot={{ r: 4, fill: 'var(--pnl-green)', stroke: '#fff', strokeWidth: 1.5 }} />
                 </LineChart>
               </ResponsiveContainer>
-              <div className="mt-3 pt-3 border-t border-white/5 flex justify-between text-[10px] text-white/50">
+              <div className="mt-3 pt-3 border-t border-[var(--pnl-hair)] flex justify-between text-[10px] text-[var(--pnl-text-3)]">
                 <span>Impresiones totales</span>
-                <span className="text-white/50">{NUM(s.impressions)}</span>
+                <span className="text-[var(--pnl-text-3)]">{NUM(s.impressions)}</span>
               </div>
             </div>
 
             {/* Fuentes de tráfico — revenue real por canal, ver AttributionSection abajo */}
-            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
-              <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4">Fuentes de tráfico (órdenes)</h3>
+            <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+              <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-4">Fuentes de tráfico (órdenes)</h3>
               <div className="space-y-3">
                 {(data?.channels ?? []).filter(c => c.orders > 0).map(c => {
                   const totOrders = (data?.channels ?? []).reduce((s2, x) => s2 + x.orders, 0)
@@ -611,12 +553,12 @@ export default function DashboardPage() {
                   return (
                     <div key={c.key}>
                       <div className="flex justify-between text-xs mb-1.5">
-                        <span className="text-white/60 flex items-center gap-2">
+                        <span className="text-[var(--pnl-text-2)] flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full inline-block" style={{ background: c.color }} />{c.label}
                         </span>
-                        <span className="text-white/80 font-semibold">{c.orders} órdenes ({pct.toFixed(0)}%)</span>
+                        <span className="text-[var(--pnl-text)] font-semibold">{c.orders} órdenes ({pct.toFixed(0)}%)</span>
                       </div>
-                      <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                      <div className="h-1.5 rounded-full bg-[var(--pnl-track)] overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-500"
                           style={{ width: `${pct}%`, background: c.color, opacity: 0.7 }} />
                       </div>
@@ -624,8 +566,8 @@ export default function DashboardPage() {
                   )
                 })}
               </div>
-              <div className="mt-4 pt-4 border-t border-white/5 rounded-xl bg-[#0e0e16] p-3">
-                <p className="text-[10px] text-white/55 leading-relaxed">
+              <div className="mt-4 pt-4 border-t border-[var(--pnl-hair)] rounded-xl bg-[var(--pnl-panel)] p-3">
+                <p className="text-[10px] text-[var(--pnl-text-2)] leading-relaxed">
                   Clasificación por utm/fbclid capturado por Tiendanube al momento del click. Detalle y ROAS real abajo.
                 </p>
               </div>
@@ -639,23 +581,23 @@ export default function DashboardPage() {
                 channels={data.channels ?? []}
                 timeline={data.timeline}
                 summary={{ metaSpend: s.metaSpend, roasMetaReal: s.roasMetaReal, roasBlended: s.roasBlended, cacMetaReal: s.cacMetaReal }}
-                since={since} until={until} acHex={theme.acHex}
+                since={since} until={until} acHex={AC_HEX}
               />
             </div>
           )}
 
           {/* ── Curiosos: cohortes de visitantes por canal ───────────── */}
           <div className="mb-5">
-            <CuriososSection acHex={theme.acHex} />
+            <CuriososSection acHex={AC_HEX} />
           </div>
 
           {/* ── Bottom: LTV ──────────────────────────────────────────── */}
           <div className="grid grid-cols-1 gap-4 mb-5">
-            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5 md:max-w-md">
+            <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5 md:max-w-md">
               {/* Título con tooltip */}
-              <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 mb-4 flex items-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-3)] mb-4 flex items-center">
                 LTV / CAC ratio
-                <HelpTip text="Mide cuántas veces el valor de vida de un cliente supera lo que costó conseguirlo. Objetivo ≥3x: si gastás $10.000 en ads por cliente, ese cliente debería generar al menos $30.000 en total. Por debajo de 1x estás perdiendo dinero en publicidad." />
+                <Ayuda>Mide cuántas veces el valor de vida de un cliente supera lo que costó conseguirlo. Objetivo ≥3x: si gastás $10.000 en ads por cliente, ese cliente debería generar al menos $30.000 en total. Por debajo de 1x estás perdiendo dinero en publicidad.</Ayuda>
               </p>
 
               {/* Ratio principal */}
@@ -666,40 +608,40 @@ export default function DashboardPage() {
                 return (
                   <>
                     <div className="flex items-end gap-2 mb-3">
-                      <p className={`text-3xl font-bold font-mono ${good ? 'text-emerald-400' : ratio > 0 ? 'text-orange-400' : 'text-white/30'}`}>
+                      <p className={`text-3xl font-bold font-mono ${good ? 'text-[var(--pnl-green-text)]' : ratio > 0 ? 'text-[var(--pnl-amber)]' : 'text-[var(--pnl-text-3)]'}`}>
                         {cac > 0 ? `${ratio.toFixed(1)}x` : '—'}
                       </p>
-                      <p className="text-[10px] text-white/40 mb-1">objetivo ≥3x</p>
+                      <p className="text-[10px] text-[var(--pnl-text-3)] mb-1">objetivo ≥3x</p>
                     </div>
 
                     {/* Barra de progreso */}
-                    <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden mb-3">
+                    <div className="w-full h-2 rounded-full bg-[var(--pnl-track)] overflow-hidden mb-3">
                       <div className="h-full rounded-full transition-all duration-700"
                         style={{
                           width: `${pct}%`,
                           background: good
-                            ? 'linear-gradient(90deg,#34d399,#10b981)'
+                            ? 'linear-gradient(90deg,var(--pnl-green),var(--pnl-green-text))'
                             : ratio > 1
-                              ? 'linear-gradient(90deg,#f97316,#fb923c)'
-                              : 'linear-gradient(90deg,#f87171,#ef4444)',
+                              ? 'linear-gradient(90deg,var(--pnl-amber),var(--pnl-amber-soft))'
+                              : 'linear-gradient(90deg,var(--pnl-red),var(--pnl-red-text))',
                         }} />
                     </div>
 
                     {/* LTV y CAC como valores separados */}
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--pnl-hair)]">
                       <div>
-                        <p className="text-[9px] text-white/35 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                        <p className="text-[9px] text-[var(--pnl-text-3)] uppercase tracking-wider mb-0.5 flex items-center gap-1">
                           LTV
-                          <HelpTip text="Ingreso total histórico promedio por cliente. Calculado sobre todos los clientes registrados desde siempre (no solo el período seleccionado)." />
+                          <Ayuda>Ingreso total histórico promedio por cliente. Calculado sobre todos los clientes registrados desde siempre (no solo el período seleccionado).</Ayuda>
                         </p>
-                        <p className="text-sm font-mono font-bold text-white/80">{ARS(s.ltv)}</p>
+                        <p className="text-sm font-mono font-bold text-[var(--pnl-text)]">{ARS(s.ltv)}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] text-white/35 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                        <p className="text-[9px] text-[var(--pnl-text-3)] uppercase tracking-wider mb-0.5 flex items-center gap-1">
                           CAC
-                          <HelpTip text="Costo de Adquisición de Cliente: gasto total en Meta Ads del período dividido por los nuevos clientes conseguidos." />
+                          <Ayuda>Costo de Adquisición de Cliente: gasto total en Meta Ads del período dividido por los nuevos clientes conseguidos.</Ayuda>
                         </p>
-                        <p className="text-sm font-mono font-bold text-white/80">{cac > 0 ? ARS(cac) : '—'}</p>
+                        <p className="text-sm font-mono font-bold text-[var(--pnl-text)]">{cac > 0 ? ARS(cac) : '—'}</p>
                       </div>
                     </div>
                   </>
@@ -711,11 +653,11 @@ export default function DashboardPage() {
           {/* ══ SECCIÓN VENTAS POR PRODUCTO ══════════════════════════ */}
           <div className="mb-2">
             <div className="flex items-center gap-3 mb-4">
-              <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/55">Ventas por producto</h2>
+              <h2 className="text-[10px] uppercase tracking-[0.2em] text-[var(--pnl-text-2)]">Ventas por producto</h2>
               {selectedProduct && (
                 <button onClick={() => setSelectedProduct(null)}
                   className="text-[10px] rounded-lg px-2 py-0.5 transition-colors border"
-                  style={{ color: acStr(0.7), borderColor: acStr(0.2) }}>
+                  style={{ color: 'var(--pnl-amber)', borderColor: 'color-mix(in srgb, var(--pnl-amber) 25%, transparent)' }}>
                   ✕ limpiar filtro
                 </button>
               )}
@@ -723,21 +665,21 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
               {/* Categorías con acordeón */}
-              <div className="lg:col-span-1 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5">
+              <div className="lg:col-span-1 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-white/55">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">
                     Por categoría
                   </p>
                   {selectedProduct && (
                     <button onClick={() => setSelectedProduct(null)}
                       className="text-[10px] rounded-lg px-2 py-0.5 transition-colors border"
-                  style={{ color: acStr(0.7), borderColor: acStr(0.2) }}>
+                  style={{ color: 'var(--pnl-amber)', borderColor: 'color-mix(in srgb, var(--pnl-amber) 25%, transparent)' }}>
                       ✕ limpiar
                     </button>
                   )}
                 </div>
                 {ordersLoading
-                  ? <div className="text-white/50 text-xs py-8 text-center">Cargando...</div>
+                  ? <div className="text-[var(--pnl-text-3)] text-xs py-8 text-center">Cargando...</div>
                   : <CategoryAccordion
                       categories={ordersData?.categories ?? []}
                       totalRevenue={ordersData?.summary.totalRevenue ?? 0}
@@ -748,12 +690,12 @@ export default function DashboardPage() {
               </div>
 
               {/* Timeline filtrada por producto */}
-              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5">
+              <div className="lg:col-span-2 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
                 <div className="flex items-baseline justify-between mb-4">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-white/50">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-3)]">
                     {selectedProduct ? `Ingresos — ${selectedProduct.slice(0,30)}…` : 'Ingresos totales por día'}
                   </p>
-                  <span className="text-xs font-mono font-bold" style={{ color: 'rgb(var(--ac))' }}>
+                  <span className="text-xs font-mono font-bold" style={{ color: 'var(--pnl-amber)' }}>
                     {ARS(ordersData?.summary.totalRevenue ?? 0)}
                   </span>
                 </div>
@@ -764,8 +706,8 @@ export default function DashboardPage() {
                   >
                     <defs>
                       <linearGradient id="prodGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%"   stopColor={theme.acHex} stopOpacity={0.4} />
-                        <stop offset="100%" stopColor={theme.acHex} stopOpacity={0} />
+                        <stop offset="0%"   stopColor={AC_HEX} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={AC_HEX} stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid vertical={false} stroke={cGrid2} />
@@ -776,19 +718,19 @@ export default function DashboardPage() {
                       tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
                       axisLine={false} tickLine={false} />
                     <Tooltip
-                      contentStyle={{ background:'rgba(10,10,20,0.95)', border:`1px solid ${theme.acHex}33`, borderRadius:10, fontSize:11 }}
+                      contentStyle={{ background:'var(--pnl-panel)', border:`1px solid ${AC_HEX}33`, borderRadius:10, fontSize:11 }}
                       formatter={(v:unknown) => [ARS(Number(v)), 'Ingresos']}
-                      cursor={{ stroke:`${theme.acHex}4d`, strokeWidth:1 }}
+                      cursor={{ stroke:`${AC_HEX}4d`, strokeWidth:1 }}
                     />
-                    <Area type="monotone" dataKey="revenue" stroke={theme.acHex} strokeWidth={2}
+                    <Area type="monotone" dataKey="revenue" stroke={AC_HEX} strokeWidth={2}
                       fill="url(#prodGrad)" dot={false}
-                      activeDot={{ r:3, fill:'#f97316', strokeWidth:0 }} />
+                      activeDot={{ r:3, fill:'var(--pnl-amber)', strokeWidth:0 }} />
                   </AreaChart>
                 </ResponsiveContainer>
                 {/* Ticket promedio */}
-                <div className="mt-3 pt-3 border-t border-white/5 flex justify-between text-[10px] text-white/50">
+                <div className="mt-3 pt-3 border-t border-[var(--pnl-hair)] flex justify-between text-[10px] text-[var(--pnl-text-3)]">
                   <span>Ticket promedio</span>
-                  <span className="font-mono text-white/50">{ARS(ordersData?.summary.avgOrderValue ?? 0)}</span>
+                  <span className="font-mono text-[var(--pnl-text-3)]">{ARS(ordersData?.summary.avgOrderValue ?? 0)}</span>
                 </div>
               </div>
             </div>
@@ -796,55 +738,55 @@ export default function DashboardPage() {
 
           {/* ══ SECCIÓN MÉTODOS DE PAGO ══════════════════════════════ */}
           <div>
-            <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/55 mb-4">Métodos de pago</h2>
+            <h2 className="text-[10px] uppercase tracking-[0.2em] text-[var(--pnl-text-2)] mb-4">Métodos de pago</h2>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
               {/* Donut */}
-              <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 mb-4">
+              <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-3)] mb-4">
                   {selectedProduct ? `Filtrado: ${selectedProduct.slice(0,20)}…` : 'Distribución general'}
                 </p>
                 {ordersLoading
-                  ? <div className="text-white/50 text-xs py-16 text-center">Cargando...</div>
+                  ? <div className="text-[var(--pnl-text-3)] text-xs py-16 text-center">Cargando...</div>
                   : <PaymentDonut data={ordersData?.payments ?? []} />
                 }
               </div>
 
               {/* Tabla detalle */}
-              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 mb-4">Detalle por método</p>
+              <div className="lg:col-span-2 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-3)] mb-4">Detalle por método</p>
                 {ordersLoading
-                  ? <div className="text-white/50 text-xs py-8 text-center">Cargando...</div>
+                  ? <div className="text-[var(--pnl-text-3)] text-xs py-8 text-center">Cargando...</div>
                   : <div className="space-y-1">
                       {/* Header */}
-                      <div className="grid grid-cols-4 text-[10px] uppercase tracking-widest text-white/50 px-3 pb-2 border-b border-white/5">
+                      <div className="grid grid-cols-4 text-[10px] uppercase tracking-widest text-[var(--pnl-text-3)] px-3 pb-2 border-b border-[var(--pnl-hair)]">
                         <span className="col-span-2">Método</span>
                         <span className="text-right">Órdenes</span>
                         <span className="text-right">Total</span>
                       </div>
                       {(ordersData?.payments ?? []).map(p => (
                         <div key={p.label}
-                          className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 hover:bg-[#111119] transition-colors group">
+                          className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 hover:bg-[var(--pnl-panel-2)] transition-colors group">
                           <div className="col-span-2 flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
-                            <span className="text-[11px] text-white/70 truncate">{p.label}</span>
+                            <span className="text-[11px] text-[var(--pnl-text)] truncate">{p.label}</span>
                           </div>
                           <div className="text-right">
-                            <span className="text-[11px] font-mono text-white/50">{p.count}</span>
-                            <span className="text-[10px] text-white/50 ml-1">({p.pct}%)</span>
+                            <span className="text-[11px] font-mono text-[var(--pnl-text-3)]">{p.count}</span>
+                            <span className="text-[10px] text-[var(--pnl-text-3)] ml-1">({p.pct}%)</span>
                           </div>
                           <div className="text-right">
-                            <span className="text-[11px] font-mono text-white/80">{ARS(p.revenue)}</span>
+                            <span className="text-[11px] font-mono text-[var(--pnl-text)]">{ARS(p.revenue)}</span>
                           </div>
                         </div>
                       ))}
                       {/* Total */}
-                      <div className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 border-t border-white/5 mt-1 pt-3">
-                        <div className="col-span-2 text-[11px] text-white/40 font-medium">Total período</div>
-                        <div className="text-right text-[11px] font-mono text-white/50">
+                      <div className="grid grid-cols-4 items-center rounded-xl px-3 py-2.5 border-t border-[var(--pnl-hair)] mt-1 pt-3">
+                        <div className="col-span-2 text-[11px] text-[var(--pnl-text-3)] font-medium">Total período</div>
+                        <div className="text-right text-[11px] font-mono text-[var(--pnl-text-3)]">
                           {(ordersData?.payments ?? []).reduce((s,p)=>s+p.count,0)}
                         </div>
-                        <div className="text-right text-[11px] font-mono font-semibold" style={{ color: 'rgb(var(--ac))' }}>
+                        <div className="text-right text-[11px] font-mono font-semibold" style={{ color: 'var(--pnl-amber)' }}>
                           {ARS((ordersData?.payments ?? []).reduce((s,p)=>s+p.revenue,0))}
                         </div>
                       </div>
@@ -857,81 +799,81 @@ export default function DashboardPage() {
           {/* ══ RENDIMIENTO DE CANALES ══════════════════════════════ */}
           <div className="mt-8 mb-8">
             <div className="flex items-center gap-3 mb-5">
-              <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/50">Rendimiento de canales digitales</h2>
+              <h2 className="text-[10px] uppercase tracking-[0.2em] text-[var(--pnl-text-3)]">Rendimiento de canales digitales</h2>
             </div>
-            <PerformanceSection since={since} until={until} acHex={theme.acHex} isLight={isLight} />
+            <PerformanceSection since={since} until={until} acHex={AC_HEX} />
           </div>
 
           {/* ══ GASTO CLAUDE (bots IG + WhatsApp) ════════════════════ */}
           <div className="mt-8">
             <div className="flex items-center gap-3 mb-5">
-              <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/50">Gasto de los bots (Claude API)</h2>
+              <h2 className="text-[10px] uppercase tracking-[0.2em] text-[var(--pnl-text-3)]">Gasto de los bots (Claude API)</h2>
             </div>
-            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
+            <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
               <div className="flex items-baseline justify-between mb-5 flex-wrap gap-2">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 flex items-center">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] flex items-center">
                   Costo diario por canal · últimos 30 días
-                  <HelpTip text="Tokens consumidos por los asistentes de Instagram y WhatsApp, convertidos a USD (Haiku 4.5). Se registra en cada respuesta del bot. WhatsApp aparece cuando el bridge esté reconectado." />
+                  <Ayuda>Tokens consumidos por los asistentes de Instagram y WhatsApp, convertidos a USD (Haiku 4.5). Se registra en cada respuesta del bot. WhatsApp aparece cuando el bridge esté reconectado.</Ayuda>
                 </h3>
                 {usage && (
-                  <span className="text-[10px] font-mono text-white/45">
-                    total 30d <span className="text-emerald-400 font-semibold">${usage.totalCost?.toFixed(2) ?? '0.00'}</span>
-                    <span className="text-white/25"> · {usage.totalCalls ?? 0} respuestas</span>
+                  <span className="text-[10px] font-mono text-[var(--pnl-text-3)]">
+                    total 30d <span className="text-[var(--pnl-green-text)] font-semibold">${usage.totalCost?.toFixed(2) ?? '0.00'}</span>
+                    <span className="text-[var(--pnl-text-3)]"> · {usage.totalCalls ?? 0} respuestas</span>
                   </span>
                 )}
               </div>
               {usage && usage.series?.length
                 ? <ClaudeUsageChart data={usage.series} />
-                : <div className="h-[200px] flex items-center justify-center text-white/20 text-xs">
+                : <div className="h-[200px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">
                     {usage ? 'Sin consumo registrado todavía' : 'Cargando...'}
                   </div>
               }
-              <p className="text-[9px] text-white/25 mt-2">Prompt caching activo: la base de conocimiento se cachea (~$0.10/M vs $1/M) → costo real muy bajo por respuesta.</p>
+              <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">Prompt caching activo: la base de conocimiento se cachea (~$0.10/M vs $1/M) → costo real muy bajo por respuesta.</p>
             </div>
           </div>
 
           {/* ══ SECCIÓN HISTÓRICO MENSUAL ════════════════════════════ */}
           <div className="mt-8">
             <div className="flex items-center gap-3 mb-5">
-              <h2 className="text-[10px] uppercase tracking-[0.2em] text-white/50">Análisis histórico — últimos 12 meses</h2>
-              {monthlyLoading && <span className="text-[10px] text-white/25 animate-pulse">cargando...</span>}
+              <h2 className="text-[10px] uppercase tracking-[0.2em] text-[var(--pnl-text-3)]">Análisis histórico — últimos 12 meses</h2>
+              {monthlyLoading && <span className="text-[10px] text-[var(--pnl-text-3)] animate-pulse">cargando...</span>}
             </div>
 
             {/* ── Gráfico 12 meses Revenue / Spend / Neto ── */}
-            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 mb-4">
+            <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6 mb-4">
               <div className="flex items-baseline justify-between mb-5">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55">Ingresos · Gasto Meta · Neto mensual</h3>
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">Ingresos · Gasto Meta · Neto mensual</h3>
                 {monthly && (
-                  <span className="text-[10px] font-mono text-white/35">
+                  <span className="text-[10px] font-mono text-[var(--pnl-text-3)]">
                     acum. {ARS(monthly.series.reduce((s,m)=>s+m.revenue,0))}
                   </span>
                 )}
               </div>
               {monthly
                 ? <MonthlyRevenueChart data={monthly.series} />
-                : <div className="h-[220px] flex items-center justify-center text-white/20 text-xs">Cargando...</div>
+                : <div className="h-[220px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
               }
             </div>
 
             {/* ── ROAS + CAC trend | Ticket + Órdenes ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
-              <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-5 flex items-center">ROAS y CAC mensual<HelpTip text="ROAS mide el retorno de la inversión publicitaria. CAC es cuánto cuesta adquirir cada cliente nuevo. Si el ROAS baja o el CAC sube mes a mes, los anuncios están perdiendo eficiencia." /></h3>
+              <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5 flex items-center">ROAS y CAC mensual<Ayuda>ROAS mide el retorno de la inversión publicitaria. CAC es cuánto cuesta adquirir cada cliente nuevo. Si el ROAS baja o el CAC sube mes a mes, los anuncios están perdiendo eficiencia.</Ayuda></h3>
                 {monthly
                   ? <RoasCacChart data={monthly.series} />
-                  : <div className="h-[180px] flex items-center justify-center text-white/20 text-xs">Cargando...</div>
+                  : <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
                 }
-                <p className="text-[9px] text-white/25 mt-2">ROAS baja = Meta se encarece · CAC sube = cuesta más adquirir cada cliente</p>
+                <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">ROAS baja = Meta se encarece · CAC sube = cuesta más adquirir cada cliente</p>
               </div>
 
-              <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-5 flex items-center">Ticket y volumen<HelpTip text="Ticket promedio = valor promedio por orden. Órdenes = cantidad de ventas. Si el ticket sube sin más órdenes, estás vendiendo productos más caros. Si suben las órdenes, hay más demanda." /></h3>
+              <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5 flex items-center">Ticket y volumen<Ayuda>Ticket promedio = valor promedio por orden. Órdenes = cantidad de ventas. Si el ticket sube sin más órdenes, estás vendiendo productos más caros. Si suben las órdenes, hay más demanda.</Ayuda></h3>
                 {monthly
                   ? <AvgTicketChart data={monthly.series} />
-                  : <div className="h-[160px] flex items-center justify-center text-white/20 text-xs">Cargando...</div>
+                  : <div className="h-[160px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
                 }
-                <p className="text-[9px] text-white/25 mt-2">Ticket baja + órdenes suben = ventas más accesibles · Ticket sube = clientes de mayor valor</p>
+                <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">Ticket baja + órdenes suben = ventas más accesibles · Ticket sube = clientes de mayor valor</p>
               </div>
             </div>
 
@@ -939,50 +881,50 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
               {/* Repeat rate card */}
-              <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4 flex items-center">Tasa de recompra<HelpTip text="% de clientes únicos que compraron en dos o más meses distintos. Un número alto indica fidelidad y reduce la dependencia de publicidad para generar ventas. Saludable: ≥20%." /></h3>
+              <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-4 flex items-center">Tasa de recompra<Ayuda>% de clientes únicos que compraron en dos o más meses distintos. Un número alto indica fidelidad y reduce la dependencia de publicidad para generar ventas. Saludable: ≥20%.</Ayuda></h3>
                 {monthly ? (
                   <>
                     <div className="flex items-end gap-2 mb-3">
-                      <p className={`text-3xl font-bold font-mono ${monthly.repeatRate >= 20 ? 'text-emerald-400' : monthly.repeatRate >= 10 ? 'text-orange-400' : 'text-red-400'}`}>
+                      <p className={`text-3xl font-bold font-mono ${monthly.repeatRate >= 20 ? 'text-[var(--pnl-green-text)]' : monthly.repeatRate >= 10 ? 'text-[var(--pnl-amber)]' : 'text-[var(--pnl-red-text)]'}`}>
                         {monthly.repeatRate}%
                       </p>
-                      <p className="text-[10px] text-white/35 mb-1">de clientes únicos</p>
+                      <p className="text-[10px] text-[var(--pnl-text-3)] mb-1">de clientes únicos</p>
                     </div>
-                    <div className="w-full h-1.5 rounded-full bg-white/5 overflow-hidden mb-3">
+                    <div className="w-full h-1.5 rounded-full bg-[var(--pnl-track)] overflow-hidden mb-3">
                       <div className="h-full rounded-full transition-all duration-700"
                         style={{
                           width: `${Math.min(100, monthly.repeatRate * 2)}%`,
-                          background: monthly.repeatRate >= 20 ? 'linear-gradient(90deg,#34d399,#10b981)'
-                                    : monthly.repeatRate >= 10 ? 'linear-gradient(90deg,#f97316,#fb923c)'
-                                    : 'linear-gradient(90deg,#f43f5e,#fb7185)',
+                          background: monthly.repeatRate >= 20 ? 'linear-gradient(90deg,var(--pnl-green),var(--pnl-green-text))'
+                                    : monthly.repeatRate >= 10 ? 'linear-gradient(90deg,var(--pnl-amber),var(--pnl-amber-soft))'
+                                    : 'linear-gradient(90deg,var(--pnl-red),var(--pnl-red-text))',
                         }} />
                     </div>
                     <div className="space-y-1.5 text-[11px]">
                       <div className="flex justify-between">
-                        <span className="text-white/45">Compraron 2+ meses</span>
-                        <span className="font-mono text-white/70">{monthly.repeatCount}</span>
+                        <span className="text-[var(--pnl-text-3)]">Compraron 2+ meses</span>
+                        <span className="font-mono text-[var(--pnl-text)]">{monthly.repeatCount}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-white/45">Clientes únicos totales</span>
-                        <span className="font-mono text-white/70">{monthly.totalUnique}</span>
+                        <span className="text-[var(--pnl-text-3)]">Clientes únicos totales</span>
+                        <span className="font-mono text-[var(--pnl-text)]">{monthly.totalUnique}</span>
                       </div>
-                      <div className="flex justify-between pt-1 border-t border-white/5">
-                        <span className="text-white/30 text-[9px]">Objetivo saludable</span>
-                        <span className="text-white/30 text-[9px]">≥ 20%</span>
+                      <div className="flex justify-between pt-1 border-t border-[var(--pnl-hair)]">
+                        <span className="text-[var(--pnl-text-3)] text-[9px]">Objetivo saludable</span>
+                        <span className="text-[var(--pnl-text-3)] text-[9px]">≥ 20%</span>
                       </div>
                     </div>
                   </>
-                ) : <div className="h-24 flex items-center justify-center text-white/20 text-xs">Cargando...</div>}
+                ) : <div className="h-24 flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>}
               </div>
 
               {/* Tabla mensual resumen */}
-              <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 overflow-x-auto">
-                <h3 className="text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4">Resumen por mes</h3>
+              <div className="lg:col-span-2 rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6 overflow-x-auto">
+                <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-4">Resumen por mes</h3>
                 {monthly ? (
                   <table className="w-full text-[11px]">
                     <thead>
-                      <tr className="text-[9px] uppercase tracking-widest text-white/30 border-b border-white/5">
+                      <tr className="text-[9px] uppercase tracking-widest text-[var(--pnl-text-3)] border-b border-[var(--pnl-hair)]">
                         <th className="text-left pb-2 font-medium">Mes</th>
                         <th className="text-right pb-2 font-medium">Ingresos</th>
                         <th className="text-right pb-2 font-medium">Meta</th>
@@ -999,40 +941,39 @@ export default function DashboardPage() {
                         const isCurrent = i === 0
                         return (
                           <tr key={m.key}
-                            className="border-b border-white/[0.04]"
-                            style={isCurrent ? { background: 'rgb(var(--ac) / 0.05)' } : undefined}>
+                            className="border-b border-[var(--pnl-hair)]"
+                            style={isCurrent ? { background: 'color-mix(in srgb, var(--pnl-amber) 6%, transparent)' } : undefined}>
                             <td className="py-2 font-mono"
-                              style={{ color: isCurrent ? 'rgb(var(--ac))' : 'var(--t-muted)' }}>
-                              {m.label} {isCurrent && <span className="text-[9px]" style={{ color: 'rgb(var(--ac) / 0.6)' }}>← actual</span>}
+                              style={{ color: isCurrent ? 'var(--pnl-amber)' : 'var(--pnl-text-2)' }}>
+                              {m.label} {isCurrent && <span className="text-[9px]" style={{ color: 'color-mix(in srgb, var(--pnl-amber) 65%, transparent)' }}>← actual</span>}
                             </td>
-                            <td className="py-2 text-right font-mono text-white/80">{ARS(m.revenue)}</td>
-                            <td className="py-2 text-right font-mono text-white/45">{ARS(m.spend)}</td>
-                            <td className={`py-2 text-right font-mono font-semibold ${m.net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            <td className="py-2 text-right font-mono text-[var(--pnl-text)]">{ARS(m.revenue)}</td>
+                            <td className="py-2 text-right font-mono text-[var(--pnl-text-3)]">{ARS(m.spend)}</td>
+                            <td className={`py-2 text-right font-mono font-semibold ${m.net >= 0 ? 'text-[var(--pnl-green-text)]' : 'text-[var(--pnl-red-text)]'}`}>
                               {ARS(m.net)}
                             </td>
-                            <td className={`py-2 text-right font-mono ${m.roas >= 3 ? 'text-emerald-400' : m.roas > 0 ? 'text-orange-400' : 'text-white/20'}`}
+                            <td className={`py-2 text-right font-mono ${m.roas >= 3 ? 'text-[var(--pnl-green-text)]' : m.roas > 0 ? 'text-[var(--pnl-amber)]' : 'text-[var(--pnl-text-3)]'}`}
                               title="Revenue confirmado Meta (utm/fbclid) / gasto Meta -- ver lib/attribution.ts">
                               {m.roas > 0 ? `${m.roas}x` : '—'}
                             </td>
-                            <td className={`py-2 text-right font-mono ${m.roasBlended >= 3 ? 'text-emerald-400' : m.roasBlended > 0 ? 'text-orange-400' : 'text-white/20'}`}
+                            <td className={`py-2 text-right font-mono ${m.roasBlended >= 3 ? 'text-[var(--pnl-green-text)]' : m.roasBlended > 0 ? 'text-[var(--pnl-amber)]' : 'text-[var(--pnl-text-3)]'}`}
                               title="Ingresos totales TN / gasto Meta -- mezcla venta orgánica, sirve para ver salud general del negocio, NO para decidir presupuesto de ads.">
                               {m.roasBlended > 0 ? `${m.roasBlended}x` : '—'}
                             </td>
-                            <td className="py-2 text-right font-mono text-orange-400/80">{ARS(m.metaRevenue)}</td>
-                            <td className="py-2 text-right font-mono text-emerald-400/70">{ARS(m.orgCiegoRevenue)}</td>
-                            <td className="py-2 text-right font-mono text-white/55">{m.orders || '—'}</td>
+                            <td className="py-2 text-right font-mono text-[var(--pnl-amber)]">{ARS(m.metaRevenue)}</td>
+                            <td className="py-2 text-right font-mono text-[var(--pnl-green-text)]">{ARS(m.orgCiegoRevenue)}</td>
+                            <td className="py-2 text-right font-mono text-[var(--pnl-text-2)]">{m.orders || '—'}</td>
                           </tr>
                         )
                       })}
                     </tbody>
                   </table>
-                ) : <div className="h-40 flex items-center justify-center text-white/20 text-xs">Cargando...</div>}
+                ) : <div className="h-40 flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>}
               </div>
             </div>
           </div>
         </>
       )}
-      </div>{/* fin wrapper grayscale */}
-    </main>
+    </PanelShell>
   )
 }

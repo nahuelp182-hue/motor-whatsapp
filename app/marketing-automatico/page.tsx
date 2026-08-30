@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { SidebarNav } from '@/components/SidebarNav'
-import { FondoHolografico } from '@/components/FondoHolografico'
+import { PanelShell } from '@/components/PanelShell'
+import { Banda, Seccion, Tarjeta, Kpi as KpiBase } from '@/components/panel/Primitivos'
 
 type Contador = { enviados: number; fallidos: number; pendientes: number }
 type Template = { key: string; name: string; id: string; status: string; category?: string }
@@ -32,10 +32,10 @@ const NOMBRE_EVENTO: Record<string, string> = {
 }
 
 const NOMBRE_ESTADO_TEMPLATE: Record<string, { label: string; color: string }> = {
-  APPROVED: { label: 'Aprobada', color: '#34d399' },
-  PENDING: { label: 'Pendiente de Meta', color: '#f59e0b' },
-  REJECTED: { label: 'Rechazada', color: '#f87171' },
-  DESCONOCIDO: { label: 'Sin datos', color: '#71717a' },
+  APPROVED: { label: 'Aprobada', color: 'var(--pnl-green)' },
+  PENDING: { label: 'Pendiente de Meta', color: 'var(--pnl-amber)' },
+  REJECTED: { label: 'Rechazada', color: 'var(--pnl-red-text)' },
+  DESCONOCIDO: { label: 'Sin datos', color: 'var(--pnl-text-3)' },
 }
 
 function hora(ts: string): string {
@@ -75,149 +75,146 @@ export default function MarketingAutomaticoPage() {
   const totalFallidos = eventos.reduce((s, [, c]) => s + c.fallidos, 0)
 
   return (
-    <div className="fx-holo fx-charts relative isolate min-h-screen bg-[#0a0a12] text-white max-lg:pt-14 lg:pl-[256px]">
-      <SidebarNav />
-      <FondoHolografico />
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        {/* Header */}
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">Marketing automático · WhatsApp</h1>
-            <a href="/dashboard" className="text-xs text-white/40 hover:text-white/70">← Volver al dashboard</a>
+    <PanelShell
+      titulo="Marketing automático"
+      sub="WhatsApp"
+      accion={
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] p-1">
+            {RANGOS.map((r) => (
+              <button
+                key={r.days}
+                onClick={() => setDays(r.days)}
+                aria-pressed={days === r.days}
+                className={`min-h-9 rounded-md px-3 text-xs transition-colors ${days === r.days ? 'bg-[var(--pnl-track)] text-[var(--pnl-text)]' : 'text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)]'}`}
+              >
+                {r.label}
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-xl border border-white/[0.08] bg-[#0e0e16] p-1">
-              {RANGOS.map((r) => (
-                <button
-                  key={r.days}
-                  onClick={() => setDays(r.days)}
-                  className={`rounded-lg px-3 py-1 text-xs transition ${days === r.days ? 'bg-white/[0.1] text-white' : 'text-white/50 hover:text-white/80'}`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={cargar}
-              className="rounded-xl border border-white/[0.08] bg-[#0e0e16] px-3 py-1.5 text-xs text-white/60 hover:text-white"
-            >
-              ↻ Actualizar
-            </button>
-          </div>
+          <button
+            onClick={cargar}
+            className="min-h-9 rounded-lg border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] px-3 text-xs text-[var(--pnl-text-2)] hover:text-[var(--pnl-text)]"
+          >
+            Actualizar
+          </button>
         </div>
+      }
+    >
+      {loading && <p className="text-sm text-[var(--pnl-text-3)]">Cargando…</p>}
 
-        {loading && <p className="text-sm text-white/40">Cargando…</p>}
-
-        {!loading && data && (
-          <>
-            {/* KPIs generales */}
-            <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Kpi label="Mensajes enviados" value={totalEnviados} accent="#34d399" />
-              <Kpi label="Fallidos" value={totalFallidos} accent={totalFallidos ? '#f87171' : undefined} />
-              <Kpi label="Campañas activas" value={data.campanas.filter((c) => c.is_active).length} />
-              <Kpi
+      {!loading && data && (
+        <>
+          <Seccion>
+            <Banda n="01">Resumen</Banda>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <KpiBase label="Mensajes enviados" valor={String(totalEnviados)} tono="bueno" />
+              <KpiBase label="Fallidos" valor={String(totalFallidos)} tono={totalFallidos ? 'malo' : undefined} />
+              <KpiBase label="Campañas activas" valor={String(data.campanas.filter((c) => c.is_active).length)} />
+              <KpiBase
                 label="Plantillas aprobadas"
-                value={data.templates.filter((t) => t.status === 'APPROVED').length}
-                accent="#34d399"
+                valor={String(data.templates.filter((t) => t.status === 'APPROVED').length)}
+                tono="bueno"
               />
             </div>
+          </Seccion>
 
-            {/* Estado de plantillas */}
-            <div className="mb-5 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-4">
-              <h2 className="mb-3 text-sm font-semibold text-white/80">Estado de plantillas (Meta)</h2>
+          <Seccion>
+            <Banda n="02">Estado de plantillas (Meta)</Banda>
+            <Tarjeta>
               <div className="grid gap-2 sm:grid-cols-2">
                 {data.templates.map((t) => {
                   const info = NOMBRE_ESTADO_TEMPLATE[t.status] ?? NOMBRE_ESTADO_TEMPLATE.DESCONOCIDO
                   return (
-                    <div key={t.id} className="flex items-center justify-between rounded-xl border border-white/[0.06] px-3 py-2">
-                      <span className="text-sm text-white/80">{t.name}</span>
-                      <span className="rounded px-2 py-0.5 text-xs" style={{ background: `${info.color}22`, color: info.color }}>
+                    <div key={t.id} className="flex min-h-11 items-center justify-between rounded-md border border-[var(--pnl-hair)] px-3">
+                      <span className="text-sm text-[var(--pnl-text-2)]">{t.name}</span>
+                      <span
+                        className="rounded px-2 py-0.5 text-xs"
+                        style={{ background: `color-mix(in srgb, ${info.color} 15%, transparent)`, color: info.color }}
+                      >
                         {info.label}
                       </span>
                     </div>
                   )
                 })}
               </div>
-            </div>
+            </Tarjeta>
+          </Seccion>
 
-            {/* Por flujo */}
-            <div className="mb-5 grid gap-3 sm:grid-cols-3">
+          <Seccion>
+            <Banda n="03">Por flujo</Banda>
+            <div className="grid gap-3 sm:grid-cols-3">
               {Object.entries(NOMBRE_EVENTO).map(([key, label]) => {
                 const c = data.porEvento[key] ?? { enviados: 0, fallidos: 0, pendientes: 0 }
                 return (
-                  <div key={key} className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-4">
-                    <div className="mb-2 text-sm font-medium text-white/80">{label}</div>
-                    <div className="flex gap-4 text-xs text-white/50">
-                      <span><span className="text-base font-semibold text-emerald-400">{c.enviados}</span> enviados</span>
-                      {c.fallidos > 0 && <span><span className="text-base font-semibold text-red-400">{c.fallidos}</span> fallidos</span>}
-                      {c.pendientes > 0 && <span><span className="text-base font-semibold text-amber-400">{c.pendientes}</span> pendientes</span>}
+                  <Tarjeta key={key}>
+                    <div className="mb-2 text-sm font-medium text-[var(--pnl-text-2)]">{label}</div>
+                    <div className="flex gap-4 text-xs text-[var(--pnl-text-3)]">
+                      <span><span className="num text-base font-semibold text-[var(--pnl-green-text)]">{c.enviados}</span> enviados</span>
+                      {c.fallidos > 0 && <span><span className="num text-base font-semibold text-[var(--pnl-red-text)]">{c.fallidos}</span> fallidos</span>}
+                      {c.pendientes > 0 && <span><span className="num text-base font-semibold text-[var(--pnl-amber)]">{c.pendientes}</span> pendientes</span>}
                     </div>
-                  </div>
+                  </Tarjeta>
                 )
               })}
             </div>
+          </Seccion>
 
-            {/* Reseñas recibidas */}
-            <div className="mb-5 rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-4">
-              <h2 className="mb-3 text-sm font-semibold text-white/80">⭐ Reseñas recibidas ({data.resenas.length})</h2>
+          <Seccion>
+            <Banda n="04">Reseñas recibidas ({data.resenas.length})</Banda>
+            <Tarjeta>
               {data.resenas.length === 0 && (
-                <p className="text-sm text-white/40">Todavía no llegó ninguna respuesta al pedido de reseña.</p>
+                <p className="text-sm text-[var(--pnl-text-3)]">Todavía no llegó ninguna respuesta al pedido de reseña.</p>
               )}
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 {data.resenas.map((r, i) => (
-                  <div key={i} className="rounded-xl border border-white/[0.05] p-3">
-                    <div className="mb-1 flex items-center justify-between gap-2 text-xs text-white/40">
+                  <div key={i} className="rounded-md border border-[var(--pnl-hair)] p-3">
+                    <div className="mb-1 flex items-center justify-between gap-2 text-xs text-[var(--pnl-text-3)]">
                       <span>{r.cliente || telLindo(r.telefono)}</span>
-                      <span>{hora(r.ts)}</span>
+                      <span className="num">{hora(r.ts)}</span>
                     </div>
-                    <p className="text-sm text-white/85 whitespace-pre-wrap break-words">{r.texto}</p>
+                    <p className="whitespace-pre-wrap break-words text-sm text-[var(--pnl-text-2)]">{r.texto}</p>
                   </div>
                 ))}
               </div>
-            </div>
+            </Tarjeta>
+          </Seccion>
 
-            {/* Actividad reciente */}
-            <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-4">
-              <h2 className="mb-3 text-sm font-semibold text-white/80">Actividad reciente</h2>
+          <Seccion>
+            <Banda n="05">Actividad reciente</Banda>
+            <Tarjeta>
               {data.recientes.length === 0 && (
-                <p className="text-sm text-white/40">Sin envíos en este período todavía.</p>
+                <p className="text-sm text-[var(--pnl-text-3)]">Sin envíos en este período todavía.</p>
               )}
-              <div className="space-y-1.5">
-                {data.recientes.map((r, i) => (
-                  <div key={i} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/[0.05] px-3 py-2 text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white/70">{NOMBRE_EVENTO[r.tipo_evento] ?? r.tipo_evento}</span>
-                      <span className="text-white/40">{r.cliente || telLindo(r.telefono)}</span>
+              <div className="flex flex-col gap-1.5">
+                {data.recientes.map((r, i) => {
+                  const colorEstado =
+                    r.estado === 'SENT' ? 'var(--pnl-green-text)' :
+                    r.estado === 'FAILED' ? 'var(--pnl-red-text)' : 'var(--pnl-amber)'
+                  return (
+                    <div key={i} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--pnl-hair)] px-3 py-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[var(--pnl-text-2)]">{NOMBRE_EVENTO[r.tipo_evento] ?? r.tipo_evento}</span>
+                        <span className="text-[var(--pnl-text-3)]">{r.cliente || telLindo(r.telefono)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {r.error && <span className="text-[var(--pnl-red-text)]" title={r.error}>error</span>}
+                        <span
+                          className="rounded px-1.5 py-0.5"
+                          style={{ background: `color-mix(in srgb, ${colorEstado} 15%, transparent)`, color: colorEstado }}
+                        >
+                          {r.estado}
+                        </span>
+                        <span className="num text-[var(--pnl-text-3)]">{hora(r.ts)}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {r.error && <span className="text-red-400" title={r.error}>error</span>}
-                      <span
-                        className="rounded px-1.5 py-0.5"
-                        style={{
-                          background: r.estado === 'SENT' ? '#34d39922' : r.estado === 'FAILED' ? '#f8717122' : '#f59e0b22',
-                          color: r.estado === 'SENT' ? '#34d399' : r.estado === 'FAILED' ? '#f87171' : '#f59e0b',
-                        }}
-                      >
-                        {r.estado}
-                      </span>
-                      <span className="text-white/35">{hora(r.ts)}</span>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function Kpi({ label, value, accent }: { label: string; value: number; accent?: string }) {
-  return (
-    <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-3">
-      <div className="text-lg font-semibold" style={accent ? { color: accent } : undefined}>{value}</div>
-      <div className="text-[11px] text-white/45">{label}</div>
-    </div>
+            </Tarjeta>
+          </Seccion>
+        </>
+      )}
+    </PanelShell>
   )
 }

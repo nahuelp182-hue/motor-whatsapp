@@ -351,3 +351,91 @@ main[data-light].fx-charts .recharts-active-dot circle {
 .fx-holo:not([data-light]) .rounded-xl:not([data-isolated]):not([data-mono]) {
   border-color: rgba(125, 195, 255, 0.12);
 }
+/* ═══════════════════════════════════════════════════════════════
+   SISTEMA DE DISEÑO — panel grafito + ámbar
+   Tema único. Reemplaza los 12 temas del ThemePicker.
+   Referencia: claude-sync/referencias-diseno/panel-oscuro-premium.html
+
+   --pnl-text-3 se subió de #6C7385 (el valor de la referencia) porque
+   daba 2,86:1 sobre los paneles y no pasaba WCAG AA. Con #9198AB da
+   4,71:1 sobre --pnl-panel y 4,18:1 sobre --pnl-panel-2, por eso las
+   etiquetas chicas van a 12px y no menos.
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --pnl-page:    #23262F;
+  --pnl-panel:   #2A2E38;
+  --pnl-panel-2: #313644;
+  --pnl-track:   #3A4052;
+  --pnl-hair:    #383D4A;
+
+  --pnl-text:    #E8EAF0;
+  --pnl-text-2:  #BEC3D0;
+  --pnl-text-3:  #9198AB;
+
+  --pnl-amber:      #F5A623;
+  --pnl-amber-soft: #FFC259;
+  --pnl-lilac:      #7E86B8;
+  --pnl-lilac-soft: #969DC9;
+  --pnl-red:        #E8503A;
+  --pnl-red-text:   #FF8A73;  /* --pnl-red da 4,06:1: no sirve para texto */
+  --pnl-teal:       #2BB3A3;
+  --pnl-green:      #4CAF7D;
+  --pnl-green-text: #6FD79E;
+
+  --pnl-sidebar: 232px;
+  --pnl-rail:    64px;
+}
+
+/* El panel nuevo vive dentro de .panel-root para no pisar las vistas
+   que todavía no se migraron. */
+.panel-root {
+  background:
+    radial-gradient(1200px 800px at 20% 0%, #2C3040 0%, transparent 60%),
+    radial-gradient(1000px 900px at 100% 100%, #2B2F3E 0%, transparent 55%),
+    var(--pnl-page);
+  color: var(--pnl-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.panel-root :focus-visible {
+  outline: 2px solid var(--pnl-amber);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.panel-root ::selection { background: rgba(245,166,35,.28); color: #fff; }
+
+/* Números tabulares: sin esto las columnas bailan al refrescar. */
+.panel-root .num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+
+/* Los componentes shadcn (Button, Switch, Input, Select) leen --primary para su
+   color de acento. Es violeta global (ver el --primary de :root, elegido para
+   el panel de widgets/reseñas viejo) — acá se pisa a ámbar SOLO dentro del
+   panel, sin tocar el token global que otras pantallas (login, público)
+   puedan estar usando. */
+.panel-root {
+  --primary: oklch(0.78 0.16 75);
+  --primary-foreground: oklch(0.2 0.02 75);
+  --ring: oklch(0.78 0.16 75 / 0.5);
+}
+
+/* Saltar al contenido: hay 15 tabulaciones (8 de nav + 7 de rango)
+   antes de llegar al cuerpo de la vista. */
+.panel-skip {
+  position: absolute; left: 16px; top: 16px; z-index: 60;
+  background: var(--pnl-amber); color: #23262F;
+  font-size: 13px; font-weight: 600; padding: 10px 16px;
+  border-radius: 6px; text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform 160ms ease;
+}
+.panel-skip:focus-visible { transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-root *, .panel-root *::before, .panel-root *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
