@@ -59,10 +59,6 @@ function LoginForm() {
 
         {/* Logo / título */}
         <div className="text-center mb-8">
-          <div className="inline-flex w-12 h-12 rounded-2xl items-center justify-center mb-4"
-            style={{ background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.2)' }}>
-            <span style={{ fontSize: 22 }}>🍄</span>
-          </div>
           <p className="text-[10px] uppercase tracking-[0.22em] text-orange-400/60 mb-1">Motor WhatsApp</p>
           <h1 className="text-lg font-bold text-white">Panel de métricas</h1>
           <p className="text-xs text-white/35 mt-1">Acceso restringido — ingresá tu clave</p>
