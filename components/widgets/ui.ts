@@ -1,122 +1,108 @@
-// Piezas visuales compartidas del panel de widgets.
+// Piezas visuales compartidas del panel de widgets y de reseñas.
 //
-// Sistema de diseño Micelium (definitivo 23/07/26): "Neutro premium + salvia". Casi
-// blanco/negro como Tesla/Samsung, la salvia SOLO como firma. Títulos en Fraunces, cuerpo
-// en Manrope, números en DM Mono. Los tokens se declaran UNA vez acá y todos los editores
-// los usan, así el panel y el store parecen la misma empresa.
-//
-// Paleta:  fondo #fafafa · card #fff · alt #f4f4f1 · hairline #e7e7e2
-//          ink #171717 · cuerpo #3f3f3c · muted #737373 · faint #a3a3a0
-//          acento salvia #6f8a5f · texto-acento #57704a · wash #eef1e9
+// Sistema de diseño: grafito + ámbar (el mismo del panel entero, ver globals.css
+// y componentes/panel/Primitivos.tsx). Reemplaza al "Neutro premium + salvia"
+// del 23/07/26. Los tokens se declaran UNA vez acá y todos los editores los
+// usan, así widgets, reseñas y el resto del panel comparten superficie.
 
-// ── Modo premium oscuro (24/07/26) ────────────────────────────────────────────
-// El panel dejó de ser una isla clara: ahora comparte el tema oscuro del resto del dashboard
-// (fondo #07070f, acento salvia vía --ac). Los componentes shadcn se dan vuelta con la clase
-// `dark` en el <main>; estos tokens cubren lo hardcodeado.
-//
-// Superficies opacas (25/07/26): las tarjetas eran white/[0.0x] traslúcido y dejaban ver la
-// retícula y las auroras del fondo por debajo — el contenido flotaba sobre ruido. Ahora cada
-// nivel es un gris azulado opaco, ya mezclado sobre el fondo de página:
-//   #0a0a12 · #0e0e16 (tarjeta) · #111119 · #14141c (campo) · #16161f · #191922 · #1e1e28
+/** Acento del panel: ámbar. */
+export const ACENTO = 'var(--pnl-amber)'
+/** Fuente de títulos — Barlow Semi Condensed, la del resto del panel. */
+export const TITULO = "'Barlow Semi Condensed', 'Barlow', sans-serif"
 
-/** Acento holográfico (violeta-índigo) legible sobre oscuro, a tono con el dashboard. */
-export const ACENTO = '#a5b4fc'
-/** Fuente de títulos — Fraunces, servida por el layout como variable. */
-export const TITULO = 'var(--font-fraunces), Georgia, serif'
-
-/** Tarjeta base: superficie opaca, igual que las del dashboard. */
+/** Tarjeta base: superficie opaca, igual que las del resto del panel. */
 export const CARD =
-  'rounded-2xl border border-white/[0.06] bg-[#0e0e16]'
+  'rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel)]'
 
-/** Campo de formulario sobre oscuro. */
+/** Campo de formulario. */
 export const INPUT =
-  'w-full rounded-xl border border-white/10 bg-[#14141c] px-3 py-2 text-sm text-white/80 ' +
-  'placeholder:text-white/30 focus:border-white/25 focus:ring-2 focus:ring-white/10 ' +
-  'focus:outline-none transition-colors'
+  'w-full rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] px-3 py-2 text-sm text-[var(--pnl-text)] ' +
+  'placeholder:text-[var(--pnl-text-3)] focus:border-[var(--pnl-track)] focus-visible:outline-2 focus-visible:outline-[var(--pnl-amber)] ' +
+  'transition-colors'
 
-/** Rótulo de campo — eyebrow Manrope. */
-export const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/45'
+/** Rótulo de campo — eyebrow. */
+export const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--pnl-text-3)]'
 
 // ── Escala de encabezados ────────────────────────────────────────────────────
 // La regla para que la vista descanse: cada nivel tiene que verse claramente más
 // grande y más oscuro que el de abajo. No repetir el mismo eyebrow chico para el
 // título de una sección y para un rótulo menor — ahí es donde todo se aplana.
 //
-//   H1  Fraunces 30px ink        →  el nombre de la pantalla
-//   SECCION  18px semibold ink   →  qué es este bloque (Catálogo, Rendimiento…)
+//   H1  30px        →  el nombre de la pantalla
+//   SECCION  18px semibold   →  qué es este bloque (Catálogo, Rendimiento…)
 //   SUBSECCION  15px semibold    →  título de una tarjeta o grupo
 //   EYEBROW  11px mayúsc muted   →  rótulos y unidades, el piso de la escala
 
 /** Título de sección: el nivel que ordena la página. Grande y claro, se lee de un vistazo. */
-export const SECCION = 'text-xl font-semibold tracking-tight text-white'
+export const SECCION = 'text-xl font-semibold tracking-tight text-[var(--pnl-text)]'
 
 /** Bajada de sección: una línea de contexto debajo del título, en cuerpo legible. */
-export const SECCION_SUB = 'text-[13px] leading-relaxed text-white/55'
+export const SECCION_SUB = 'text-[13px] leading-relaxed text-[var(--pnl-text-2)]'
 
 /** Título de una tarjeta o grupo dentro de una sección. */
-export const SUBSECCION = 'text-[15px] font-semibold tracking-tight text-white'
+export const SUBSECCION = 'text-[15px] font-semibold tracking-tight text-[var(--pnl-text)]'
 
 /** Micro-rótulo (unidades, contadores, "apagado"). El piso de la escala. */
-export const EYEBROW = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45'
+export const EYEBROW = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--pnl-text-3)]'
 
 // ── Tonos de panel ───────────────────────────────────────────────────────────
 // Tarjetas de indicador tintadas con el color de su categoría (menta / celeste / durazno /
 // violeta). Tintes muy bajos: el color titula, el número —en blanco— manda la lectura.
 // Mismos colores de categoría de más abajo.
-//
-// Los fondos son OPACOS (el tinte ya viene mezclado sobre el #07070f de la página, no es un
-// rgba): las tarjetas son superficie, no vidrio. Con relleno traslúcido se les veía la
-// retícula y las auroras del fondo por debajo y el panel entero hacía ruido.
 export const TONOS = {
-  salvia:  { fondo: '#151819', borde: 'rgb(111 138 95 / 0.22)' },
-  celeste: { fondo: '#111925', borde: 'rgb(95 168 211 / 0.20)' },
-  durazno: { fondo: '#211814', borde: 'rgb(240 160 60 / 0.20)' },
-  violeta: { fondo: '#171628', borde: 'rgb(155 140 240 / 0.20)' },
+  salvia:  { fondo: 'color-mix(in srgb, var(--pnl-green) 10%, var(--pnl-panel))', borde: 'color-mix(in srgb, var(--pnl-green) 22%, transparent)' },
+  celeste: { fondo: 'color-mix(in srgb, var(--pnl-lilac) 10%, var(--pnl-panel))', borde: 'color-mix(in srgb, var(--pnl-lilac) 22%, transparent)' },
+  durazno: { fondo: 'color-mix(in srgb, var(--pnl-amber) 10%, var(--pnl-panel))', borde: 'color-mix(in srgb, var(--pnl-amber) 22%, transparent)' },
+  violeta: { fondo: 'color-mix(in srgb, var(--pnl-lilac-soft) 10%, var(--pnl-panel))', borde: 'color-mix(in srgb, var(--pnl-lilac-soft) 22%, transparent)' },
 } as const
 
 export type TonoKey = keyof typeof TONOS
 
-/** Panel oscuro de contraste: ink casi negro. */
-export const PANEL_OSCURO = '#191917'
+/** Panel oscuro de contraste. */
+export const PANEL_OSCURO = 'var(--pnl-page)'
 
 /** Texto de ayuda debajo del campo. */
-export const AYUDA = 'mt-1.5 text-[13px] leading-relaxed text-white/50'
+export const AYUDA = 'mt-1.5 text-[13px] leading-relaxed text-[var(--pnl-text-2)]'
 
-/** Advertencia: ámbar legible sobre oscuro. */
-export const AVISO = 'text-xs leading-relaxed text-amber-400'
+/** Advertencia: ámbar, la misma línea de contraste que el resto del panel. */
+export const AVISO = 'text-xs leading-relaxed text-[var(--pnl-amber)]'
 
 /** Botón secundario. */
 export const BTN =
-  'rounded-md border border-white/10 bg-[#14141c] px-3 py-1.5 text-xs font-medium text-white/70 ' +
-  'hover:border-white/25 hover:text-white transition-all disabled:opacity-30'
+  'min-h-9 rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] px-3 py-1.5 text-xs font-medium text-[var(--pnl-text-2)] ' +
+  'hover:border-[var(--pnl-track)] hover:text-[var(--pnl-text)] transition-all disabled:opacity-30'
 
 // ── Categorías ───────────────────────────────────────────────────────────────
 // Cada widget declara su categoría en lib/widgets/tipos.ts. Acá se le pone nombre, color y
 // —lo importante— para qué sirve la categoría: elegir widget es elegir qué palanca tocar,
 // no qué dibujito queda lindo.
+// Los colores van en hex (no var(--pnl-*)) porque el código los concatena con
+// transparencia (`${cat.color}22`, `${cat.color}88`) en varias tarjetas — eso
+// no es válido sobre un var(). Son los mismos hex que los tokens --pnl-amber,
+// --pnl-green, --pnl-lilac y --pnl-lilac-soft.
 export const CATEGORIAS = {
   conversion: {
     label: 'Conversión',
     icono: '🎯',
-    color: '#f0a03c',
+    color: '#F5A623',
     para: 'Empujan la decisión: acercan el pago, la consulta o el clic.',
   },
   confianza: {
     label: 'Confianza',
     icono: '🛡️',
-    color: '#6f9e5f',
+    color: '#4CAF7D',
     para: 'Bajan la desconfianza, que es el freno número uno.',
   },
   captura: {
     label: 'Captura',
     icono: '✉️',
-    color: '#9b8cf0',
+    color: '#7E86B8',
     para: 'Se quedan con el contacto: quien no compra hoy sigue siendo alcanzable.',
   },
   contenido: {
     label: 'Contenido',
     icono: '📖',
-    color: '#5fa8d3',
+    color: '#969DC9',
     para: 'Explican sin vender. Para cuando la duda es qué es esto, no cuánto cuesta.',
   },
 } as const

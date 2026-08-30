@@ -5,7 +5,7 @@ import { ResponsiveContainer, AreaChart, Area } from 'recharts'
 export function SparklineChart({ data, color }: { data: number[]; color?: string }) {
   const uid   = useId().replace(/[^a-zA-Z0-9]/g, '')
   const gradId = `sg-${uid}`
-  const strokeColor = color ?? 'rgb(var(--ac))'
+  const strokeColor = color ?? 'var(--pnl-amber)'
   const chartData   = data.map((v, i) => ({ i, v }))
 
   return (

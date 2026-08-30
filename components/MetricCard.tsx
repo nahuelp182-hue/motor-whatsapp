@@ -1,7 +1,6 @@
 'use client'
 import { SparklineChart } from './SparklineChart'
-import { HelpTip } from './HelpTip'
-import { BorderBeam } from '@/components/ui/border-beam'
+import { Ayuda } from '@/components/panel/Primitivos'
 import { NumeroRodante } from '@/components/widgets/NumeroRodante'
 
 interface MetricCardProps {
@@ -25,55 +24,26 @@ export function MetricCard({
   return (
     <div
       data-highlight={highlight ? 'true' : undefined}
-      className={`relative rounded-2xl p-5 flex flex-col justify-between min-h-[130px] transition-all duration-300 group hover:z-[100] border ${
+      className={`relative rounded-md p-5 flex flex-col justify-between min-h-[130px] transition-all duration-300 border ${
         highlight
-          ? ''
-          : 'bg-gradient-to-br from-white/[0.04] to-white/[0.01] border-white/[0.07]'
+          ? 'border-[color-mix(in_srgb,var(--pnl-amber)_35%,transparent)]'
+          : 'bg-[var(--pnl-panel)] border-[var(--pnl-hair)]'
       }`}
       style={highlight ? {
-        background:   'linear-gradient(to bottom right, rgb(var(--ac) / 0.12) 0%, rgb(var(--ac) / 0.04) 100%)',
-        borderColor:  'rgb(var(--ac) / 0.2)',
+        background: 'linear-gradient(to bottom right, color-mix(in srgb, var(--pnl-amber) 14%, var(--pnl-panel)) 0%, var(--pnl-panel) 100%)',
       } : undefined}
     >
-      {highlight && (
-        <div
-          className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-2xl pointer-events-none"
-          style={{ background: 'rgb(var(--ac) / 0.1)' }}
-        />
-      )}
-
-      {/* Haz holográfico que recorre el borde (Magic UI). Más marcado en la card destacada. */}
-      <BorderBeam
-        size={highlight ? 130 : 90}
-        duration={highlight ? 7 : 10}
-        borderWidth={1.5}
-        colorFrom="#22d3ee"
-        colorTo="#a78bfa"
-        className="opacity-70"
-      />
-      {highlight && (
-        <BorderBeam
-          size={130}
-          duration={7}
-          delay={3.5}
-          borderWidth={1.5}
-          colorFrom="#a78bfa"
-          colorTo="#22d3ee"
-          className="opacity-70"
-        />
-      )}
-
       {/* Label + MoM badge */}
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/50 leading-none flex items-center">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--pnl-text-3)] leading-none flex items-center">
           {label}
-          {tip && <HelpTip text={tip} />}
+          {tip && <Ayuda>{tip}</Ayuda>}
         </p>
         {mom !== undefined && (
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 flex-shrink-0 ${
             isGood
-              ? 'text-emerald-400 bg-emerald-500/10'
-              : 'text-red-400 bg-red-500/10'
+              ? 'text-[var(--pnl-green-text)] bg-[color-mix(in_srgb,var(--pnl-green)_14%,transparent)]'
+              : 'text-[var(--pnl-red-text)] bg-[color-mix(in_srgb,var(--pnl-red)_14%,transparent)]'
           }`}>
             {mom >= 0 ? '↑' : '↓'} {Math.abs(mom).toFixed(0)}%
           </span>
@@ -84,26 +54,26 @@ export function MetricCard({
       <div>
         <p
           className="text-2xl font-bold tracking-tight leading-none font-mono"
-          style={{ color: highlight ? 'rgb(var(--ac))' : 'var(--t-text)' }}
+          style={{ color: highlight ? 'var(--pnl-amber)' : 'var(--pnl-text)' }}
         >
           <NumeroRodante value={value} />
         </p>
         {sub && (
-          <p className="mt-1.5 text-[10px] text-white/55 leading-snug">{sub}</p>
+          <p className="mt-1.5 text-[10px] text-[var(--pnl-text-2)] leading-snug">{sub}</p>
         )}
       </div>
 
       {/* MoM label */}
       {mom !== undefined && (
-        <p className="text-[9px] text-white/25 mt-1">vs mes anterior</p>
+        <p className="text-[9px] text-[var(--pnl-text-3)] mt-1">vs mes anterior</p>
       )}
 
       {/* Sparkline */}
       {sparkData && sparkData.length > 1 && (
-        <div className="absolute bottom-0 left-0 right-0 h-10 overflow-hidden rounded-b-2xl opacity-40 group-hover:opacity-70 transition-opacity pointer-events-none">
+        <div className="absolute bottom-0 left-0 right-0 h-10 overflow-hidden rounded-b-md opacity-50 pointer-events-none">
           <SparklineChart
             data={sparkData}
-            color={highlight ? undefined : 'rgba(255,255,255,0.7)'}
+            color={highlight ? 'var(--pnl-amber)' : 'var(--pnl-text-3)'}
           />
         </div>
       )}

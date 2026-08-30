@@ -5,15 +5,14 @@ import { motion, AnimatePresence } from 'motion/react'
 import { CampoEditor } from '@/components/widgets/CampoEditor'
 import { VistaPrevia, type Resenas } from '@/components/widgets/VistaPrevia'
 import { Metricas } from '@/components/widgets/Metricas'
-import { CARD, LABEL, AYUDA, AVISO, ACENTO, TITULO, SECCION, SECCION_SUB, SUBSECCION, TONOS, type TonoKey, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
+import { CARD, LABEL, AYUDA, AVISO, ACENTO, SECCION, SECCION_SUB, SUBSECCION, TONOS, type TonoKey, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
 import { NumeroRodante } from '@/components/widgets/NumeroRodante'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { BorderBeam } from '@/components/ui/border-beam'
-import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern'
-import { SidebarNav } from '@/components/SidebarNav'
+import { PanelShell } from '@/components/PanelShell'
+import { Banda, Seccion as PanelSeccion } from '@/components/panel/Primitivos'
 import { Acordeon } from '@/components/widgets/Acordeon'
 import { resumenDeGrupo } from '@/components/widgets/resumen'
 import { validarConfig } from '@/lib/widgets/validacion'
@@ -25,8 +24,8 @@ import { RefreshCw, Plus, Trash2, Check } from 'lucide-react'
 // que se pueden crear, y el formulario de cada uno. Este archivo no conoce ningún widget
 // en particular — si lo llegara a conocer, el motor dejó de ser genérico.
 //
-// Estética: sistema de diseño Micelium "Neutro premium + salvia" (definitivo 23/07/26).
-// Blanco/negro editorial, Fraunces en títulos, salvia solo como firma. Ver ./ui.
+// Estética: sistema de diseño del panel — grafito + ámbar. Ver components/panel/Primitivos.tsx
+// y components/widgets/ui.ts (tokens compartidos con Reseñas).
 
 type Widget = {
   id: string
@@ -146,66 +145,10 @@ export default function WidgetsPage() {
   const ctxActual = CONTEXTOS.find(c => c.key === ctx)!
 
   return (
-    <main
-      className="dark fx-holo relative isolate min-h-screen px-5 pb-8 pt-16 font-sans text-white/70 md:px-8 lg:pl-[256px] lg:pt-8"
-      style={{
-        '--ac': '167 139 250',
-        background:
-          'radial-gradient(ellipse 90% 40% at 50% -5%, rgb(167 139 250 / 0.10) 0%, transparent 55%), #07070f',
-      } as React.CSSProperties}
-    >
-      <SidebarNav />
-
-      {/* Ambiente holográfico igual que el dashboard: grilla animada + auroras difusas,
-          decorativo, detrás del contenido, sin capturar el puntero. */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <AnimatedGridPattern
-          numSquares={22}
-          maxOpacity={0.05}
-          duration={5}
-          className="absolute inset-x-0 -top-1/4 h-[140%] skew-y-12 text-cyan-300/40 [mask-image:radial-gradient(ellipse_at_top,white,transparent_75%)]"
-        />
-        <div
-          className="absolute -top-40 left-[18%] h-[480px] w-[480px] rounded-full bg-cyan-500/10 blur-[130px]"
-          style={{ animation: 'aurora 12s ease-in-out infinite alternate' }}
-        />
-        <div
-          className="absolute top-24 right-[14%] h-[440px] w-[440px] rounded-full bg-violet-500/10 blur-[130px]"
-          style={{ animation: 'aurora 14s ease-in-out infinite alternate' }}
-        />
-      </div>
-
-      {/* ── Encabezado ─────────────────────────────────────────────── */}
-      <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p
-            className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em]"
-            style={{ color: ACENTO }}
-          >
-            Motor de widgets
-          </p>
-          <h1 className="text-[32px] font-semibold leading-none tracking-tight text-white md:text-[36px]" style={{ fontFamily: TITULO }}>
-            Panel de widgets
-          </h1>
-          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/70">
-            Prendés, apagás y editás desde acá. Los cambios salen al sitio en menos de un minuto,
-            sin desplegar nada.
-          </p>
-          <div className="mt-3 flex gap-3">
-            <a href="/dashboard" className="text-xs text-white/35 transition-colors hover:text-white">
-              ← Panel de métricas
-            </a>
-            <a
-              href="https://guias.infomicelium.com.ar/guia"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-white/35 transition-colors hover:text-white"
-            >
-              Ver el sitio →
-            </a>
-          </div>
-        </div>
-
+    <PanelShell
+      titulo="Panel de widgets"
+      sub="Prendés, apagás y editás desde acá. Los cambios salen al sitio en menos de un minuto."
+      accion={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => void cargar()}>
             <RefreshCw />
@@ -215,25 +158,27 @@ export default function WidgetsPage() {
             {creando ? 'Cerrar catálogo' : (<><Plus />Agregar widget</>)}
           </Button>
         </div>
-      </div>
-
-      {/* ── Resumen del contexto ───────────────────────────────────── */}
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi
-          tono="salvia"
-          label="Prendidos"
-          valor={`${total.activos}/${delCtx.length}`}
-          sub={delCtx.length === 0 ? 'Todavía no hay widgets acá' : `en ${ctxActual.label.toLowerCase()}`}
-        />
-        <Kpi tono="celeste" label="Vistas" valor={NUM(total.impresion)} sub="últimos 30 días" />
-        <Kpi tono="durazno" label="Clics" valor={NUM(total.interaccion)} sub="interacciones registradas" />
-        <Kpi
-          tono="violeta"
-          label="Interacción"
-          valor={total.tasa === null ? '—' : `${total.tasa.toFixed(1)}%`}
-          sub={total.conversion > 0 ? `${NUM(total.conversion)} conversiones` : 'de cada vista, un clic'}
-        />
-      </div>
+      }
+    >
+      <PanelSeccion>
+        <Banda n="01">Resumen del contexto</Banda>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Kpi
+            tono="salvia"
+            label="Prendidos"
+            valor={`${total.activos}/${delCtx.length}`}
+            sub={delCtx.length === 0 ? 'Todavía no hay widgets acá' : `en ${ctxActual.label.toLowerCase()}`}
+          />
+          <Kpi tono="celeste" label="Vistas" valor={NUM(total.impresion)} sub="últimos 30 días" />
+          <Kpi tono="durazno" label="Clics" valor={NUM(total.interaccion)} sub="interacciones registradas" />
+          <Kpi
+            tono="violeta"
+            label="Interacción"
+            valor={total.tasa === null ? '—' : `${total.tasa.toFixed(1)}%`}
+            sub={total.conversion > 0 ? `${NUM(total.conversion)} conversiones` : 'de cada vista, un clic'}
+          />
+        </div>
+      </PanelSeccion>
 
       {/* ── Contextos ──────────────────────────────────────────────── */}
       <div className={`${CARD} mb-6 p-1.5`}>
@@ -250,24 +195,27 @@ export default function WidgetsPage() {
                   setCreando(false)
                 }}
                 title={c.donde}
-                className={`relative flex items-center gap-2 rounded-xl px-4 py-2.5 text-[14px] transition-colors ${activo ? 'font-semibold' : 'font-medium'}`}
-                style={{ color: activo ? ACENTO : 'rgba(255,255,255,0.5)' }}
+                className={`relative flex min-h-11 items-center gap-2 rounded-lg px-4 text-[14px] transition-colors ${activo ? 'font-semibold' : 'font-medium'}`}
+                style={{ color: activo ? ACENTO : 'var(--pnl-text-3)' }}
               >
                 {/* La píldora se desliza entre pestañas: un solo elemento con layoutId que
                     motion mueve de una posición a la otra en vez de aparecer y desaparecer. */}
                 {activo && (
                   <motion.span
                     layoutId="ctxPill"
-                    className="absolute inset-0 rounded-xl"
-                    style={{ background: 'rgb(var(--ac) / 0.15)' }}
+                    className="absolute inset-0 rounded-lg"
+                    style={{ background: 'color-mix(in srgb, var(--pnl-amber) 15%, transparent)' }}
                     transition={{ type: 'spring', stiffness: 320, damping: 30 }}
                   />
                 )}
                 <span className="relative z-10 text-base leading-none">{c.icono}</span>
                 <span className="relative z-10">{c.label}</span>
                 <span
-                  className="relative z-10 rounded-md px-1.5 py-0.5 font-mono text-[10px]"
-                  style={{ background: activo ? 'rgb(var(--ac) / 0.22)' : '#191922', color: activo ? ACENTO : 'rgba(255,255,255,0.5)' }}
+                  className="num relative z-10 rounded-md px-1.5 py-0.5 text-[10px]"
+                  style={{
+                    background: activo ? 'color-mix(in srgb, var(--pnl-amber) 22%, transparent)' : 'var(--pnl-panel-2)',
+                    color: activo ? ACENTO : 'var(--pnl-text-3)',
+                  }}
                 >
                   {n}
                 </span>
@@ -276,66 +224,70 @@ export default function WidgetsPage() {
           })}
         </div>
       </div>
-      <p className="-mt-4 mb-6 text-[13px] text-white/45">{ctxActual.donde}.</p>
+      <p className="-mt-4 mb-6 text-[13px] text-[var(--pnl-text-3)]">{ctxActual.donde}.</p>
 
-      {/* ── Catálogo por categoría ─────────────────────────────────── */}
-      {creando && <Catalogo tipos={disponibles} onElegir={t => void crear(t)} />}
+      <PanelSeccion>
+        <Banda n="02">{creando ? 'Catálogo' : editando ? 'Editar widget' : 'Widgets activos'}</Banda>
 
-      {/* ── Rendimiento ────────────────────────────────────────────
-          Arriba de la lista y no escondido en otra pantalla: la decisión que importa es
-          cuál apagar, y esa se toma mirando los números al lado de los widgets. */}
-      {!editando && !creando && <Metricas />}
+        {/* ── Catálogo por categoría ─────────────────────────────────── */}
+        {creando && <Catalogo tipos={disponibles} onElegir={t => void crear(t)} />}
 
-      {/* ── Lista o editor ─────────────────────────────────────────── */}
-      {cargando ? (
-        <p className="text-sm text-white/35">Cargando…</p>
-      ) : editando ? (
-        <Editor
-          widget={editando}
-          tipo={tipoDe(editando.tipo)}
-          paginas={paginas}
-          productos={productos}
-          resenas={resenas}
-          guardando={guardando}
-          activo={widgets.find(w => w.id === editando.id)?.activo ?? false}
-          onCerrar={() => setEditando(null)}
-          onCambio={setEditando}
-          onToggle={() =>
-            patch({ id: editando.id, activo: !(widgets.find(w => w.id === editando.id)?.activo ?? false) })
-          }
-          onGuardar={async () => {
-            await patch({
-              id: editando.id,
-              nombre: editando.nombre,
-              config: editando.config,
-              reglas: editando.reglas ?? {},
-            })
-            setToast('Cambios guardados')
-          }}
-          onBorrar={() => void borrar(editando)}
-        />
-      ) : delCtx.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/15 bg-[#0e0e16] p-12 text-center">
-          <p className="text-sm text-white/50">Todavía no hay widgets en {ctxActual.label.toLowerCase()}.</p>
-          <Button size="sm" className="mt-3" onClick={() => setCreando(true)}>
-            Ver el catálogo
-          </Button>
-        </div>
-      ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {delCtx.map(w => (
-            <TarjetaWidget
-              key={w.id}
-              widget={w}
-              tipo={tipoDe(w.tipo)}
-              metrica={metricas[w.id] ?? { impresion: 0, interaccion: 0, conversion: 0 }}
-              maxImpresion={Math.max(1, ...delCtx.map(x => metricas[x.id]?.impresion ?? 0))}
-              onToggle={() => void patch({ id: w.id, activo: !w.activo })}
-              onEditar={() => setEditando(w)}
-            />
-          ))}
-        </div>
-      )}
+        {/* ── Rendimiento ────────────────────────────────────────────
+            Arriba de la lista y no escondido en otra pantalla: la decisión que importa es
+            cuál apagar, y esa se toma mirando los números al lado de los widgets. */}
+        {!editando && !creando && <Metricas />}
+
+        {/* ── Lista o editor ─────────────────────────────────────────── */}
+        {cargando ? (
+          <p className="text-sm text-[var(--pnl-text-3)]">Cargando…</p>
+        ) : editando ? (
+          <Editor
+            widget={editando}
+            tipo={tipoDe(editando.tipo)}
+            paginas={paginas}
+            productos={productos}
+            resenas={resenas}
+            guardando={guardando}
+            activo={widgets.find(w => w.id === editando.id)?.activo ?? false}
+            onCerrar={() => setEditando(null)}
+            onCambio={setEditando}
+            onToggle={() =>
+              patch({ id: editando.id, activo: !(widgets.find(w => w.id === editando.id)?.activo ?? false) })
+            }
+            onGuardar={async () => {
+              await patch({
+                id: editando.id,
+                nombre: editando.nombre,
+                config: editando.config,
+                reglas: editando.reglas ?? {},
+              })
+              setToast('Cambios guardados')
+            }}
+            onBorrar={() => void borrar(editando)}
+          />
+        ) : delCtx.length === 0 ? (
+          <div className="rounded-md border border-dashed border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-12 text-center">
+            <p className="text-sm text-[var(--pnl-text-2)]">Todavía no hay widgets en {ctxActual.label.toLowerCase()}.</p>
+            <Button size="sm" className="mt-3" onClick={() => setCreando(true)}>
+              Ver el catálogo
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {delCtx.map(w => (
+              <TarjetaWidget
+                key={w.id}
+                widget={w}
+                tipo={tipoDe(w.tipo)}
+                metrica={metricas[w.id] ?? { impresion: 0, interaccion: 0, conversion: 0 }}
+                maxImpresion={Math.max(1, ...delCtx.map(x => metricas[x.id]?.impresion ?? 0))}
+                onToggle={() => void patch({ id: w.id, activo: !w.activo })}
+                onEditar={() => setEditando(w)}
+              />
+            ))}
+          </div>
+        )}
+      </PanelSeccion>
 
       {/* Acuse de guardado: confirmación breve, sale y entra con motion, se borra solo. */}
       <AnimatePresence>
@@ -345,13 +297,13 @@ export default function WidgetsPage() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 14, scale: 0.96 }}
             transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-            className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.12] px-4 py-2.5 text-sm font-medium text-emerald-300 shadow-lg backdrop-blur-md"
+            className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-md border border-[rgba(76,175,125,.25)] bg-[rgba(76,175,125,.12)] px-4 py-2.5 text-sm font-medium text-[var(--pnl-green-text)] shadow-lg backdrop-blur-md"
           >
             <Check className="size-4" /> {toast}
           </motion.div>
         )}
       </AnimatePresence>
-    </main>
+    </PanelShell>
   )
 }
 
@@ -371,19 +323,20 @@ function Kpi({
 }) {
   const t = TONOS[tono]
   return (
+    // Sin BorderBeam: es un efecto de hero (Magic UI), no de tarjeta de KPI — es
+    // justo el patrón que generaba el scroll horizontal en el dashboard viejo.
     <div
-      className="relative flex min-h-[116px] flex-col justify-between overflow-hidden rounded-2xl border p-4"
+      className="relative flex min-h-[116px] flex-col justify-between rounded-md border p-4"
       style={{ background: t.fondo, borderColor: t.borde }}
     >
-      <BorderBeam size={80} duration={9} borderWidth={1.5} colorFrom="#22d3ee" colorTo="#a78bfa" className="opacity-60" />
-      <p className="text-[11px] font-semibold uppercase leading-none tracking-[0.15em] text-white/50">
+      <p className="text-[11px] font-semibold uppercase leading-none tracking-[0.15em] text-[var(--pnl-text-3)]">
         {label}
       </p>
       <div>
-        <p className="font-mono text-[34px] font-bold leading-none tracking-tight text-white">
+        <p className="num text-[34px] font-bold leading-none tracking-tight text-[var(--pnl-text)]">
           <NumeroRodante value={valor} />
         </p>
-        {sub && <p className="mt-2 text-[12px] leading-snug text-white/50">{sub}</p>}
+        {sub && <p className="mt-2 text-[12px] leading-snug text-[var(--pnl-text-3)]">{sub}</p>}
       </div>
     </div>
   )
@@ -423,7 +376,7 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
                 </span>
                 <span className="h-px flex-1" style={{ background: `${cat.color}33` }} />
               </div>
-              <p className="mb-3 ml-[38px] text-[13px] leading-relaxed text-white/45">{cat.para}</p>
+              <p className="mb-3 ml-[38px] text-[13px] leading-relaxed text-[var(--pnl-text-3)]">{cat.para}</p>
               <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                 {delGrupo.map((t, i) => (
                   <motion.button
@@ -438,7 +391,7 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
                     title={[t.descripcion, t.uso, t.cuidado && `⚠ ${t.cuidado}`]
                       .filter(Boolean)
                       .join('\n\n')}
-                    className="group flex items-start gap-3 rounded-xl border border-white/10 bg-[#111119] p-3.5 text-left transition-all hover:border-white/20 hover:bg-[#191922]"
+                    className="group flex items-start gap-3 rounded-xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] p-3.5 text-left transition-all hover:border-[var(--pnl-track)] hover:bg-[var(--pnl-track)]"
                     style={{ borderLeft: `2px solid ${cat.color}88` }}
                   >
                     <span
@@ -449,19 +402,19 @@ function Catalogo({ tipos, onElegir }: { tipos: TipoWidget[]; onElegir: (t: Tipo
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5">
-                        <span className="truncate text-[15px] font-semibold text-white">{t.nombre}</span>
+                        <span className="truncate text-[15px] font-semibold text-[var(--pnl-text)]">{t.nombre}</span>
                         {t.cuidado && (
-                          <span className="text-[11px] text-amber-600" title={t.cuidado}>
+                          <span className="text-[11px] text-[var(--pnl-amber)]" title={t.cuidado}>
                             ⚠
                           </span>
                         )}
                         {t.datosVivos && (
-                          <span className="text-[11px] text-emerald-600" title="Se llena solo con datos reales del sitio">
+                          <span className="text-[11px] text-[var(--pnl-green-text)]" title="Se llena solo con datos reales del sitio">
                             ⚡
                           </span>
                         )}
                       </span>
-                      <span className="mt-1 line-clamp-2 block text-[13px] leading-relaxed text-white/50">
+                      <span className="mt-1 line-clamp-2 block text-[13px] leading-relaxed text-[var(--pnl-text-3)]">
                         {t.descripcion}
                       </span>
                     </span>
@@ -506,8 +459,8 @@ function TarjetaWidget({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: w.activo ? 1 : 0.6, y: 0 }}
       transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-      className={`${CARD} p-4 hover:border-white/15`}
-      style={{ borderLeft: `2px solid ${w.activo ? cat.color : 'rgba(255,255,255,0.15)'}` }}
+      className={`${CARD} p-4 hover:border-[var(--pnl-hair)]`}
+      style={{ borderLeft: `2px solid ${w.activo ? cat.color : 'var(--pnl-track)'}` }}
     >
       <div className="flex items-start gap-3">
         <div className="mt-0.5" title={w.activo ? 'Prendido — se está viendo en el sitio' : 'Apagado'}>
@@ -523,8 +476,8 @@ function TarjetaWidget({
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold text-white">{w.nombre}</p>
-          <p className="mt-0.5 truncate text-[12px] text-white/45">{tipo?.nombre ?? w.tipo}</p>
+          <p className="truncate text-[15px] font-semibold text-[var(--pnl-text)]">{w.nombre}</p>
+          <p className="mt-0.5 truncate text-[12px] text-[var(--pnl-text-3)]">{tipo?.nombre ?? w.tipo}</p>
         </div>
 
         <Button variant="outline" size="sm" onClick={onEditar}>
@@ -559,7 +512,7 @@ function Dato({ valor, label, acento }: { valor: string; label: string; acento?:
       <p className="font-mono text-lg font-bold leading-none" style={{ color: acento ?? '#fff' }}>
         <NumeroRodante value={valor} />
       </p>
-      <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-white/45">{label}</p>
+      <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--pnl-text-3)]">{label}</p>
     </div>
   )
 }
@@ -645,7 +598,7 @@ function Editor({
         <span className={SUBSECCION}>{tipo.nombre}</span>
         <div className="ml-auto flex items-center gap-2">
           <Switch checked={activo} onCheckedChange={onToggle} />
-          <span className={`text-xs font-medium ${activo ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+          <span className={`text-xs font-medium ${activo ? 'text-[var(--pnl-green-text)]' : 'text-muted-foreground'}`}>
             {activo ? 'Al aire' : 'Apagado'}
           </span>
         </div>
@@ -666,16 +619,16 @@ function Editor({
             transition={{ duration: 0.22, ease: 'easeOut' }}
             className="mb-4 overflow-hidden"
           >
-            <div className="space-y-1.5 rounded-2xl border border-amber-500/25 bg-amber-500/[0.08] p-3.5">
+            <div className="space-y-1.5 rounded-2xl border border-[rgba(245,166,35,.25)] bg-[rgba(245,166,35,.08)] p-3.5">
               {avisos.map((a, i) => (
                 <div key={i} className="flex items-start gap-2 text-[13px] leading-relaxed">
                   <span
-                    className={`mt-px text-[10px] leading-4 ${a.nivel === 'error' ? 'text-red-400' : 'text-amber-400'}`}
+                    className={`mt-px text-[10px] leading-4 ${a.nivel === 'error' ? 'text-[var(--pnl-red-text)]' : 'text-[var(--pnl-amber)]'}`}
                     aria-hidden
                   >
                     {a.nivel === 'error' ? '●' : '▲'}
                   </span>
-                  <span className="text-amber-100/90">{a.mensaje}</span>
+                  <span className="text-[var(--pnl-text)]">{a.mensaje}</span>
                 </div>
               ))}
             </div>
@@ -689,8 +642,8 @@ function Editor({
           {/* Qué hace y qué necesita, arriba de todo: configurar un widget no debería
               requerir acordarse de nada ni preguntar. */}
           <div className={`${CARD} p-4`} style={{ borderLeft: `2px solid ${cat.color}88` }}>
-            <p className="text-[14px] leading-relaxed text-white/70">{tipo.descripcion}</p>
-            <p className="mt-2 text-[13px] leading-relaxed text-white/50">{tipo.uso}</p>
+            <p className="text-[14px] leading-relaxed text-[var(--pnl-text-2)]">{tipo.descripcion}</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-[var(--pnl-text-3)]">{tipo.uso}</p>
             {tipo.cuidado && <p className={`mt-2 ${AVISO}`}>⚠ {tipo.cuidado}</p>}
           </div>
 
@@ -747,13 +700,13 @@ function Editor({
             <div className="space-y-5">
               <div>
                 <label className={LABEL}>En qué páginas</label>
-                <p className="mb-2 text-[13px] leading-relaxed text-white/50">
+                <p className="mb-2 text-[13px] leading-relaxed text-[var(--pnl-text-3)]">
                   Sin marcar ninguna, aparece en todas. Marcá solo si querés acotarlo.
                 </p>
                 {/* Casillas con las páginas que existen de verdad. Antes había que escribir la
                     dirección a mano, que es la forma más fácil de equivocarse en una letra y no
                     enterarse nunca. */}
-                <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-[#0e0e16] p-2.5">
+                <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-2.5">
                   {/* Las páginas del contexto del widget van arriba: en un widget de ficha de
                       producto, las fichas son lo único que se va a marcar, y buscarlas abajo de
                       veinte guías es la parte del panel que más cuesta. */}
@@ -768,7 +721,7 @@ function Editor({
                     return (
                       <label
                         key={p.ruta}
-                        className="flex cursor-pointer items-start gap-2 rounded-lg px-1.5 py-1 text-xs text-white/70 hover:bg-[#191922]"
+                        className="flex cursor-pointer items-start gap-2 rounded-lg px-1.5 py-1 text-xs text-[var(--pnl-text-2)] hover:bg-[var(--pnl-track)]"
                       >
                         <input
                           type="checkbox"
@@ -813,13 +766,13 @@ function Editor({
 
               <div>
                 <label className={LABEL}>Ventana de fechas</label>
-                <p className="mb-2 text-[13px] leading-relaxed text-white/50">
+                <p className="mb-2 text-[13px] leading-relaxed text-[var(--pnl-text-3)]">
                   Opcional. Fuera de la ventana el widget ni siquiera se envía a la página, así que
                   una promoción vencida no queda escondida en el código a la vista de nadie.
                 </p>
                 <div className="flex gap-3">
                   <div>
-                    <label className="mb-1 block text-[11px] text-white/50">Desde</label>
+                    <label className="mb-1 block text-[11px] text-[var(--pnl-text-3)]">Desde</label>
                     <Input
                       type="date"
                       value={(reglas.desde ?? '').slice(0, 10)}
@@ -827,7 +780,7 @@ function Editor({
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[11px] text-white/50">Hasta</label>
+                    <label className="mb-1 block text-[11px] text-[var(--pnl-text-3)]">Hasta</label>
                     <Input
                       type="date"
                       value={(reglas.hasta ?? '').slice(0, 10)}

@@ -1,8 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { SidebarNav } from '@/components/SidebarNav'
-import { FondoHolografico } from '@/components/FondoHolografico'
+import { PanelShell } from '@/components/PanelShell'
 import { PanelApicultura } from '@/components/PanelApicultura'
 import { PanelPreguntasML } from '@/components/PanelPreguntasML'
 
@@ -135,30 +134,26 @@ export default function ConversacionesPage() {
   }, [convs, actual])
   const conteo = (f: (c: Conversacion) => boolean) => todas.filter(f).length
 
+  const titulo = vista === 'bot'
+    ? `Conversaciones del bot${canal === 'todos' ? '' : ` · ${NOMBRE_CANAL[canal]}`}`
+    : vista === 'apicultura'
+      ? 'Despachos apícolas'
+      : 'Preguntas de MercadoLibre'
+
   return (
-    <div className="fx-holo fx-charts relative isolate min-h-screen bg-[#0a0a12] text-white max-lg:pt-14 lg:pl-[256px]">
-      <SidebarNav />
-      <FondoHolografico />
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        {/* Header */}
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">
-              {vista === 'bot'
-                ? `Conversaciones del bot${canal === 'todos' ? '' : ` · ${NOMBRE_CANAL[canal]}`}`
-                : vista === 'apicultura'
-                  ? 'Despachos apícolas · WhatsApp al tío'
-                  : 'Preguntas de MercadoLibre · MICELIUMSTORE'}
-            </h1>
-            <a href="/dashboard" className="text-xs text-white/40 hover:text-white/70">← Volver al dashboard</a>
-          </div>
-          <div className={`flex items-center gap-2 ${vista === 'bot' ? '' : 'hidden'}`}>
-            <div className="flex rounded-xl border border-white/[0.08] bg-[#0e0e16] p-1">
+    <PanelShell
+      titulo={titulo}
+      sub={vista === 'apicultura' ? 'WhatsApp al tío' : vista === 'ml-preguntas' ? 'MICELIUMSTORE' : undefined}
+      accion={
+        vista === 'bot' ? (
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] p-1">
               {RANGOS.map((r) => (
                 <button
                   key={r.days}
                   onClick={() => { setDays(r.days); setSel(null) }}
-                  className={`rounded-lg px-3 py-1 text-xs transition ${days === r.days ? 'bg-white/[0.1] text-white' : 'text-white/50 hover:text-white/80'}`}
+                  aria-pressed={days === r.days}
+                  className={`min-h-9 rounded-md px-3 text-xs transition-colors ${days === r.days ? 'bg-[var(--pnl-track)] text-[var(--pnl-text)]' : 'text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)]'}`}
                 >
                   {r.label}
                 </button>
@@ -166,231 +161,233 @@ export default function ConversacionesPage() {
             </div>
             <button
               onClick={cargar}
-              className="rounded-xl border border-white/[0.08] bg-[#0e0e16] px-3 py-1.5 text-xs text-white/60 hover:text-white"
+              className="min-h-9 rounded-lg border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] px-3 text-xs text-[var(--pnl-text-2)] hover:text-[var(--pnl-text)]"
             >
-              ↻ Actualizar
+              Actualizar
             </button>
           </div>
-        </div>
+        ) : undefined
+      }
+    >
+      <div className="flex gap-0 overflow-x-auto border-b border-[var(--pnl-hair)]">
+        {([['bot', 'Clientes (bot)'], ['apicultura', 'Apicultura'], ['ml-preguntas', 'Preguntas ML']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setVista(id)}
+            aria-selected={vista === id}
+            role="tab"
+            className={`min-h-11 whitespace-nowrap border-b-2 px-4 text-[13.5px] transition-colors ${
+              vista === id
+                ? 'border-[var(--pnl-amber)] font-semibold text-[var(--pnl-text)]'
+                : 'border-transparent text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-        {/* Pestañas */}
-        <div className="mb-4 flex gap-1 border-b border-white/[0.06]">
-          {([['bot', 'Clientes (bot)'], ['apicultura', 'Apicultura'], ['ml-preguntas', 'Preguntas ML']] as const).map(([id, label]) => (
-            <button
-              key={id}
-              onClick={() => setVista(id)}
-              className={`-mb-px border-b-2 px-3 py-2 text-sm transition ${
-                vista === id
-                  ? 'border-white/60 text-white'
-                  : 'border-transparent text-white/45 hover:text-white/75'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      {vista === 'apicultura' && <PanelApicultura />}
+      {vista === 'ml-preguntas' && <PanelPreguntasML />}
 
-        {vista === 'apicultura' && <PanelApicultura />}
-        {vista === 'ml-preguntas' && <PanelPreguntasML />}
-
-        {/* Filtros por categoría (clickeables) + búsqueda */}
-        {vista === 'bot' && t && (
-          <div className="mb-4 space-y-3">
-            {/* Canal. Es la pregunta más gruesa —por dónde entró— así que pesa distinto que
-                los filtros de categoría: tarjetas grandes, color de la plataforma y el número
-                bien visible. La primera versión eran píldoras chicas y grises, indistinguibles
-                de la fila de abajo; en una pantalla donde el canal es lo que hay que vigilar,
-                eso lo volvía invisible. */}
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-              {CANALES.map((ch) => {
-                const activo = canal === ch.id
-                const n = ch.id === 'todos'
-                  ? (t.porCanal ? t.porCanal.wa + t.porCanal.ig + t.porCanal.messenger + t.porCanal.facebook : t.conversaciones)
-                  : (t.porCanal?.[ch.id] ?? 0)
-                return (
-                  <button
-                    key={ch.id}
-                    onClick={() => { setCanal(ch.id); setSel(null) }}
-                    style={activo ? { borderColor: ch.color, background: `${ch.color}1a` } : undefined}
-                    className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition ${
-                      activo
-                        ? 'text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04)]'
-                        : 'border-white/[0.07] bg-[#0e0e16] text-white/55 hover:border-white/[0.16] hover:text-white/90'
-                    }`}
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{ background: ch.color, boxShadow: activo ? `0 0 8px ${ch.color}` : undefined }}
-                      />
-                      <span className="truncate text-sm font-medium">{ch.label}</span>
-                    </span>
-                    <span
-                      className="shrink-0 text-lg font-semibold tabular-nums"
-                      style={{ color: activo ? ch.color : undefined }}
-                    >
-                      {n}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.05] pt-3">
-              <span className="mr-1 text-[10px] uppercase tracking-widest text-white/25">Categoría</span>
-              {FILTROS.map((f) => {
-                const n = conteo(f.test)
-                const activo = filtro === f.id
-                return (
-                  <button
-                    key={f.id}
-                    onClick={() => { setFiltro(f.id); setSel(null) }}
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition ${
-                      activo ? 'border-white/[0.2] bg-[#1e1e28] text-white' : 'border-white/[0.06] bg-[#0e0e16] text-white/55 hover:text-white/90'
-                    }`}
-                  >
-                    {f.color && <span className="inline-block h-2 w-2 rounded-full" style={{ background: f.color }} />}
-                    <span>{f.label}</span>
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activo ? 'bg-white/[0.15]' : 'bg-[#191922] text-white/50'}`}>{n}</span>
-                  </button>
-                )
-              })}
-            </div>
-            <input
-              value={q}
-              onChange={(e) => { setQ(e.target.value); setSel(null) }}
-              placeholder="Buscar por nombre, número o texto del mensaje…"
-              className="w-full rounded-xl border border-white/[0.08] bg-[#0e0e16] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-white/[0.2] focus:outline-none sm:max-w-md"
-            />
-          </div>
-        )}
-
-        {vista === 'bot' && loading && <p className="text-sm text-white/40">Cargando…</p>}
-        {vista === 'bot' && !loading && convs.length === 0 && (
-          <p className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 text-sm text-white/40">
-            No hay conversaciones en este período.
-          </p>
-        )}
-
-        {vista === 'bot' && !loading && convs.length > 0 && (
-          <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-            {/* Lista */}
-            <div className={`space-y-1.5 ${actual ? 'hidden lg:block' : ''}`}>
-              {convs.map((c) => (
+      {/* Filtros por categoría (clickeables) + búsqueda */}
+      {vista === 'bot' && t && (
+        <div className="flex flex-col gap-3">
+          {/* Canal. Es la pregunta más gruesa —por dónde entró— así que pesa distinto que
+              los filtros de categoría: tarjetas grandes, color de la plataforma y el número
+              bien visible. La primera versión eran píldoras chicas y grises, indistinguibles
+              de la fila de abajo; en una pantalla donde el canal es lo que hay que vigilar,
+              eso lo volvía invisible. */}
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {CANALES.map((ch) => {
+              const activo = canal === ch.id
+              const n = ch.id === 'todos'
+                ? (t.porCanal ? t.porCanal.wa + t.porCanal.ig + t.porCanal.messenger + t.porCanal.facebook : t.conversaciones)
+                : (t.porCanal?.[ch.id] ?? 0)
+              return (
                 <button
-                  key={claveDe(c)}
-                  onClick={() => setSel(claveDe(c))}
-                  className={`w-full rounded-xl border p-3 text-left transition ${
-                    sel === claveDe(c)
-                      ? 'border-white/[0.15] bg-[#191922]'
-                      : 'border-white/[0.06] bg-[#0e0e16] hover:bg-[#14141c]'
+                  key={ch.id}
+                  onClick={() => { setCanal(ch.id); setSel(null) }}
+                  style={activo ? { borderColor: ch.color, background: `${ch.color}1a` } : undefined}
+                  className={`flex min-h-11 items-center justify-between gap-2 rounded-md border px-3 text-left transition-colors ${
+                    activo
+                      ? 'text-[var(--pnl-text)]'
+                      : 'border-[var(--pnl-hair)] bg-[var(--pnl-panel)] text-[var(--pnl-text-2)] hover:border-[var(--pnl-track)] hover:text-[var(--pnl-text)]'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <span
-                        className="size-1.5 shrink-0 rounded-full"
-                        style={{ background: COLOR_CANAL[c.canal] ?? '#a3a3a0' }}
-                        title={NOMBRE_CANAL[c.canal] ?? c.canal}
-                      />
-                      <span className="truncate text-sm font-medium">{c.nombre || telLindo(c.sender, c.canal)}</span>
-                    </span>
-                    <span className="shrink-0 text-[10px] text-white/35">{hora(c.ultimoTs)}</span>
-                  </div>
-                  <div className="mt-0.5 truncate text-xs text-white/45">
-                    {c.mensajes[c.mensajes.length - 1]?.text || ''}
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {c.derivada && <Badge color="#f59e0b">derivado</Badge>}
-                    {c.seguimiento && <Badge color="#60a5fa">seguimiento</Badge>}
-                    {c.manual && <Badge color="#34d399">manual</Badge>}
-                    {c.feedback && <Badge color="#c084fc">feedback</Badge>}
-                    {c.error && <Badge color="#f87171">error</Badge>}
-                  </div>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ background: ch.color, boxShadow: activo ? `0 0 8px ${ch.color}` : undefined }}
+                    />
+                    <span className="truncate text-sm font-medium">{ch.label}</span>
+                  </span>
+                  <span
+                    className="num shrink-0 text-lg font-semibold"
+                    style={{ color: activo ? ch.color : undefined }}
+                  >
+                    {n}
+                  </span>
                 </button>
-              ))}
-            </div>
+              )
+            })}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-[var(--pnl-hair)] pt-3">
+            <span className="mr-1 text-[10px] uppercase tracking-widest text-[var(--pnl-text-3)]">Categoría</span>
+            {FILTROS.map((f) => {
+              const n = conteo(f.test)
+              const activo = filtro === f.id
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => { setFiltro(f.id); setSel(null) }}
+                  aria-pressed={activo}
+                  className={`flex min-h-9 items-center gap-2 rounded-full border px-3 text-xs transition-colors ${
+                    activo ? 'border-[var(--pnl-track)] bg-[var(--pnl-panel-2)] text-[var(--pnl-text)]' : 'border-[var(--pnl-hair)] bg-[var(--pnl-panel)] text-[var(--pnl-text-2)] hover:text-[var(--pnl-text)]'
+                  }`}
+                >
+                  {f.color && <span className="inline-block size-2 rounded-full" style={{ background: f.color }} />}
+                  <span>{f.label}</span>
+                  <span className={`num rounded-full px-1.5 py-0.5 text-[10px] ${activo ? 'bg-[var(--pnl-track)]' : 'bg-[var(--pnl-panel-2)] text-[var(--pnl-text-3)]'}`}>{n}</span>
+                </button>
+              )
+            })}
+          </div>
+          <input
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setSel(null) }}
+            placeholder="Buscar por nombre, número o texto del mensaje…"
+            className="min-h-11 w-full rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] px-3 text-sm text-[var(--pnl-text)] placeholder:text-[var(--pnl-text-3)] focus-visible:border-[var(--pnl-track)] focus-visible:outline-2 focus-visible:outline-[var(--pnl-amber)] sm:max-w-md"
+          />
+        </div>
+      )}
 
-            {/* Hilo */}
-            <div className={`rounded-2xl border border-white/[0.06] bg-[#0e0e16] ${actual ? '' : 'hidden lg:block'}`}>
-              {actual ? (
-                <div className="flex h-full flex-col">
-                  <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] p-4">
-                    <div>
-                      <div className="flex items-center gap-1.5 text-sm font-semibold">
-                        <span
-                          className="size-2 shrink-0 rounded-full"
-                          style={{ background: COLOR_CANAL[actual.canal] ?? '#a3a3a0' }}
-                        />
-                        {actual.nombre || telLindo(actual.sender, actual.canal)}
-                      </div>
-                      {actual.canal === 'wa' ? (
-                        <a
-                          href={`https://wa.me/${actual.sender.replace(/\D/g, '')}`}
-                          target="_blank"
-                          className="text-[11px] text-white/40 hover:text-white/70"
-                        >
-                          {telLindo(actual.sender)} · abrir en WhatsApp ↗
-                        </a>
-                      ) : (
-                        <span className="text-[11px] text-white/40">
-                          {actual.usuario ? `@${actual.usuario} · ` : ''}
-                          {NOMBRE_CANAL[actual.canal] ?? actual.canal} · se responde desde la app de Meta
-                        </span>
-                      )}
+      {vista === 'bot' && loading && <p className="text-sm text-[var(--pnl-text-3)]">Cargando…</p>}
+      {vista === 'bot' && !loading && convs.length === 0 && (
+        <p className="rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6 text-sm text-[var(--pnl-text-3)]">
+          No hay conversaciones en este período.
+        </p>
+      )}
+
+      {vista === 'bot' && !loading && convs.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+          {/* Lista */}
+          <div className={`flex flex-col gap-1.5 ${actual ? 'hidden lg:flex' : ''}`}>
+            {convs.map((c) => (
+              <button
+                key={claveDe(c)}
+                onClick={() => setSel(claveDe(c))}
+                className={`w-full rounded-md border p-3 text-left transition-colors ${
+                  sel === claveDe(c)
+                    ? 'border-[var(--pnl-track)] bg-[var(--pnl-panel-2)]'
+                    : 'border-[var(--pnl-hair)] bg-[var(--pnl-panel)] hover:bg-[var(--pnl-panel-2)]'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span
+                      className="size-1.5 shrink-0 rounded-full"
+                      style={{ background: COLOR_CANAL[c.canal] ?? '#a3a3a0' }}
+                      title={NOMBRE_CANAL[c.canal] ?? c.canal}
+                    />
+                    <span className="truncate text-sm font-medium text-[var(--pnl-text)]">{c.nombre || telLindo(c.sender, c.canal)}</span>
+                  </span>
+                  <span className="num shrink-0 text-[10px] text-[var(--pnl-text-3)]">{hora(c.ultimoTs)}</span>
+                </div>
+                <div className="mt-0.5 truncate text-xs text-[var(--pnl-text-3)]">
+                  {c.mensajes[c.mensajes.length - 1]?.text || ''}
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {c.derivada && <Badge color="#F5A623">derivado</Badge>}
+                  {c.seguimiento && <Badge color="#7E86B8">seguimiento</Badge>}
+                  {c.manual && <Badge color="#4CAF7D">manual</Badge>}
+                  {c.feedback && <Badge color="#969DC9">feedback</Badge>}
+                  {c.error && <Badge color="#E8503A">error</Badge>}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Hilo */}
+          <div className={`rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] ${actual ? '' : 'hidden lg:block'}`}>
+            {actual ? (
+              <div className="flex h-full flex-col">
+                <div className="flex items-center justify-between gap-2 border-b border-[var(--pnl-hair)] p-4">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-[var(--pnl-text)]">
+                      <span
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ background: COLOR_CANAL[actual.canal] ?? '#a3a3a0' }}
+                      />
+                      {actual.nombre || telLindo(actual.sender, actual.canal)}
                     </div>
-                    <button onClick={() => setSel(null)} className="text-xs text-white/40 hover:text-white/70 lg:hidden">
-                      ← Lista
-                    </button>
+                    {actual.canal === 'wa' ? (
+                      <a
+                        href={`https://wa.me/${actual.sender.replace(/\D/g, '')}`}
+                        target="_blank"
+                        className="text-[11px] text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)]"
+                      >
+                        {telLindo(actual.sender)} · abrir en WhatsApp ↗
+                      </a>
+                    ) : (
+                      <span className="text-[11px] text-[var(--pnl-text-3)]">
+                        {actual.usuario ? `@${actual.usuario} · ` : ''}
+                        {NOMBRE_CANAL[actual.canal] ?? actual.canal} · se responde desde la app de Meta
+                      </span>
+                    )}
                   </div>
-                  <div className="space-y-3 p-4">
-                    {actual.mensajes.map((m, i) => (
-                      <div key={i} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-                        <div
-                          className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${
-                            m.role === 'user'
-                              ? m.archivo
-                                ? 'border border-white/10 bg-[#191922] italic text-white/60'
-                                : 'bg-[#191922] text-white/90'
-                              : m.auto
-                                // Automatización: no es el bot conversando, es un envío
-                                // programado. Se distingue para no leerlo como respuesta.
-                                ? 'border border-white/10 bg-white/[0.04] italic text-white/55'
-                                : m.derivar
-                                  ? 'bg-amber-500/15 text-amber-100'
-                                  : 'bg-emerald-500/15 text-emerald-50'
-                          }`}
-                        >
-                          <p className="whitespace-pre-wrap break-words">{m.text}</p>
-                          <div className="mt-1 flex items-center justify-end gap-1.5 text-[10px] text-white/35">
-                            {m.accion && <span className="rounded bg-white/10 px-1">{m.accion}</span>}
-                            <span>{hora(m.ts)}</span>
-                          </div>
+                  <button onClick={() => setSel(null)} className="min-h-9 text-xs text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)] lg:hidden">
+                    ← Lista
+                  </button>
+                </div>
+                <div className="flex flex-col gap-3 p-4">
+                  {actual.mensajes.map((m, i) => (
+                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                      <div
+                        className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${
+                          m.role === 'user'
+                            ? m.archivo
+                              ? 'border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] italic text-[var(--pnl-text-2)]'
+                              : 'bg-[var(--pnl-panel-2)] text-[var(--pnl-text)]'
+                            : m.auto
+                              // Automatización: no es el bot conversando, es un envío
+                              // programado. Se distingue para no leerlo como respuesta.
+                              ? 'border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] italic text-[var(--pnl-text-2)]'
+                              : m.derivar
+                                ? 'bg-[rgba(245,166,35,.15)] text-[var(--pnl-text)]'
+                                : 'bg-[rgba(76,175,125,.15)] text-[var(--pnl-text)]'
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                        <div className="mt-1 flex items-center justify-end gap-1.5 text-[10px] text-[var(--pnl-text-3)]">
+                          {m.accion && <span className="rounded bg-[var(--pnl-track)] px-1">{m.accion}</span>}
+                          <span className="num">{hora(m.ts)}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                  {/* Responder desde el panel solo funciona en WhatsApp: la ruta usa la Cloud
-                      API con el número de la marca. Instagram y Messenger se contestan desde
-                      la app de Meta, y decirlo es mejor que ofrecer un campo que falla. */}
-                  {actual.canal === 'wa' ? (
-                    <Responder sender={actual.sender} onEnviado={cargar} />
-                  ) : (
-                    <div className="border-t border-white/[0.06] p-4 text-xs text-white/40">
-                      Desde acá solo se responde por WhatsApp. Este hilo entró por{' '}
-                      {NOMBRE_CANAL[actual.canal] ?? actual.canal}: contestalo desde la app de Meta.
                     </div>
-                  )}
+                  ))}
                 </div>
-              ) : (
-                <div className="flex h-40 items-center justify-center text-sm text-white/30">
-                  Elegí una conversación
-                </div>
-              )}
-            </div>
+                {/* Responder desde el panel solo funciona en WhatsApp: la ruta usa la Cloud
+                    API con el número de la marca. Instagram y Messenger se contestan desde
+                    la app de Meta, y decirlo es mejor que ofrecer un campo que falla. */}
+                {actual.canal === 'wa' ? (
+                  <Responder sender={actual.sender} onEnviado={cargar} />
+                ) : (
+                  <div className="border-t border-[var(--pnl-hair)] p-4 text-xs text-[var(--pnl-text-3)]">
+                    Desde acá solo se responde por WhatsApp. Este hilo entró por{' '}
+                    {NOMBRE_CANAL[actual.canal] ?? actual.canal}: contestalo desde la app de Meta.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex h-40 items-center justify-center text-sm text-[var(--pnl-text-3)]">
+                Elegí una conversación
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </PanelShell>
   )
 }
 
@@ -436,7 +433,7 @@ function Responder({ sender, onEnviado }: { sender: string; onEnviado: () => voi
   }
 
   return (
-    <div className="border-t border-white/[0.06] p-4">
+    <div className="border-t border-[var(--pnl-hair)] p-4">
       <div className="flex items-end gap-2">
         <textarea
           value={texto}
@@ -450,17 +447,17 @@ function Responder({ sender, onEnviado }: { sender: string; onEnviado: () => voi
           }}
           rows={2}
           placeholder="Responder como Micelium…"
-          className="flex-1 resize-none rounded-xl border border-white/[0.08] bg-[#111119] px-3 py-2 text-sm text-white/90 placeholder:text-white/25 focus:border-white/20 focus:outline-none"
+          className="min-h-11 flex-1 resize-none rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] px-3 py-2 text-sm text-[var(--pnl-text)] placeholder:text-[var(--pnl-text-3)] focus-visible:border-[var(--pnl-track)] focus-visible:outline-2 focus-visible:outline-[var(--pnl-amber)]"
         />
         <button
           onClick={() => void enviar()}
           disabled={enviando || !texto.trim()}
-          className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm text-emerald-100 hover:bg-emerald-500/30 disabled:opacity-40"
+          className="min-h-11 rounded-md bg-[var(--pnl-amber)] px-4 text-sm font-semibold text-[#23262F] hover:bg-[var(--pnl-amber-soft)] disabled:opacity-40"
         >
           {enviando ? 'Enviando…' : 'Enviar'}
         </button>
       </div>
-      {error && <p className="mt-2 text-xs text-amber-300/90">{error}</p>}
+      {error && <p className="mt-2 text-xs text-[var(--pnl-amber)]">{error}</p>}
     </div>
   )
 }

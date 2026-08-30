@@ -12,10 +12,11 @@
 // veredicto global y el botón viven ARRIBA de las pestañas porque valen para las dos.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Activity, AlertTriangle, CheckCircle2, ChevronDown, HelpCircle,
-  Loader2, RefreshCw, Server, Cloud, Workflow, Monitor, DollarSign,
+  CheckCircle2, ChevronDown, HelpCircle,
+  Loader2, RefreshCw, Server, Cloud, Workflow, Monitor,
 } from 'lucide-react'
-import { SidebarNav } from '@/components/SidebarNav'
+import { PanelShell } from '@/components/PanelShell'
+import { Banda, Seccion, Aviso } from '@/components/panel/Primitivos'
 
 type Estado = 'ok' | 'atrasado' | 'falla' | 'nunca' | 'corriendo'
 type Origen = 'vps' | 'vercel' | 'github' | 'windows'
@@ -45,10 +46,11 @@ function hace(h: number | null): string {
   return `hace ${Math.round(h / 24)} días`
 }
 
-// 'corriendo' va en azul y no en verde a propósito: no está diciendo que salió bien, está
+// 'corriendo' va en lila y no en verde a propósito: no está diciendo que salió bien, está
 // diciendo que todavía no se sabe. Confundirlo con OK es la mentira que se quiere evitar.
 const COLOR: Record<Estado, string> = {
-  ok: '#34d399', falla: '#f87171', atrasado: '#fbbf24', nunca: '#94a3b8', corriendo: '#60a5fa',
+  ok: 'var(--pnl-green)', falla: 'var(--pnl-red)', atrasado: 'var(--pnl-amber)',
+  nunca: 'var(--pnl-text-3)', corriendo: 'var(--pnl-lilac)',
 }
 const ETIQUETA: Record<Estado, string> = {
   ok: 'OK', falla: 'Falló', atrasado: 'Atrasado', nunca: 'Sin reportar', corriendo: 'En proceso',
@@ -68,25 +70,25 @@ function Punto({ estado }: { estado: Estado }) {
 
 function FilaJob({ j }: { j: Job }) {
   return (
-    <div className="flex items-start gap-3 border-t border-white/[0.06] py-2.5 first:border-t-0">
+    <div className="flex items-start gap-3 border-t border-[var(--pnl-hair)] py-2.5 first:border-t-0">
       <span className="mt-1.5"><Punto estado={j.estado} /></span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-mono text-[13px] text-white/90">{j.slug}</span>
-          <span className="text-[11px] text-white/35">{hace(j.horas)}</span>
+          <span className="num text-[13px] text-[var(--pnl-text)]">{j.slug}</span>
+          <span className="text-[11px] text-[var(--pnl-text-3)]">{hace(j.horas)}</span>
           {/* Se escribe con todas las letras, y no solo con el color del punto, porque es
               el estado que más se malinterpreta: sin la palabra, un job que arrancó recién
               se lee como uno que no reportó. */}
           {j.estado === 'corriendo' && (
-            <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] text-sky-300">
+            <span className="rounded-full bg-[rgba(126,134,184,.18)] px-2 py-0.5 text-[11px] text-[var(--pnl-lilac-soft)]">
               En proceso
             </span>
           )}
         </div>
         {/* La reseña es lo único que vuelve legible una fila en rojo a las 3 de la mañana. */}
-        <p className="mt-0.5 text-[12.5px] leading-snug text-white/55">{j.que}</p>
+        <p className="mt-0.5 text-[12.5px] leading-snug text-[var(--pnl-text-2)]">{j.que}</p>
         {j.detalle && (
-          <pre className="mt-1.5 max-h-32 overflow-auto whitespace-pre-wrap rounded-lg bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-red-300/80">
+          <pre className="mt-1.5 max-h-32 overflow-auto whitespace-pre-wrap rounded-md bg-black/30 p-2 font-mono text-[11px] leading-relaxed text-[var(--pnl-red-text)]">
             {j.detalle}
           </pre>
         )}
@@ -101,22 +103,23 @@ function Grupo({ origen, jobs }: { origen: Origen; jobs: Job[] }) {
   const rotos = jobs.filter((j) => j.estado === 'falla' || j.estado === 'atrasado').length
 
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-[#0e0e16]">
+    <div className="rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel)]">
       <button
         onClick={() => setAbierto((v) => !v)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left"
+        className="flex min-h-11 w-full items-center gap-3 px-4 py-3 text-left"
         aria-expanded={abierto}
       >
-        <Icono className="size-4 shrink-0 text-white/40" />
-        <span className="text-sm font-medium text-white/85">{NOMBRE_ORIGEN[origen]}</span>
-        <span className="text-xs text-white/35">{jobs.length}</span>
+        <Icono className="size-4 shrink-0 text-[var(--pnl-text-3)]" aria-hidden />
+        <span className="text-sm font-medium text-[var(--pnl-text)]">{NOMBRE_ORIGEN[origen]}</span>
+        <span className="text-xs text-[var(--pnl-text-3)]">{jobs.length}</span>
         {rotos > 0 && (
-          <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] text-red-300">
+          <span className="rounded-full bg-[rgba(232,80,58,.15)] px-2 py-0.5 text-[11px] text-[var(--pnl-red-text)]">
             {rotos} con problemas
           </span>
         )}
         <ChevronDown
-          className={`ml-auto size-4 shrink-0 text-white/30 transition-transform ${abierto ? 'rotate-180' : ''}`}
+          className={`ml-auto size-4 shrink-0 text-[var(--pnl-text-3)] transition-transform motion-reduce:transition-none ${abierto ? 'rotate-180' : ''}`}
+          aria-hidden
         />
       </button>
       {abierto && (
@@ -169,160 +172,159 @@ export default function SistemaPage() {
   const sano = d && rotos.length === 0
 
   return (
-    <div className="min-h-screen bg-[#08080d] lg:pl-[248px]">
-      <SidebarNav />
-      <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-        <header className="mb-5 flex flex-wrap items-center gap-3">
-          <Activity className="size-5 text-cyan-300" />
-          <h1 className="text-lg font-semibold text-white">Sistema</h1>
-          {d && (
-            <span className="flex items-center gap-2 text-sm text-white/55">
-              {sano ? (
-                <><CheckCircle2 className="size-4 text-emerald-400" />
-                  {d.resumen.ok} de {d.resumen.total} en orden</>
-              ) : (
-                <><AlertTriangle className="size-4 text-red-400" />
-                  {rotos.length} de {d.resumen.total} con problemas</>
-              )}
-            </span>
-          )}
+    <PanelShell
+      titulo="Sistema"
+      sub={
+        d ? (
+          sano
+            ? `${d.resumen.ok} de ${d.resumen.total} en orden`
+            : `${rotos.length} de ${d.resumen.total} con problemas`
+        ) : undefined
+      }
+      accion={
+        <button
+          onClick={auditar}
+          disabled={auditando}
+          className="flex min-h-11 items-center gap-2 rounded-lg border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] px-3.5 text-[13px] font-medium text-[var(--pnl-text)] transition-colors hover:bg-[var(--pnl-track)] disabled:opacity-50"
+        >
+          {auditando ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
+          {auditando ? 'Auditando…' : 'Auditar ahora'}
+        </button>
+      }
+    >
+      {aviso && <Aviso>{aviso}</Aviso>}
+
+      <div className="flex gap-0 overflow-x-auto border-b border-[var(--pnl-hair)]">
+        {([['estado', 'Estado'], ['gasto', 'Gasto IA']] as const).map(([id, txt]) => (
           <button
-            onClick={auditar}
-            disabled={auditando}
-            className="ml-auto flex items-center gap-2 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3.5 py-2 text-[13px] font-medium text-cyan-200 transition-colors hover:bg-cyan-400/15 disabled:opacity-50"
+            key={id}
+            onClick={() => setPestana(id)}
+            aria-selected={pestana === id}
+            role="tab"
+            className={`min-h-11 whitespace-nowrap border-b-2 px-4 text-[13.5px] transition-colors ${
+              pestana === id
+                ? 'border-[var(--pnl-amber)] font-semibold text-[var(--pnl-text)]'
+                : 'border-transparent text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)]'
+            }`}
           >
-            {auditando ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-            {auditando ? 'Auditando…' : 'Auditar ahora'}
+            {txt}
           </button>
-        </header>
+        ))}
+      </div>
 
-        {aviso && (
-          <p className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[13px] text-white/70">
-            {aviso}
-          </p>
-        )}
+      {cargando && <p className="text-sm text-[var(--pnl-text-3)]">Cargando…</p>}
 
-        <div className="mb-5 flex gap-1 border-b border-white/[0.08]">
-          {([['estado', 'Estado', Activity], ['gasto', 'Gasto IA', DollarSign]] as const).map(
-            ([id, txt, Ico]) => (
-              <button
-                key={id}
-                onClick={() => setPestana(id)}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-[13.5px] transition-colors ${
-                  pestana === id
-                    ? 'border-cyan-400 text-white'
-                    : 'border-transparent text-white/45 hover:text-white/70'
-                }`}
-              >
-                <Ico className="size-4" />{txt}
-              </button>
-            ),
-          )}
-        </div>
-
-        {cargando && <p className="text-sm text-white/40">Cargando…</p>}
-
-        {d && pestana === 'estado' && (
-          <div className="flex flex-col gap-4">
+      {d && pestana === 'estado' && (
+        <>
+          <Seccion>
+            <Banda n="01">Necesita atención</Banda>
             {/* Zona de atención: solo lo roto. Si no hay nada, una línea y listo. */}
             {rotos.length > 0 ? (
-              <section className="rounded-2xl border border-red-500/25 bg-red-500/[0.04] p-4">
-                <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-red-300">
-                  <AlertTriangle className="size-4" />Necesita atención
-                </h2>
+              <div className="rounded-md border border-l-2 border-[rgba(232,80,58,.28)] border-l-[var(--pnl-red)] bg-[rgba(232,80,58,.07)] p-4">
                 {rotos.map((j) => <FilaJob key={j.slug} j={j} />)}
-              </section>
+              </div>
             ) : (
-              <p className="flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] px-4 py-3 text-sm text-emerald-300/90">
-                <CheckCircle2 className="size-4" />
-                Todas las automatizaciones corrieron dentro de su cadencia.
-              </p>
+              <Aviso tono="ok">
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="size-4 shrink-0 text-[var(--pnl-green-text)]" aria-hidden />
+                  Todas las automatizaciones corrieron dentro de su cadencia.
+                </span>
+              </Aviso>
             )}
 
             {d.resumen.nunca > 0 && (
-              <p className="flex items-start gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5 text-[12.5px] text-white/50">
-                <HelpCircle className="mt-0.5 size-4 shrink-0 text-white/30" />
-                <span>
-                  <strong className="text-white/70">{d.resumen.nunca} sin reportar todavía.</strong>{' '}
-                  No es lo mismo que caído: son los que aún no llegaron a su primera corrida
-                  desde que se instrumentó el sistema. Los mensuales tardan hasta 30 días en aparecer.
+              <Aviso>
+                <span className="flex items-start gap-2">
+                  <HelpCircle className="mt-0.5 size-4 shrink-0 text-[var(--pnl-text-3)]" aria-hidden />
+                  <span>
+                    <strong className="text-[var(--pnl-text)]">{d.resumen.nunca} sin reportar todavía.</strong>{' '}
+                    No es lo mismo que caído: son los que aún no llegaron a su primera corrida
+                    desde que se instrumentó el sistema. Los mensuales tardan hasta 30 días en aparecer.
+                  </span>
                 </span>
-              </p>
+              </Aviso>
             )}
+          </Seccion>
 
-            {(['vps', 'github', 'windows', 'vercel'] as Origen[]).map((o) => {
-              const jobs = d.jobs.filter((j) => j.origen === o)
-              return jobs.length ? <Grupo key={o} origen={o} jobs={jobs} /> : null
-            })}
-          </div>
-        )}
-
-        {d && pestana === 'gasto' && (
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="text-2xl font-semibold text-white">{USD(d.gasto.total)}</span>
-              <span className="text-sm text-white/45">en {d.gasto.desdeDias} días</span>
+          <Seccion>
+            <Banda n="02">Por origen</Banda>
+            <div className="flex flex-col gap-3">
+              {(['vps', 'github', 'windows', 'vercel'] as Origen[]).map((o) => {
+                const jobs = d.jobs.filter((j) => j.origen === o)
+                return jobs.length ? <Grupo key={o} origen={o} jobs={jobs} /> : null
+              })}
             </div>
+          </Seccion>
+        </>
+      )}
 
-            <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#0e0e16]">
-              <table className="w-full min-w-[680px] text-left text-[13px]">
-                <thead className="text-[11px] uppercase tracking-wide text-white/35">
-                  <tr className="border-b border-white/[0.08]">
-                    <th className="px-4 py-2.5 font-medium">Consumidor</th>
-                    <th className="px-3 py-2.5 text-right font-medium">USD</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Por llamada</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Llamadas</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Búsquedas</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Caché</th>
+      {d && pestana === 'gasto' && (
+        <Seccion>
+          <Banda n="01">Gasto de IA</Banda>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="num text-2xl font-semibold">{USD(d.gasto.total)}</span>
+            <span className="text-sm text-[var(--pnl-text-3)]">en {d.gasto.desdeDias} días</span>
+          </div>
+
+          <div className="overflow-x-auto rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel)]">
+            <table className="w-full min-w-[680px] text-left text-[13px]">
+              <caption className="sr-only">Gasto de IA por consumidor, últimos {d.gasto.desdeDias} días</caption>
+              <thead className="text-[11px] uppercase tracking-wide text-[var(--pnl-text-3)]">
+                <tr className="border-b border-[var(--pnl-hair)]">
+                  <th scope="col" className="px-4 py-2.5 font-medium">Consumidor</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">USD</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">Por llamada</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">Llamadas</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">Búsquedas</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">Caché</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.gasto.consumidores.map((c) => (
+                  <tr key={c.canal} className="border-b border-[var(--pnl-hair)] last:border-0">
+                    <td className="px-4 py-2.5">
+                      <span className="num text-[var(--pnl-text)]">{c.canal}</span>
+                      <span className="ml-2 text-[11px] text-[var(--pnl-text-3)]">{c.proveedor}</span>
+                    </td>
+                    <td className="num px-3 py-2.5 text-right text-[var(--pnl-text)]">{USD(c.usd)}</td>
+                    <td className="num px-3 py-2.5 text-right text-[var(--pnl-text-2)]">{USD(c.usdPorLlamada)}</td>
+                    <td className="num px-3 py-2.5 text-right text-[var(--pnl-text-2)]">{NUM(c.llamadas)}</td>
+                    <td className="num px-3 py-2.5 text-right text-[var(--pnl-text-2)]">
+                      {c.busquedas ? NUM(c.busquedas) : '—'}
+                    </td>
+                    <td className="num px-3 py-2.5 text-right text-[var(--pnl-text-2)]">
+                      {c.cachePct >= 1 ? `${c.cachePct.toFixed(0)}%` : '—'}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {d.gasto.consumidores.map((c) => (
-                    <tr key={c.canal} className="border-b border-white/[0.04] last:border-0">
-                      <td className="px-4 py-2.5">
-                        <span className="font-mono text-white/85">{c.canal}</span>
-                        <span className="ml-2 text-[11px] text-white/30">{c.proveedor}</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-white/90">{USD(c.usd)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-white/60">{USD(c.usdPorLlamada)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-white/50">{NUM(c.llamadas)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-white/50">
-                        {c.busquedas ? NUM(c.busquedas) : '—'}
-                      </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-white/50">
-                        {c.cachePct >= 1 ? `${c.cachePct.toFixed(0)}%` : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                  {d.gasto.consumidores.length === 0 && (
-                    <tr><td colSpan={6} className="px-4 py-6 text-center text-white/35">Sin datos todavía</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex flex-col gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-[12.5px] leading-relaxed text-white/50">
-              <p>
-                <strong className="text-white/70">USD por llamada importa tanto como el total.</strong>{' '}
-                Un consumidor caro por llamada se arregla tocando el prompt o las herramientas;
-                uno caro por volumen, bajando la frecuencia. Con solo el total, los dos se ven igual.
-              </p>
-              <p>
-                <strong className="text-white/70">La búsqueda web casi no cuesta por sí misma</strong>{' '}
-                (USD 10 cada 1.000), pero sus resultados vuelven como tokens de entrada. Ahí está
-                el gasto real: la palanca es <code className="text-white/70">max_uses</code>, no el modelo.
-              </p>
-              <p>
-                Esto es una estimación propia calculada con la tabla de precios del código.
-                El número facturado está en{' '}
-                <a href="https://platform.claude.com/cost" target="_blank" rel="noopener"
-                   className="text-cyan-300/80 underline underline-offset-2">la consola de Anthropic</a>.
-                El consumo de Claude Code no aparece acá: va por suscripción, no por API.
-              </p>
-            </div>
+                ))}
+                {d.gasto.consumidores.length === 0 && (
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-[var(--pnl-text-3)]">Sin datos todavía</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
-      </main>
-    </div>
+
+          <div className="flex flex-col gap-2 rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--pnl-text-2)]">
+            <p>
+              <strong className="text-[var(--pnl-text)]">USD por llamada importa tanto como el total.</strong>{' '}
+              Un consumidor caro por llamada se arregla tocando el prompt o las herramientas;
+              uno caro por volumen, bajando la frecuencia. Con solo el total, los dos se ven igual.
+            </p>
+            <p>
+              <strong className="text-[var(--pnl-text)]">La búsqueda web casi no cuesta por sí misma</strong>{' '}
+              (USD 10 cada 1.000), pero sus resultados vuelven como tokens de entrada. Ahí está
+              el gasto real: la palanca es <code className="text-[var(--pnl-text)]">max_uses</code>, no el modelo.
+            </p>
+            <p>
+              Esto es una estimación propia calculada con la tabla de precios del código.
+              El número facturado está en{' '}
+              <a href="https://platform.claude.com/cost" target="_blank" rel="noopener"
+                 className="text-[var(--pnl-amber)] underline underline-offset-2">la consola de Anthropic</a>.
+              El consumo de Claude Code no aparece acá: va por suscripción, no por API.
+            </p>
+          </div>
+        </Seccion>
+      )}
+    </PanelShell>
   )
 }

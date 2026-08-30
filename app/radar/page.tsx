@@ -1,7 +1,7 @@
 import { getPool } from '@/lib/db'
 import { ultimosDos, analizar, leerYT, type Fila, type Analisis, type YTVideo } from '@/lib/radar'
-import { SidebarNav } from '@/components/SidebarNav'
-import { FondoHolografico } from '@/components/FondoHolografico'
+import { PanelShell } from '@/components/PanelShell'
+import { Banda, Seccion, Vacio } from '@/components/panel/Primitivos'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,11 +28,11 @@ function fmtViews(n: number): string {
 
 function TarjetaYouTube({ videos }: { videos: YTVideo[] }) {
   return (
-    <section className="rounded-2xl border bg-[#0e0e16] p-5" style={{ borderColor: '#ef444455' }}>
-      <h2 className="text-sm font-semibold" style={{ color: '#f87171' }}>📺 Qué performa en YouTube</h2>
-      <p className="mb-3 text-[11px] text-white/40">Videos de tu nicho por vistas — formatos/ángulos que funcionan</p>
+    <section className="rounded-md border border-l-2 border-[var(--pnl-hair)] border-l-[var(--pnl-red)] bg-[var(--pnl-panel)] p-5">
+      <h2 className="text-sm font-semibold text-[var(--pnl-red-text)]">Qué performa en YouTube</h2>
+      <p className="mb-3 text-[11px] text-[var(--pnl-text-3)]">Videos de tu nicho por vistas — formatos/ángulos que funcionan</p>
       {videos.length === 0 ? (
-        <p className="text-xs italic text-white/35">se llena en el próximo cron</p>
+        <p className="text-xs italic text-[var(--pnl-text-3)]">se llena en el próximo cron</p>
       ) : (
         <div className="flex flex-col">
           {videos.map((v) => (
@@ -41,14 +41,14 @@ function TarjetaYouTube({ videos }: { videos: YTVideo[] }) {
               href={`https://www.youtube.com/watch?v=${v.videoId}`}
               target="_blank"
               rel="noopener"
-              className="flex items-start gap-2 border-t border-white/[0.05] py-1.5 text-sm text-white/85 first:border-t-0 hover:text-red-300"
+              className="flex items-start gap-2 border-t border-[var(--pnl-hair)] py-1.5 text-sm text-[var(--pnl-text)] first:border-t-0 hover:text-[var(--pnl-red-text)]"
             >
-              <span className="mt-0.5 shrink-0 rounded bg-[#191922] px-1.5 py-0.5 text-[10px] text-white/60">
+              <span className="num mt-0.5 shrink-0 rounded bg-[var(--pnl-panel-2)] px-1.5 py-0.5 text-[10px] text-[var(--pnl-text-2)]">
                 {fmtViews(v.views)}
               </span>
               <span className="flex-1">
                 {v.titulo}
-                <span className="block text-[11px] text-white/35">{v.canal}</span>
+                <span className="block text-[11px] text-[var(--pnl-text-3)]">{v.canal}</span>
               </span>
             </a>
           ))}
@@ -63,8 +63,12 @@ function Badge({ estado }: { estado: Fila['estado'] }) {
   const nuevo = estado === 'NUEVO'
   return (
     <span
-      className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-      style={{ background: nuevo ? '#4ade80' : '#3a5bd8', color: nuevo ? '#04210f' : '#fff' }}
+      className={[
+        'rounded-full px-2 py-0.5 text-[10px] font-bold',
+        nuevo
+          ? 'bg-[var(--pnl-green)] text-[#04210f]'
+          : 'bg-[var(--pnl-lilac)] text-white',
+      ].join(' ')}
     >
       {nuevo ? 'NUEVO' : 'SUBE'}
     </span>
@@ -72,7 +76,7 @@ function Badge({ estado }: { estado: Fila['estado'] }) {
 }
 
 function Lista({ filas, max }: { filas: Fila[]; max: number }) {
-  if (filas.length === 0) return <p className="text-xs italic text-white/35">nada por ahora</p>
+  if (filas.length === 0) return <p className="text-xs italic text-[var(--pnl-text-3)]">nada por ahora</p>
   return (
     <div className="flex flex-col">
       {filas.slice(0, max).map((f) => (
@@ -81,11 +85,11 @@ function Lista({ filas, max }: { filas: Fila[]; max: number }) {
           href={`https://www.google.com/search?q=${encodeURIComponent(f.consulta)}`}
           target="_blank"
           rel="noopener"
-          className="flex items-center gap-2 border-t border-white/[0.05] py-1.5 text-sm text-white/85 first:border-t-0 hover:text-emerald-300"
+          className="flex min-h-11 items-center gap-2 border-t border-[var(--pnl-hair)] py-1.5 text-sm text-[var(--pnl-text)] first:border-t-0 hover:text-[var(--pnl-green-text)]"
         >
           <span className="flex-1">{f.consulta}</span>
           <Badge estado={f.estado} />
-          <span className="text-[11px] text-white/30">x{f.score}</span>
+          <span className="num text-[11px] text-[var(--pnl-text-3)]">x{f.score}</span>
         </a>
       ))}
     </div>
@@ -97,11 +101,16 @@ function Card({ titulo, sub, filas, max, acento }: {
 }) {
   return (
     <section
-      className="rounded-2xl border bg-[#0e0e16] p-5"
-      style={{ borderColor: acento ? acento + '55' : 'rgba(255,255,255,0.06)' }}
+      className="rounded-md border border-l-2 border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5"
+      style={acento ? { borderLeftColor: acento } : undefined}
     >
-      <h2 className="text-sm font-semibold" style={{ color: acento ?? '#e8eaed' }}>{titulo}</h2>
-      <p className="mb-3 text-[11px] text-white/40">{sub}</p>
+      <h2
+        className="text-sm font-semibold"
+        style={{ color: acento ?? 'var(--pnl-text)' }}
+      >
+        {titulo}
+      </h2>
+      <p className="mb-3 text-[11px] text-[var(--pnl-text-3)]">{sub}</p>
       <Lista filas={filas} max={max} />
     </section>
   )
@@ -112,33 +121,21 @@ export default async function RadarPage() {
   const total = a.emergentes.length + a.contenido.length + a.compra.length + yt.length
 
   return (
-    <div className="fx-holo fx-charts relative isolate min-h-screen bg-[#0a0a12] text-white max-lg:pt-14 lg:pl-[256px]">
-      <SidebarNav />
-      <FondoHolografico />
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        {/* Header */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">🌱 Radar de Tendencias</h1>
-            <a href="/dashboard" className="text-xs text-white/40 hover:text-white/70">← Volver al dashboard</a>
-          </div>
-          <div className="text-right text-[11px] text-white/40">
-            {fecha ? <>Snapshot {fecha}</> : 'Sin datos aún'}
-          </div>
-        </div>
-
-        <p className="mb-5 max-w-2xl text-xs text-white/40">
+    <PanelShell titulo="Radar de Tendencias" sub={fecha ? `Snapshot ${fecha}` : 'Sin datos aún'}>
+      <Seccion>
+        <Banda n="01">Qué busca tu público</Banda>
+        <p className="max-w-2xl text-xs text-[var(--pnl-text-3)]">
           Lo que tu público realmente busca sobre tus temas (autocultivo, gírgolas, adaptógenos…),
           filtrado a Argentina. No son noticias del día: son ideas de contenido con demanda real y
-          durabilidad. <span className="text-emerald-300/80">Emergentes</span> = lo que empezó a
+          durabilidad. <span className="text-[var(--pnl-green-text)]">Emergentes</span> = lo que empezó a
           subir respecto de ayer.
         </p>
 
         {total === 0 ? (
-          <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-6 text-sm text-white/60">
-            Todavía no hay snapshot. El radar corre cada mañana (cron diario). Volvé mañana
-            o disparalo manualmente desde <code className="text-white/80">/api/cron/radar</code>.
-          </div>
+          <Vacio
+            titulo="Todavía no hay snapshot"
+            detalle="El radar corre cada mañana (cron diario). Volvé mañana o disparalo manualmente desde /api/cron/radar."
+          />
         ) : (
           <div className="grid gap-4 lg:grid-cols-3">
             <Card
@@ -146,7 +143,7 @@ export default async function RadarPage() {
               sub="Nuevo o subiendo vs. ayer — lo caliente del nicho"
               filas={a.emergentes}
               max={30}
-              acento="#4ade80"
+              acento="var(--pnl-green)"
             />
             <Card
               titulo="💡 Ideas de contenido"
@@ -163,7 +160,7 @@ export default async function RadarPage() {
             <TarjetaYouTube videos={yt} />
           </div>
         )}
-      </div>
-    </div>
+      </Seccion>
+    </PanelShell>
   )
 }

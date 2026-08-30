@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { HelpTip } from '@/components/HelpTip'
+import { Ayuda } from '@/components/panel/Primitivos'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type GadsCampaign = {
@@ -58,16 +58,16 @@ function StatRow({ label, value, sub, tip, highlight }: {
   label: string; value: string; sub?: string; tip?: string; highlight?: boolean
 }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
-      <span className="text-[11px] text-white/50 flex items-center gap-1">
+    <div className="flex items-center justify-between py-2 border-b border-[var(--pnl-hair)] last:border-0">
+      <span className="text-[11px] text-[var(--pnl-text-3)] flex items-center gap-1">
         {label}
-        {tip && <HelpTip text={tip} />}
+        {tip && <Ayuda>{tip}</Ayuda>}
       </span>
       <div className="text-right">
-        <span className={`text-[11px] font-mono font-semibold ${highlight ? 'text-emerald-400' : 'text-white/80'}`}>
+        <span className={`text-[11px] font-mono font-semibold ${highlight ? 'text-[var(--pnl-green-text)]' : 'text-[var(--pnl-text)]'}`}>
           {value}
         </span>
-        {sub && <span className="text-[10px] text-white/30 ml-1.5">{sub}</span>}
+        {sub && <span className="text-[10px] text-[var(--pnl-text-3)] ml-1.5">{sub}</span>}
       </div>
     </div>
   )
@@ -77,10 +77,10 @@ function FrictionBar({ label, pct, color }: { label: string; pct: number; color:
   return (
     <div className="mb-2">
       <div className="flex justify-between text-[10px] mb-1">
-        <span className="text-white/45">{label}</span>
+        <span className="text-[var(--pnl-text-3)]">{label}</span>
         <span className="font-mono" style={{ color }}>{PCT(pct)}</span>
       </div>
-      <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+      <div className="h-1 rounded-full bg-[var(--pnl-track)] overflow-hidden">
         <div className="h-full rounded-full transition-all duration-700"
           style={{ width: `${Math.min(100, pct * 3)}%`, background: color }} />
       </div>
@@ -98,9 +98,9 @@ const CHANNEL_LABEL: Record<string, string> = {
 
 // ── Main component ───────────────────────────────────────────────────────────
 export function PerformanceSection({
-  since, until, acHex, isLight,
+  since, until, acHex,
 }: {
-  since: string; until: string; acHex: string; isLight: boolean
+  since: string; until: string; acHex: string
 }) {
   const [data, setData]       = useState<PerformanceData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -117,8 +117,8 @@ export function PerformanceSection({
       .catch(() => { setError('Error al cargar datos de rendimiento'); setLoading(false) })
   }, [since, until])
 
-  const cardCls = 'rounded-2xl border border-white/[0.06] bg-[#0e0e16] p-5'
-  const titleCls = 'text-[10px] uppercase tracking-[0.18em] text-white/55 mb-4'
+  const cardCls = 'rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5'
+  const titleCls = 'text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-4'
 
   if (loading) return (
     <div className={cardCls + ' flex items-center justify-center h-32'}>
@@ -131,7 +131,7 @@ export function PerformanceSection({
     </div>
   )
   if (error) return (
-    <div className={cardCls + ' text-red-400/70 text-xs font-mono'}>{error}</div>
+    <div className={cardCls + ' text-[var(--pnl-red-text)]/70 text-xs font-mono'}>{error}</div>
   )
   if (!data) return null
 
@@ -146,12 +146,12 @@ export function PerformanceSection({
           <h3 className={titleCls + ' mb-0 flex items-center gap-1.5'}>
             <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#4285F4' }} />
             Google Ads
-            <HelpTip text="Métricas de Google Ads para el período seleccionado. Incluye todas las campañas activas." />
+            <Ayuda>Métricas de Google Ads para el período seleccionado. Incluye todas las campañas activas.</Ayuda>
           </h3>
           {gads ? (
-            <span className="text-[10px] text-emerald-400/70 font-mono">{data.since} → {data.until}</span>
+            <span className="text-[10px] text-[var(--pnl-green-text)] font-mono">{data.since} → {data.until}</span>
           ) : (
-            <span className="text-[10px] text-white/25">sin credenciales</span>
+            <span className="text-[10px] text-[var(--pnl-text-3)]">sin credenciales</span>
           )}
         </div>
 
@@ -159,7 +159,7 @@ export function PerformanceSection({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* KPIs globales */}
             <div>
-              <p className="text-[9px] uppercase tracking-widest text-white/30 mb-3">Totales del período</p>
+              <p className="text-[9px] uppercase tracking-widest text-[var(--pnl-text-3)] mb-3">Totales del período</p>
               <StatRow label="Gasto total"     value={ARS(gads.totalCostARS)}
                 tip="Inversión total en Google Ads durante el período." />
               <StatRow label="Impresiones"     value={NUM(gads.totalImpressions)} />
@@ -179,34 +179,34 @@ export function PerformanceSection({
 
             {/* Campañas */}
             <div>
-              <p className="text-[9px] uppercase tracking-widest text-white/30 mb-3">Campañas activas</p>
+              <p className="text-[9px] uppercase tracking-widest text-[var(--pnl-text-3)] mb-3">Campañas activas</p>
               {gads.campaigns.length === 0 ? (
-                <p className="text-[11px] text-white/30 italic">Sin campañas activas en el período</p>
+                <p className="text-[11px] text-[var(--pnl-text-3)] italic">Sin campañas activas en el período</p>
               ) : (
                 <div className="space-y-2">
                   {gads.campaigns.map(c => (
-                    <div key={c.id} className="rounded-xl bg-[#111119] border border-white/[0.05] p-3">
+                    <div key={c.id} className="rounded-xl bg-[var(--pnl-panel-2)] border border-[var(--pnl-hair)] p-3">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div>
-                          <p className="text-[11px] text-white/80 font-medium leading-tight">{c.name}</p>
-                          <p className="text-[9px] text-white/30 mt-0.5">{fmtCampaignType(c.type)}</p>
+                          <p className="text-[11px] text-[var(--pnl-text)] font-medium leading-tight">{c.name}</p>
+                          <p className="text-[9px] text-[var(--pnl-text-3)] mt-0.5">{fmtCampaignType(c.type)}</p>
                         </div>
-                        <span className="text-[9px] text-emerald-400/70 bg-emerald-400/10 rounded-full px-2 py-0.5 flex-shrink-0">
+                        <span className="text-[9px] text-[var(--pnl-green-text)] bg-[color-mix(in_srgb,var(--pnl-green)_14%,transparent)] rounded-full px-2 py-0.5 flex-shrink-0">
                           {c.status === 'ENABLED' ? 'Activa' : c.status}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-center">
                         <div>
-                          <p className="text-[10px] font-mono text-white/70">{NUM(c.clicks)}</p>
-                          <p className="text-[9px] text-white/30">clicks</p>
+                          <p className="text-[10px] font-mono text-[var(--pnl-text)]">{NUM(c.clicks)}</p>
+                          <p className="text-[9px] text-[var(--pnl-text-3)]">clicks</p>
                         </div>
                         <div>
-                          <p className="text-[10px] font-mono text-white/70">{PCT(c.ctr * 100)}</p>
-                          <p className="text-[9px] text-white/30">CTR</p>
+                          <p className="text-[10px] font-mono text-[var(--pnl-text)]">{PCT(c.ctr * 100)}</p>
+                          <p className="text-[9px] text-[var(--pnl-text-3)]">CTR</p>
                         </div>
                         <div>
-                          <p className="text-[10px] font-mono text-white/70">{ARS(c.costARS)}</p>
-                          <p className="text-[9px] text-white/30">gasto</p>
+                          <p className="text-[10px] font-mono text-[var(--pnl-text)]">{ARS(c.costARS)}</p>
+                          <p className="text-[9px] text-[var(--pnl-text-3)]">gasto</p>
                         </div>
                       </div>
                     </div>
@@ -216,12 +216,12 @@ export function PerformanceSection({
             </div>
           </div>
         ) : (
-          <div className="rounded-xl bg-[#0e0e16] border border-white/[0.04] p-4 text-center space-y-2">
-            <p className="text-[11px] text-white/50">Google Ads API solo funciona via gRPC (Python)</p>
-            <p className="text-[10px] text-white/30 leading-relaxed">
+          <div className="rounded-xl bg-[var(--pnl-panel)] border border-[var(--pnl-hair)] p-4 text-center space-y-2">
+            <p className="text-[11px] text-[var(--pnl-text-3)]">Google Ads API solo funciona via gRPC (Python)</p>
+            <p className="text-[10px] text-[var(--pnl-text-3)] leading-relaxed">
               Ejecutá el script de sincronización para cargar datos en la DB:
             </p>
-            <p className="text-[10px] font-mono text-white/25 bg-[#111119] rounded px-3 py-1.5">
+            <p className="text-[10px] font-mono text-[var(--pnl-text-3)] bg-[var(--pnl-panel-2)] rounded px-3 py-1.5">
               python ~/.claude/gads_sync_db.py
             </p>
           </div>
@@ -235,9 +235,9 @@ export function PerformanceSection({
         <div className={cardCls}>
           <div className="flex items-center justify-between mb-4">
             <h3 className={titleCls + ' mb-0 flex items-center gap-1.5'}>
-              <span className="w-2 h-2 rounded-full inline-block bg-purple-400" />
+              <span className="w-2 h-2 rounded-full inline-block bg-[var(--pnl-lilac)]" />
               Microsoft Clarity
-              <HelpTip text="Comportamiento real de usuarios en infomicelium.com.ar. Sesiones, scroll, fricción y dispositivos." />
+              <Ayuda>Comportamiento real de usuarios en infomicelium.com.ar. Sesiones, scroll, fricción y dispositivos.</Ayuda>
             </h3>
           </div>
 
@@ -254,25 +254,25 @@ export function PerformanceSection({
 
               {/* Dispositivos */}
               <div className="pt-3 pb-1">
-                <p className="text-[9px] uppercase tracking-widest text-white/25 mb-2">Dispositivos</p>
+                <p className="text-[9px] uppercase tracking-widest text-[var(--pnl-text-3)] mb-2">Dispositivos</p>
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <div className="flex justify-between text-[10px] mb-1">
-                      <span className="text-white/45">Mobile</span>
-                      <span className="font-mono text-white/70">{PCT(clarity.mobilePct)}</span>
+                      <span className="text-[var(--pnl-text-3)]">Mobile</span>
+                      <span className="font-mono text-[var(--pnl-text)]">{PCT(clarity.mobilePct)}</span>
                     </div>
-                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                      <div className="h-full rounded-full bg-purple-400/60"
+                    <div className="h-1.5 rounded-full bg-[var(--pnl-track)] overflow-hidden">
+                      <div className="h-full rounded-full bg-[var(--pnl-lilac)]/60"
                         style={{ width: `${clarity.mobilePct}%` }} />
                     </div>
                   </div>
                   <div className="flex-1">
                     <div className="flex justify-between text-[10px] mb-1">
-                      <span className="text-white/45">Desktop</span>
-                      <span className="font-mono text-white/70">{PCT(clarity.desktopPct)}</span>
+                      <span className="text-[var(--pnl-text-3)]">Desktop</span>
+                      <span className="font-mono text-[var(--pnl-text)]">{PCT(clarity.desktopPct)}</span>
                     </div>
-                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                      <div className="h-full rounded-full bg-indigo-400/60"
+                    <div className="h-1.5 rounded-full bg-[var(--pnl-track)] overflow-hidden">
+                      <div className="h-full rounded-full bg-[var(--pnl-lilac-soft)]/60"
                         style={{ width: `${clarity.desktopPct}%` }} />
                     </div>
                   </div>
@@ -280,26 +280,26 @@ export function PerformanceSection({
               </div>
 
               {/* Fricción */}
-              <div className="pt-3 border-t border-white/5">
-                <p className="text-[9px] uppercase tracking-widest text-white/25 mb-2 flex items-center gap-1">
+              <div className="pt-3 border-t border-[var(--pnl-hair)]">
+                <p className="text-[9px] uppercase tracking-widest text-[var(--pnl-text-3)] mb-2 flex items-center gap-1">
                   Señales de fricción
-                  <HelpTip text="% de sesiones con ese tipo de fricción. Quickback alto → la primera pantalla no convence. Rage clicks → elementos que parecen clickeables pero no lo son." />
+                  <Ayuda>% de sesiones con ese tipo de fricción. Quickback alto → la primera pantalla no convence. Rage clicks → elementos que parecen clickeables pero no lo son.</Ayuda>
                 </p>
                 <FrictionBar label="Quickback"    pct={clarity.quickbackPct}
-                  color={clarity.quickbackPct > 10 ? '#f87171' : '#facc15'} />
-                <FrictionBar label="Rage clicks"  pct={clarity.rageClickPct}   color="#f97316" />
-                <FrictionBar label="Dead clicks"  pct={clarity.deadClickPct}   color="#818cf8" />
+                  color={clarity.quickbackPct > 10 ? 'var(--pnl-red)' : 'var(--pnl-amber)'} />
+                <FrictionBar label="Rage clicks"  pct={clarity.rageClickPct}   color="var(--pnl-amber)" />
+                <FrictionBar label="Dead clicks"  pct={clarity.deadClickPct}   color="var(--pnl-lilac)" />
               </div>
             </div>
           ) : clarity ? (
             <div className="py-6 text-center">
-              <p className="text-[11px] text-white/40">Sin datos suficientes aún</p>
-              <p className="text-[10px] text-white/25 mt-1">Clarity acaba de instalarse — revisá en 48hs</p>
+              <p className="text-[11px] text-[var(--pnl-text-3)]">Sin datos suficientes aún</p>
+              <p className="text-[10px] text-[var(--pnl-text-3)] mt-1">Clarity acaba de instalarse — revisá en 48hs</p>
             </div>
           ) : (
             <div className="py-6 text-center">
-              <p className="text-[11px] text-white/40">No configurado</p>
-              <p className="text-[10px] text-white/25 font-mono mt-1">CLARITY_TOKEN · CLARITY_PROJECT_ID</p>
+              <p className="text-[11px] text-[var(--pnl-text-3)]">No configurado</p>
+              <p className="text-[10px] text-[var(--pnl-text-3)] font-mono mt-1">CLARITY_TOKEN · CLARITY_PROJECT_ID</p>
             </div>
           )}
         </div>
@@ -310,7 +310,7 @@ export function PerformanceSection({
             <h3 className={titleCls + ' mb-0 flex items-center gap-1.5'}>
               <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#E37400' }} />
               Google Analytics 4
-              <HelpTip text="Tráfico y comportamiento de sesiones en infomicelium.com.ar según GA4." />
+              <Ayuda>Tráfico y comportamiento de sesiones en infomicelium.com.ar según GA4.</Ayuda>
             </h3>
           </div>
 
@@ -327,18 +327,18 @@ export function PerformanceSection({
                 tip="Tiempo promedio de sesión. Para producto de alta consideración, objetivo: > 60s." />
 
               {ga4.sources.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-white/5">
-                  <p className="text-[9px] uppercase tracking-widest text-white/25 mb-2">Fuentes de tráfico</p>
+                <div className="mt-3 pt-3 border-t border-[var(--pnl-hair)]">
+                  <p className="text-[9px] uppercase tracking-widest text-[var(--pnl-text-3)] mb-2">Fuentes de tráfico</p>
                   {ga4.sources.slice(0, 5).map(s => {
                     const pct = ga4.sessions > 0 ? (s.sessions / ga4.sessions) * 100 : 0
                     const label = CHANNEL_LABEL[s.channel] ?? s.channel
                     return (
                       <div key={s.channel} className="mb-2">
                         <div className="flex justify-between text-[10px] mb-1">
-                          <span className="text-white/50">{label}</span>
-                          <span className="font-mono text-white/60">{NUM(s.sessions)} ({PCT(pct)})</span>
+                          <span className="text-[var(--pnl-text-3)]">{label}</span>
+                          <span className="font-mono text-[var(--pnl-text-2)]">{NUM(s.sessions)} ({PCT(pct)})</span>
                         </div>
-                        <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+                        <div className="h-1 rounded-full bg-[var(--pnl-track)] overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-700"
                             style={{ width: `${pct}%`, background: acHex + 'aa' }} />
                         </div>
@@ -350,11 +350,11 @@ export function PerformanceSection({
             </div>
           ) : (
             <div className="py-6 text-center space-y-2">
-              <p className="text-[11px] text-white/40">Necesitás el Property ID numérico de GA4</p>
-              <p className="text-[10px] text-white/25 leading-relaxed">
+              <p className="text-[11px] text-[var(--pnl-text-3)]">Necesitás el Property ID numérico de GA4</p>
+              <p className="text-[10px] text-[var(--pnl-text-3)] leading-relaxed">
                 En GA4: Administrar → Configuración de la propiedad → Property ID
               </p>
-              <p className="text-[10px] text-white/25 font-mono mt-1">env var: GA4_PROPERTY_ID</p>
+              <p className="text-[10px] text-[var(--pnl-text-3)] font-mono mt-1">env var: GA4_PROPERTY_ID</p>
             </div>
           )}
         </div>

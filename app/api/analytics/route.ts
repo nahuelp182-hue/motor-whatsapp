@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { log, traceId } from '@/lib/log'
 import { fetchTNOrdersClassified, aggregateByChannel, CHANNEL_LABEL, CHANNEL_COLOR, type TNClass } from '@/lib/attribution'
 
 export const dynamic = 'force-dynamic'
@@ -231,7 +232,14 @@ export async function GET(req: NextRequest) {
       trend7d,
     })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    // El mensaje crudo de Prisma trae el host de la base y rutas del disco,
+    // y el panel lo imprimía tal cual en pantalla. El detalle va al log del
+    // servidor; al cliente solo el trace_id para poder cruzarlo.
+    const trace = traceId(req)
+    log.error('analytics: fallo al calcular métricas', { ambito: 'analytics', trace_id: trace }, err)
+    return NextResponse.json(
+      { error: 'No se pudieron cargar las métricas', trace_id: trace },
+      { status: 500 },
+    )
   }
 }
