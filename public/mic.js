@@ -259,11 +259,26 @@
      la ficha entera se cae al reparto por conteo de párrafos y las diez ubicaciones de
      producto quedan en cualquier lado.
      De los dos `.product-form-container` que trae el tema (uno por layout), el primero es
-     siempre el visible —comprobado a 929px y a 500px—, así que `querySelector` alcanza. */
+     siempre el visible —comprobado a 929px y a 500px—, así que `querySelector` alcanza.
+
+     El nombre suelto SOLO se prueba en la ficha, y el guardia no es opcional: en la grilla
+     de categoría el mismo tema deja un `.product-form-container` de 0x0 dentro de cada
+     tarjeta (el panel de quickshop, oculto). Sin el guardia, todo widget de contexto
+     "tienda" se entierra ahí adentro y no se ve nunca. Es el mismo riesgo que ya evitaba
+     `esFicha` en la lista de candidatos genéricos, y acá faltaba. */
+  function esFichaProducto() {
+    try { return !!(window.LS && window.LS.template === 'product'); } catch (e) { return false; }
+  }
+
   function columnaFicha() {
-    return document.querySelector('.js-product-detail .product-detail-container') ||
-           document.querySelector('.product-detail-container') ||
-           document.querySelector('.js-product-detail .product-form-container') ||
+    var estricto = document.querySelector('.js-product-detail .product-detail-container') ||
+                   document.querySelector('.product-detail-container');
+    if (estricto) return estricto;
+    // Sin poder confirmar que es una ficha, no se usa el selector suelto: quedarse sin
+    // columna degrada al reparto por párrafos, que es feo pero visible. Enterrar el widget
+    // en una tarjeta de la grilla es invisible, que es peor.
+    if (!esFichaProducto()) return null;
+    return document.querySelector('.js-product-detail .product-form-container') ||
            document.querySelector('.product-form-container');
   }
 
