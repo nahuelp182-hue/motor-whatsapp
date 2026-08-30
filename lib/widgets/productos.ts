@@ -4,9 +4,15 @@
 // mano. Un id tipeado mal no falla de forma visible: el widget queda ofreciendo un producto
 // que no existe y nadie se entera hasta que alguien intenta comprarlo.
 
+import { MARCA } from '@/lib/marca'
+
 const TN_TOKEN = process.env.TN_ACCESS_TOKEN ?? ''
 const TN_STORE = process.env.TN_STORE_ID ?? ''
-const TN_UA = 'MiceliumApp (nahuelp182@gmail.com)'
+// Tiendanube pide identificar la app en el User-Agent. Sale de la marca: los pedidos de
+// OSA MAYOR no deben presentarse como los de Micelium ante la API de un tercero.
+const TN_UA = MARCA.clave === 'osamayor'
+  ? 'OsaMayorApp (info.osamayor20@gmail.com)'
+  : 'MiceliumApp (nahuelp182@gmail.com)'
 
 export type ProductoTN = {
   id: string

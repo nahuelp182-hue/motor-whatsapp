@@ -20,6 +20,8 @@ export interface Marca {
   inicial: string
   /** Bajada del login. */
   subtitulo: string
+  /** Razón social del pie del login. */
+  pie: string
   /** Rutas del panel habilitadas. `null` = todas (Micelium). */
   secciones: readonly string[] | null
   /** A dónde va el login cuando no viene un `?from=`. */
@@ -32,6 +34,7 @@ const MARCAS: Record<ClaveMarca, Marca> = {
     nombre: 'Micelium®',
     inicial: 'M',
     subtitulo: 'Panel de métricas',
+    pie: 'Micelium Argentina',
     secciones: null,
     inicio: '/dashboard',
   },
@@ -40,6 +43,7 @@ const MARCAS: Record<ClaveMarca, Marca> = {
     nombre: 'OSA MAYOR',
     inicial: 'O',
     subtitulo: 'Panel de la tienda',
+    pie: 'OSA MAYOR',
     // Solo lo que aplica a esta tienda. El resto del panel (métricas de Meta Ads,
     // MercadoLibre, apicultura, conversaciones) es data de Micelium y no debe verse
     // ni llegarse escribiendo la URL: el middleware corta esas rutas con 404.

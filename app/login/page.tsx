@@ -112,7 +112,7 @@ function LoginForm() {
         </div>
 
         <p className="text-center text-[10px] text-white/15 mt-5">
-          Micelium Argentina © {new Date().getFullYear()}
+          {MARCA.pie} © {new Date().getFullYear()}
         </p>
       </div>
     </main>
