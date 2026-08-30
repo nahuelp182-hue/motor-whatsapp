@@ -237,10 +237,17 @@ aprobación de Tiendanube.
       directos de la columna, en el orden correcto, y se vieron en pantalla. No es una
       simulación de la lógica: es el motor real dibujando.
       Medido a 1280px; el reparto de bloques se comprobó además a 500px.
-- [ ] 🤖 Publicar **un widget de prueba** y confirmar que se ve donde corresponde.
-- [ ] 🤖 Confirmar que el **evento se registra en su base**, no en la de Micelium.
-- [ ] 🤖 Probar el **formulario de reseñas de punta a punta**, incluida la foto (que debe ir
-      a su almacenamiento).
+- [x] 🤖 **Publicar un widget de prueba y confirmar que se ve donde corresponde.** Hecho
+      30/08: "Mensaje de garantía" en `/productos/luna-armonia-wfreg/`, ubicación "debajo
+      del botón de compra". Verificado en la ficha real: hijo inmediato después del
+      `<form>` en la columna, visible, con el texto correcto. Apagado después de verificar.
+- [x] 🤖 **Confirmar que el evento se registra en su base, no en la de Micelium.** Hecho
+      30/08: tras la visita, el panel de Osamayor mostró `VISTAS: 1` en el widget. El panel
+      solo puede leer su propia base (`DATABASE_URL` de la instancia), así que si lo ve ahí
+      es porque cayó ahí — no hay forma de que muestre datos de Micelium.
+- [ ] 👤 Probar el **formulario de reseñas de punta a punta**, incluida la foto (que debe ir
+      a su almacenamiento). **Bloqueado: necesita Vercel Blob conectado.** Queda para cuando
+      se resuelva ese pendiente.
 - [x] 🤖 **Ubicaciones que el tema degrada** (anotado 30/08, ninguna rompe — todas caen en
       un lugar razonable):
       - «Debajo del título» y «debajo del precio» son **el mismo punto**: el tema mete
