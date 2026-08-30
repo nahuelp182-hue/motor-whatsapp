@@ -887,7 +887,7 @@ export default function DashboardPage() {
                   )}
                 </div>
                 {monthly
-                  ? <MonthlyRevenueChart data={monthly.series} />
+                  ? <ChartErrorBoundary height={220}><MonthlyRevenueChart data={monthly.series} /></ChartErrorBoundary>
                   : <div className="h-[220px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
                 }
               </div>
@@ -896,7 +896,7 @@ export default function DashboardPage() {
                 <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
                   <h4 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5 flex items-center">ROAS y CAC mensual<Ayuda>ROAS mide el retorno de la inversión publicitaria. CAC es cuánto cuesta adquirir cada cliente nuevo. Si el ROAS baja o el CAC sube mes a mes, los anuncios están perdiendo eficiencia.</Ayuda></h4>
                   {monthly
-                    ? <RoasCacChart data={monthly.series} />
+                    ? <ChartErrorBoundary height={180}><RoasCacChart data={monthly.series} /></ChartErrorBoundary>
                     : <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
                   }
                   <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">ROAS baja = Meta se encarece · CAC sube = cuesta más adquirir cada cliente</p>
@@ -905,7 +905,7 @@ export default function DashboardPage() {
                 <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
                   <h4 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5 flex items-center">Ticket y volumen<Ayuda>Ticket promedio = valor promedio por orden. Órdenes = cantidad de ventas. Si el ticket sube sin más órdenes, estás vendiendo productos más caros. Si suben las órdenes, hay más demanda.</Ayuda></h4>
                   {monthly
-                    ? <AvgTicketChart data={monthly.series} />
+                    ? <ChartErrorBoundary height={160}><AvgTicketChart data={monthly.series} /></ChartErrorBoundary>
                     : <div className="h-[160px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
                   }
                   <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">Ticket baja + órdenes suben = ventas más accesibles · Ticket sube = clientes de mayor valor</p>
