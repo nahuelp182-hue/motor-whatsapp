@@ -211,17 +211,45 @@ Los pasos 1 a 3 **no se pueden reordenar**. El resto sí.
 La única etapa que toca una tienda real. Como hay credenciales, no hace falta app pública ni
 aprobación de Tiendanube.
 
-- [ ] 🤝 **Instalar `mic.js` en su storefront**, apuntando a su instancia.
-      Vía el recurso *Scripts* de la API, o el bootstrap `<img onerror>` en Códigos externos.
-      `where: 'store'` — nunca el checkout. Yo preparo la llamada; **la primera instalación
-      la mirás vos** porque toca una tienda en vivo.
-- [ ] 🤖 **Verificar visualmente con Playwright antes de darlo por hecho.** Las anclas asumen
-      el tema de Tiendanube y el suyo puede ser otro. Mirar la ficha renderizada.
+- [x] 🤝 **Instalar `mic.js` en su storefront.** Hecho 29/08 vía **Google Tag Manager**
+      (contenedor `GTM-5DBVNKSX`, tag HTML personalizado con activador All Pages).
+      Verificado en la tienda real sobre una URL dinámica: `window.__micInit === true`,
+      `mic.js` servido desde `osamayor-nine.vercel.app`. Detalle en
+      **`OSAMAYOR_GTM.md`**.
+      Las dos vías anteriores no sirvieron: el panel de "Códigos externos" de OSA MAYOR
+      **no tiene** el campo de JavaScript libre que sí existe en Micelium (solo GTM, GA4,
+      Facebook, códigos de conversión, AFIP, Bing), y el sistema de Scripts del Portal de
+      Partners queda **bloqueado en el front-end** para apps privadas (enforcement de
+      NubeSDK): el script llega a `active`, se registra en el HTML tras reinstalar la app,
+      y aun así el loader no lo ejecuta — mientras una app pública al lado sí carga.
+      Post-mortem completo en `OSAMAYOR.md` y en la memoria
+      `feedback_diagnostico_diferencial`.
+- [x] 🤖 **Verificar las anclas contra la ficha real.** Hecho 30/08 sobre
+      `/productos/luna-armonia-wfreg/` (a 929px y a 500px). El riesgo era real y se
+      confirmó: **el tema `new_linkedman` no tiene `.product-detail-container`**, así que la
+      ficha entera se caía al reparto por conteo de párrafos y las diez ubicaciones de
+      producto quedaban en cualquier lado. Arreglado en `public/mic.js`: `columnaFicha()`
+      ahora prueba también `.product-form-container`, que es como se llama la misma pila de
+      bloques en los temas viejos. Con eso las diez ubicaciones resuelven. Detalle de las
+      degradaciones abajo.
 - [ ] 🤖 Publicar **un widget de prueba** y confirmar que se ve donde corresponde.
 - [ ] 🤖 Confirmar que el **evento se registra en su base**, no en la de Micelium.
 - [ ] 🤖 Probar el **formulario de reseñas de punta a punta**, incluida la foto (que debe ir
       a su almacenamiento).
-- [ ] 🤖 Si el tema rompe alguna ubicación: anotar cuál y con qué selector se arregla.
+- [x] 🤖 **Ubicaciones que el tema degrada** (anotado 30/08, ninguna rompe — todas caen en
+      un lugar razonable):
+      - «Debajo del título» y «debajo del precio» son **el mismo punto**: el tema mete
+        nombre y precio en un solo bloque (`.js-product-name-price-container`).
+      - «Debajo de los medios de pago» cae igual que «debajo del botón»: el bloque de
+        cuotas vive **dentro** del `<form>`.
+      - «Debajo del envío» no tiene ancla (el tema no trae
+        `.js-free-shipping-minimum-message` ni `#product-shipping-container`) → va al final
+        de la columna.
+      - «Debajo de la descripción» ancla en la descripción **mobile**. En escritorio esa
+        copia está oculta y la visible vive fuera de la columna, así que el widget termina
+        al pie de la columna. Se ve, pero no debajo del texto.
+      Si alguna de estas molesta, se arregla con un mapa de anclas por tema; hoy no vale la
+      pena.
 
 > **Puerta de salida:** un widget visible en su tienda, con su métrica contando en su base.
 

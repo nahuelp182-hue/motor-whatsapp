@@ -251,10 +251,20 @@
   };
 
   /* La columna de la ficha. No sirve `.js-product-detail`: ese envuelve TAMBIÉN la galería
-     de fotos, y sus hijos directos son un único <div> contenedor. */
+     de fotos, y sus hijos directos son un único <div> contenedor.
+
+     `.product-detail-container` es el nombre en los temas nuevos de Tiendanube. Los temas
+     viejos (verificado el 30/08/2026 en OSA MAYOR, tema `new_linkedman`) NO lo tienen y
+     usan `.product-form-container` para la misma pila de bloques. Sin este segundo intento
+     la ficha entera se cae al reparto por conteo de párrafos y las diez ubicaciones de
+     producto quedan en cualquier lado.
+     De los dos `.product-form-container` que trae el tema (uno por layout), el primero es
+     siempre el visible —comprobado a 929px y a 500px—, así que `querySelector` alcanza. */
   function columnaFicha() {
     return document.querySelector('.js-product-detail .product-detail-container') ||
-           document.querySelector('.product-detail-container');
+           document.querySelector('.product-detail-container') ||
+           document.querySelector('.js-product-detail .product-form-container') ||
+           document.querySelector('.product-form-container');
   }
 
   /* Sube desde el ancla hasta el hijo directo de la columna. Sin esto, "debajo del precio"

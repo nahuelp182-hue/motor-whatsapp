@@ -88,6 +88,47 @@ Verificado con Prisma Client real (el mismo adapter `pg` + pooler que usa `lib/p
 contra el pooler 6543: `Widget`, `Review` y `Store` responden. Migraciones al día
 (`prisma migrate status` → "Database schema is up to date!").
 
+### El flujo real de Scripts en Tiendanube (29/08) — Nahuel repite esto en cada app nueva
+
+**Regla general de Tiendanube, no específica de Osamayor.** Cada vez que se crea una app
+nueva y se le sube un script, hay que pasar por tres estados y **ninguno de los dos
+primeros pasos del Portal alcanza para que el script funcione**:
+
+1. **Draft** — "Crear script" + "Agregar versión" en el Portal de Partners suben el
+   archivo, pero lo dejan en `status: idle`, `draft_version: null` visto desde la API.
+   **El archivo está subido pero inerte.** No sirve a nadie todavía.
+2. **Deploy testing** — un botón separado (dentro del detalle del script, no en el menú de
+   tres puntos ⋮ de la lista) que lo pasa a `status: testing`, visible solo en tiendas
+   demo del Portal.
+3. **Deploy a producción** — otro botón, recién ahí pasa a `status: active` y se sirve de
+   verdad en las tiendas reales que tienen la app instalada.
+
+**Los síntomas de saltarse el paso 2/3, para reconocerlos la próxima vez:**
+- El script aparece en la lista del Portal con el archivo cargado, pero la API
+  (`GET /v1/{store}/scripts/{id}`) devuelve `current_version: null` y `draft_version: null`
+  indefinidamente, sin importar cuántas veces se resuba el archivo.
+- El navegador real (verificado con Chrome DevTools contra `www.tiendaosamayor.com.ar`,
+  disparando `onfirstinteraction` a mano) no carga el script en absoluto.
+- `POST /v1/{store}/scripts` con ese `script_id` para asociarlo a la tienda responde
+  **500 vacío** — porque intenta asociar una versión que no existe en ningún estado
+  deployado. Pasó con nuestro script Y con Clarity (id 6990), que tampoco había pasado
+  nunca del estado "Probando (tienda demo)" desde mayo — un intento anterior con el mismo
+  problema, sin que nadie lo hubiera notado.
+- Los tres puntos (⋮) de la lista de Scripts **no tienen la opción de Deploy** — solo
+  "Agregar versión" y "Eliminar script". El botón de Deploy está en el **detalle** del
+  script (clickeando su nombre), no en ese menú.
+
+**No es un límite de plan.** Se sospechó que `AR-plan-A` (el plan real de OSA MAYOR,
+confirmado por `GET /v1/{store}/store` → `plan_name`) no soportaba scripts — descartado:
+el storefront ya tiene otra app de terceros funcionando (`abejita-google-reviews-importer`,
+visto cargando en producción con DevTools), así que el mecanismo de apps sí funciona en
+este plan. Lo que falta es un paso del flujo, no una capacidad de la cuenta.
+
+**Fuente:** documentación oficial, sección de gestión de scripts —
+`https://tiendanube.github.io/api-documentation/resources/script`. Los estados `draft` →
+`testing` (por "deploy testing") → `active` (por "deploy") están descriptos ahí; no hay
+endpoint de API para esos dos deploys, solo botones del Portal.
+
 ### Hecho el 29/08: OAuth completa, token real guardado
 
 Nahuel apuntó el callback de la app `32868` en el Portal de Partners a
@@ -106,6 +147,108 @@ Osamayor nunca iba a recibir sus propios webhooks. Arreglado: ahora la decisión
 instancia tiene bot de WhatsApp?" (`WHATSAPP_TOKEN` configurado), no un ID de tienda — y la
 URL sale del propio origin del request. El webhook mal registrado (id `39173527`) se listó
 y se borró de la cuenta real de OSA MAYOR.
+
+### Hecho el 29/08: `mic.js` instalado — la receta completa de Scripts en Tiendanube
+
+**Es una regla general de la plataforma, no de esta app** — vale para cualquier app de
+Tiendanube que use Scripts, y Nahuel confirmó que se repite en cada app nueva que hace. El
+detalle completo, reutilizable fuera de este proyecto, vive en la memoria
+`reference_tiendanube_scripts_deploy`. Acá el resumen aplicado a Osamayor.
+
+**Primer intento, fallido — por qué:**
+1. El panel "Códigos externos" de OSA MAYOR **no tiene** el campo de HTML libre que sí
+   existe en Micelium ("Códigos de tracking", Para la tienda / Para el checkout) — solo
+   campos estructurados (GTM, GA4, Facebook, AFIP, Bing). Se descartó que fuera un límite
+   del plan (`AR-plan-A`, confirmado por `GET /v1/{store}/store` → `plan_name`): el
+   storefront ya tenía otra app de terceros (`abejita-google-reviews-importer`) cargando
+   bien en producción, verificado con Chrome DevTools.
+2. Se creó el script "Motor de widgets" (id `9713`) en el Portal de Partners, con el
+   bootstrap correcto (agnóstico de `PUBLIC_BASE_URL`, apunta a
+   `osamayor-nine.vercel.app/mic.js`). Quedó en `status: idle`, `draft_version: null`
+   indefinidamente — **subir el archivo no alcanza, falta el deploy**.
+3. La API `v1/{store}/scripts` para asociarlo daba **500 vacío**, sin mensaje —
+   incompatible con scripts de múltiples versiones. Con `2025-03/{store}/scripts` (la ruta
+   correcta) el error sí trajo detalle útil.
+
+**La receta que funcionó:**
+1. Crear tienda demo (`tiendaosaprueba`) desde Resumen → "Crear tienda de prueba".
+2. Detalle del script → Versiones → tres puntos (⋮) de la versión → **"Instalar en la
+   tienda demo"**. Pasa a `status: testing`. Paso obligatorio, sin atajo.
+3. Recién ahí aparece una segunda opción en el mismo menú: **"Instalar en las tiendas"**
+   (sin "demo") — es el deploy real a producción. Activa el script solo en todas las
+   tiendas donde la app está instalada.
+4. Verificado por API (`GET 2025-03/.../scripts/9713`): `status: "active"`,
+   `current_version.src` con la URL real del bootstrap servido por Tiendanube.
+
+**Trampa evitada en el camino:** al editar el script apareció un toggle de "Modo de
+desarrollo" activado sin querer — se desactivó **sin guardar cambios**, verificado después
+que el `updated_at` del script por API no se movió (no llegó a afectar nada).
+
+**Verificación en el storefront real: sigue sin cargar 15+ minutos después del deploy.**
+Descartado que sea el script: el archivo en la CDN de Tiendanube
+(`apps-scripts.tiendanube.com/osamayorgestion/motor-de-widgets/2.js`) responde 200 con el
+contenido correcto, verificado con `fetch` directo. El problema está en que **el
+storefront no lo está referenciando en absoluto** — ni en el HTML (pedido con
+`cache: 'no-store'`, sin resultado), ni en el bundle genérico `linkedstore-v2...js`. La
+clave `window.LS.socialScripts` (candidata a ser el mecanismo de inyección dinámica) está
+vacía incluso para Clarity y la app de reviews, que sí cargan — así que no es la fuente,
+o se completa por una llamada async que no se capturó.
+
+**Descartada la hipótesis de "vive solo en demo".** Se probó directo contra
+`tiendaosaprueba.mitiendanube.com` (id de tienda `8166669`, completamente distinto al real
+`3224928`) — **tampoco carga ahí**. Ni siquiera se pudo consultar el script contra esa
+tienda por API: el access token de OSA MAYOR da 401 contra la tienda demo, porque son
+autorizaciones OAuth separadas (instalar en demo desde el Portal no comparte nada con la
+instalación real). No hay dónde esconderse: el script no está activo en ninguna tienda que
+se pudo probar.
+
+**Confirmado de nuevo, con sesión de navegador aislada (sin ningún estado de pruebas
+anteriores):** la app de la competencia (`abejita-google-reviews-importer`) sigue cargando
+sin problema con el mismo evento (`onfirstinteraction`) contra la misma tienda real. La
+nuestra no. Mismo patrón, mismo momento, un script carga y el otro no — descarta cualquier
+explicación genérica de la plataforma (caché, hora del día, etc.) y apunta a algo puntual
+de nuestra app o nuestro script.
+
+### RESUELTO el 29/08 — eran DOS causas, y la vía era otra
+
+Todo lo de arriba quedó como registro del camino equivocado. Lo que realmente pasaba:
+
+**Causa 1 — `is_auto_install` se evalúa AL INSTALAR LA APP.** La app se autorizó en la
+tienda *antes* de que el script existiera, así que esa instalación nunca lo recibió. Se
+arregló **desinstalando y reinstalando la app** (`/admin/apps/32868/authorize`, callback
+`{"ok":true,"store_id":"3224928","creada":false,"webhooks":false}`). Después de eso el
+storefront **sí** lo registra:
+`window.scriptLoaderService.addScriptOnEvent('https://apps-scripts.tiendanube.com/osamayorgestion/motor-de-widgets/2.js?...&store=3224928', 'onfirstinteraction')`.
+
+**Causa 2 — estar en el HTML no alcanza: el loader lo saltea.** Quedaron tres
+`addScriptOnEvent` seguidos en el mismo bloque `LS.ready.then(...)`: el wallet de
+Tiendanube, la app pública de reseñas y la nuestra. Con recarga limpia y **click real** de
+usuario, los dos primeros cargan y **el tercero no**, sin un error en consola. La
+diferencia entre la que carga y la que no: una es **pública/homologada** y la nuestra es
+**privada ("para tus clientes")** — que es el enforcement de NubeSDK descrito como "vía
+front-end (bloqueo sistemático)" para apps privadas que inyectan scripts (30/08/2026
+bloqueo de nuevas instalaciones; 30/10/2026 desinstalación progresiva). El script en sí
+está sano: cargado a mano con `document.createElement('script')` arranca perfecto.
+
+**La solución fue Google Tag Manager** — ver [OSAMAYOR_GTM.md](OSAMAYOR_GTM.md).
+Contenedor `GTM-5DBVNKSX` con un tag HTML personalizado (All Pages) que carga `mic.js`.
+Verificado funcionando el 29/08: `window.__micInit === true`, `mic.js` servido desde
+`osamayor-nine.vercel.app`.
+
+**Dos errores de método que costaron el día** (ver la memoria
+`feedback_diagnostico_diferencial`):
+- Nunca se miró **cómo carga Micelium** el mismo motor: usa `external-codes` con el patrón
+  `<img onerror>` y **jamás usó el sistema de Scripts de Partners**. Dos minutos de mirar
+  la implementación de referencia ahorraban todo lo de arriba.
+- Se verificó cuatro veces la misma pregunta ("¿está el script?") en vez de la pregunta
+  diferencial ("¿qué tiene la app que SÍ carga que la mía no?"), que resolvía el caso.
+- Bonus: la home está detrás de Cloudflare con `s-maxage=86400` y puede devolver HTML de
+  **10+ horas atrás**. Verificar siempre sobre una URL dinámica (`/search/?q=<random>` →
+  `cf-cache-status: DYNAMIC`).
+
+**Nota sobre el mail a soporte:** `socios@tiendanube.com` **no es soporte técnico** — es la
+casilla de marketing del programa de partners (manda newsletters de ventas). El canal real
+es el chat del Portal de Partners. Ya no hace falta: el problema está resuelto.
 
 ### Hallazgo del 28/08: el proyecto de Vercel necesita código delante para detectar Next.js
 
