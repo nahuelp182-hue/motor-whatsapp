@@ -225,13 +225,18 @@ aprobación de Tiendanube.
       Post-mortem completo en `OSAMAYOR.md` y en la memoria
       `feedback_diagnostico_diferencial`.
 - [x] 🤖 **Verificar las anclas contra la ficha real.** Hecho 30/08 sobre
-      `/productos/luna-armonia-wfreg/` (a 929px y a 500px). El riesgo era real y se
-      confirmó: **el tema `new_linkedman` no tiene `.product-detail-container`**, así que la
-      ficha entera se caía al reparto por conteo de párrafos y las diez ubicaciones de
-      producto quedaban en cualquier lado. Arreglado en `public/mic.js`: `columnaFicha()`
-      ahora prueba también `.product-form-container`, que es como se llama la misma pila de
-      bloques en los temas viejos. Con eso las diez ubicaciones resuelven. Detalle de las
-      degradaciones abajo.
+      `/productos/luna-armonia-wfreg/`. El riesgo era real y se confirmó: **el tema
+      `new_linkedman` no tiene `.product-detail-container`**, así que la ficha entera se
+      caía al reparto por conteo de párrafos y las siete ubicaciones de producto quedaban
+      en cualquier lado. Arreglado en `public/mic.js`: `columnaFicha()` prueba también
+      `.product-form-container`, que es como se llama la misma pila de bloques en los temas
+      viejos, **solo cuando `LS.template === 'product'`** (ver el ítem de la regresión).
+      **Cómo se verificó, para que no haya que creerme:** se interceptó `fetch` en el
+      navegador para que `/api/widgets/config` devolviera cinco widgets de prueba, y se
+      cargó la ficha real con el `mic.js` desplegado. Los cinco se insertaron como hijos
+      directos de la columna, en el orden correcto, y se vieron en pantalla. No es una
+      simulación de la lógica: es el motor real dibujando.
+      Medido a 1280px; el reparto de bloques se comprobó además a 500px.
 - [ ] 🤖 Publicar **un widget de prueba** y confirmar que se ve donde corresponde.
 - [ ] 🤖 Confirmar que el **evento se registra en su base**, no en la de Micelium.
 - [ ] 🤖 Probar el **formulario de reseñas de punta a punta**, incluida la foto (que debe ir
@@ -250,6 +255,32 @@ aprobación de Tiendanube.
         al pie de la columna. Se ve, pero no debajo del texto.
       Si alguna de estas molesta, se arregla con un mapa de anclas por tema; hoy no vale la
       pena.
+      Además: «debajo del título» y «debajo del precio» apuntan al mismo bloque, así que si
+      hay uno de cada uno **salen en orden invertido** respecto del `orden` del panel. Con
+      un solo widget ahí no se nota.
+- [x] 🤖 **Regresión propia, encontrada y corregida el mismo día (30/08).** El arreglo de
+      arriba, tal como salió en el primer commit, no tenía guardia de template. En la
+      **grilla de categoría y en la home** el mismo tema deja un `.product-form-container`
+      de 0×0 dentro de cada tarjeta —el panel de *quickshop*, oculto—, así que
+      `columnaFicha()` daba truthy fuera de la ficha y **todo widget de contexto "tienda"
+      se habría enterrado adentro de una tarjeta, invisible**. Es exactamente el riesgo que
+      el comentario de `contenido()` ya describía para los candidatos genéricos; ahí el
+      guardia existía y en `columnaFicha()` faltaba. Corregido: el selector suelto solo se
+      prueba con `LS.template === 'product'`. Micelium nunca estuvo afectado (su tema no
+      trae ninguno de los dos contenedores en el DOM fuera de la ficha).
+- [!] 🤝 **El contexto "tienda" no dibuja nada en la home ni en las categorías — y le pasa
+      también a Micelium.** Fuera de la ficha, `contenido()` solo acepta
+      `[data-mic-contenido]`, `article`, `.mic-ancho main` y `main`. **Ninguno de los cuatro
+      existe** en el tema de OSA MAYOR ni en el de Micelium (verificado el 30/08 en las dos
+      homes). Los widgets acotados por ruta a una ficha funcionan; los de toda la tienda no
+      se dibujan. En Micelium hoy hay **un** widget así (`viendo_ahora`, sin restricción de
+      rutas) que nunca se vio en la portada.
+      **Arreglo propuesto:** agregar `.main-content` a la lista de candidatos permitidos
+      fuera de la ficha. Existe en las dos tiendas y es el envoltorio del contenido (11
+      hijos en OSA MAYOR, 15 en Micelium); el atajo del blog ya confía en él.
+      **Por qué no lo hice solo:** cambia una tienda en producción sin que nadie lo pida —
+      el `viendo_ahora` de Micelium empezaría a aparecer en la portada al día siguiente.
+      Decisión de Nahuel: se aplica, o se deja y los widgets de tienda se acotan a fichas.
 
 > **Puerta de salida:** un widget visible en su tienda, con su métrica contando en su base.
 
