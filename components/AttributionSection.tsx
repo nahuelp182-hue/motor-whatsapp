@@ -1,6 +1,7 @@
 'use client'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
 import { Ayuda } from '@/components/panel/Primitivos'
+import { ChartErrorBoundary } from '@/components/ChartErrorBoundary'
 
 const ARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -83,18 +84,20 @@ export function AttributionSection({
               <div className="flex items-center justify-center h-40 text-[var(--pnl-text-3)] text-xs">Sin órdenes en el período</div>
             ) : (
               <div className="flex flex-col gap-3">
-                <ResponsiveContainer width="100%" height={160}>
-                  <PieChart>
-                    <Pie data={donutData} dataKey="revenue" nameKey="label" cx="50%" cy="50%"
-                      innerRadius={45} outerRadius={72} paddingAngle={2} strokeWidth={0}>
-                      {donutData.map((d, i) => <Cell key={i} fill={d.color} opacity={0.9} />)}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{ background: 'var(--pnl-panel)', border: '1px solid var(--pnl-hair)', borderRadius: 10, fontSize: 11 }}
-                      formatter={(v: unknown) => [ARS(Number(v)), '']}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <ChartErrorBoundary height={160}>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <PieChart>
+                      <Pie data={donutData} dataKey="revenue" nameKey="label" cx="50%" cy="50%"
+                        innerRadius={45} outerRadius={72} paddingAngle={2} strokeWidth={0}>
+                        {donutData.map((d, i) => <Cell key={i} fill={d.color} opacity={0.9} />)}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ background: 'var(--pnl-panel)', border: '1px solid var(--pnl-hair)', borderRadius: 10, fontSize: 11 }}
+                        formatter={(v: unknown) => [ARS(Number(v)), '']}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartErrorBoundary>
                 <div className="space-y-2">
                   {donutData.map(d => (
                     <div key={d.label}>
@@ -122,28 +125,34 @@ export function AttributionSection({
           {/* Timeline apilado */}
           <div>
             <p className="text-[9px] uppercase tracking-widest text-[var(--pnl-text-3)] mb-3">Revenue diario por canal</p>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={timeline} margin={{ top: 4, right: 4, left: -15, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="var(--pnl-hair)" />
-                <XAxis dataKey="date" tick={{ fill: 'var(--pnl-text-3)', fontSize: 9 }}
-                  tickFormatter={(d: string) => d.slice(5)} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--pnl-text-3)', fontSize: 9 }}
-                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ background: 'var(--pnl-panel)', border: '1px solid var(--pnl-hair)', borderRadius: 10, fontSize: 11 }}
-                  formatter={(v: unknown) => ARS(Number(v))}
-                />
-                <Legend wrapperStyle={{ fontSize: 10, color: 'var(--pnl-text-3)', paddingTop: 4 }} iconSize={7} iconType="circle" />
-                <Area type="monotone" dataKey="meta_ads" name="Meta Ads" stackId="1"
-                  stroke="var(--pnl-amber)" fill="var(--pnl-amber)" fillOpacity={0.5} />
-                <Area type="monotone" dataKey="sin_utm_con_landing" name="Orgánico/Directo" stackId="1"
-                  stroke="var(--pnl-green)" fill="var(--pnl-green)" fillOpacity={0.5} />
-                <Area type="monotone" dataKey="otro" name="Google/Otro" stackId="1"
-                  stroke="var(--pnl-lilac-soft)" fill="var(--pnl-lilac-soft)" fillOpacity={0.5} />
-                <Area type="monotone" dataKey="sin_dato_de_visita" name="Sin dato" stackId="1"
-                  stroke="var(--pnl-text-3)" fill="var(--pnl-text-3)" fillOpacity={0.4} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {timeline.length === 0 ? (
+              <div className="h-[220px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
+            ) : (
+              <ChartErrorBoundary height={220}>
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={timeline} margin={{ top: 4, right: 4, left: -15, bottom: 0 }}>
+                    <CartesianGrid vertical={false} stroke="var(--pnl-hair)" />
+                    <XAxis dataKey="date" tick={{ fill: 'var(--pnl-text-3)', fontSize: 9 }}
+                      tickFormatter={(d: string) => d.slice(5)} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: 'var(--pnl-text-3)', fontSize: 9 }}
+                      tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ background: 'var(--pnl-panel)', border: '1px solid var(--pnl-hair)', borderRadius: 10, fontSize: 11 }}
+                      formatter={(v: unknown) => ARS(Number(v))}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 10, color: 'var(--pnl-text-3)', paddingTop: 4 }} iconSize={7} iconType="circle" />
+                    <Area type="monotone" dataKey="meta_ads" name="Meta Ads" stackId="1"
+                      stroke="var(--pnl-amber)" fill="var(--pnl-amber)" fillOpacity={0.5} />
+                    <Area type="monotone" dataKey="sin_utm_con_landing" name="Orgánico/Directo" stackId="1"
+                      stroke="var(--pnl-green)" fill="var(--pnl-green)" fillOpacity={0.5} />
+                    <Area type="monotone" dataKey="otro" name="Google/Otro" stackId="1"
+                      stroke="var(--pnl-lilac-soft)" fill="var(--pnl-lilac-soft)" fillOpacity={0.5} />
+                    <Area type="monotone" dataKey="sin_dato_de_visita" name="Sin dato" stackId="1"
+                      stroke="var(--pnl-text-3)" fill="var(--pnl-text-3)" fillOpacity={0.4} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartErrorBoundary>
+            )}
           </div>
         </div>
 

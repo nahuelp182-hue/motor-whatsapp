@@ -18,7 +18,8 @@ import { AttributionSection } from '@/components/AttributionSection'
 import { CuriososSection } from '@/components/CuriososSection'
 import { GlobalRoasGauge } from '@/components/GlobalRoasGauge'
 import { PanelShell } from '@/components/PanelShell'
-import { Ayuda } from '@/components/panel/Primitivos'
+import { ChartErrorBoundary } from '@/components/ChartErrorBoundary'
+import { Ayuda, Rubro, Pestanas } from '@/components/panel/Primitivos'
 
 // Único acento del panel: ámbar. Reemplaza al ThemePicker de 12 temas —
 // nadie lo usaba para elegir salvo un tema, y mantenerlo era 12 paletas a
@@ -146,6 +147,8 @@ export default function DashboardPage() {
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [usage, setUsage] = useState<{ series: UsageDay[]; totalCost: number; totalCalls: number } | null>(null)
+  const [tabPublicidad, setTabPublicidad] = useState<'meta'|'atribucion'|'curiosos'>('meta')
+  const [tabTecnico, setTabTecnico] = useState<'canales'|'claude'>('canales')
 
   const load = useCallback((opts?: { esRefresco?: boolean }) => {
     if (opts?.esRefresco) setRefreshing(true)
@@ -458,59 +461,71 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%"   stopColor={cc.color} stopOpacity={0.45} />
-                    <stop offset="45%"  stopColor={cc.color} stopOpacity={0.12} />
-                    <stop offset="100%" stopColor={cc.color} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} stroke={cGrid} />
-                <XAxis dataKey="date" tick={cTick}
-                  tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
-                  interval={Math.max(0, Math.floor(mergedTimeline.length / 12))} />
-                <YAxis tick={cTick}
-                  tickFormatter={(v:number) => v>999?`$${(v/1000).toFixed(0)}k`:String(v)}
-                  axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} cursor={{ stroke: `${cc.color}40`, strokeWidth: 1 }} />
-                <Area type="monotone" dataKey={cc.key} name={cc.label}
-                  stroke={cc.color} strokeWidth={2.5}
-                  fill="url(#areaGrad)" dot={false}
-                  activeDot={{ r: 5, fill: cc.color, stroke: '#fff', strokeWidth: 1.5 }} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {mergedTimeline.length === 0 ? (
+              <div className="h-[220px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
+            ) : (
+              <ChartErrorBoundary height={220}>
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%"   stopColor={cc.color} stopOpacity={0.45} />
+                        <stop offset="45%"  stopColor={cc.color} stopOpacity={0.12} />
+                        <stop offset="100%" stopColor={cc.color} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} stroke={cGrid} />
+                    <XAxis dataKey="date" tick={cTick}
+                      tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
+                      interval={Math.max(0, Math.floor(mergedTimeline.length / 12))} />
+                    <YAxis tick={cTick}
+                      tickFormatter={(v:number) => v>999?`$${(v/1000).toFixed(0)}k`:String(v)}
+                      axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: `${cc.color}40`, strokeWidth: 1 }} />
+                    <Area type="monotone" dataKey={cc.key} name={cc.label}
+                      stroke={cc.color} strokeWidth={2.5}
+                      fill="url(#areaGrad)" dot={false}
+                      activeDot={{ r: 5, fill: cc.color, stroke: '#fff', strokeWidth: 1.5 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartErrorBoundary>
+            )}
           </div>
 
           {/* ── Revenue vs Spend ─────────────────────────────────────── */}
           <div className="mb-5">
             <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
               <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5">Ingresos TN vs Gasto Meta · {since} → {until}</h3>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barGap={2}>
-                  <defs>
-                    <linearGradient id="barRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%"   stopColor={AC_HEX} stopOpacity={0.95} />
-                      <stop offset="100%" stopColor={AC_HEX} stopOpacity={0.3} />
-                    </linearGradient>
-                    <linearGradient id="barSpend" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%"   stopColor="var(--pnl-lilac-soft)" stopOpacity={0.9} />
-                      <stop offset="100%" stopColor="var(--pnl-lilac)" stopOpacity={0.25} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid vertical={false} stroke={cGrid} />
-                  <XAxis dataKey="date" tick={cTick}
-                    tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
-                    interval={Math.max(0, Math.floor(mergedTimeline.length / 10))} />
-                  <YAxis tick={cTick}
-                    tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
-                    axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--pnl-panel-2)' }} />
-                  <Bar dataKey="revenue" name="Ingresos TN" fill="url(#barRev)"   radius={[3,3,0,0]} />
-                  <Bar dataKey="spend"   name="Gasto Meta"  fill="url(#barSpend)" radius={[3,3,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {mergedTimeline.length === 0 ? (
+                <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
+              ) : (
+                <ChartErrorBoundary height={180}>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={mergedTimeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barGap={2}>
+                      <defs>
+                        <linearGradient id="barRev" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%"   stopColor={AC_HEX} stopOpacity={0.95} />
+                          <stop offset="100%" stopColor={AC_HEX} stopOpacity={0.3} />
+                        </linearGradient>
+                        <linearGradient id="barSpend" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%"   stopColor="var(--pnl-lilac-soft)" stopOpacity={0.9} />
+                          <stop offset="100%" stopColor="var(--pnl-lilac)" stopOpacity={0.25} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid vertical={false} stroke={cGrid} />
+                      <XAxis dataKey="date" tick={cTick}
+                        tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
+                        interval={Math.max(0, Math.floor(mergedTimeline.length / 10))} />
+                      <YAxis tick={cTick}
+                        tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
+                        axisLine={false} tickLine={false} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--pnl-panel-2)' }} />
+                      <Bar dataKey="revenue" name="Ingresos TN" fill="url(#barRev)"   radius={[3,3,0,0]} />
+                      <Bar dataKey="spend"   name="Gasto Meta"  fill="url(#barSpend)" radius={[3,3,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartErrorBoundary>
+              )}
             </div>
           </div>
 
@@ -523,20 +538,26 @@ export default function DashboardPage() {
                 <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)]">Tráfico Meta Ads / día</h3>
                 <span className="text-xs font-bold text-[var(--pnl-green-text)]">{NUM(s.clicks)} clicks</span>
               </div>
-              <ResponsiveContainer width="100%" height={150}>
-                <LineChart data={tl} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke={cGrid2} />
-                  <XAxis dataKey="date" tick={cTick2}
-                    tickFormatter={(v:string)=>v.slice(5)} axisLine={false} tickLine={false}
-                    interval={Math.max(0, Math.floor(tl.length/8))} />
-                  <YAxis tick={cTick2}
-                    axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'color-mix(in srgb, var(--pnl-green) 30%, transparent)', strokeWidth: 1 }} />
-                  <Line type="monotone" dataKey="clicks" name="Clicks"
-                    stroke="var(--pnl-green)" strokeWidth={2.5} dot={false}
-                    activeDot={{ r: 4, fill: 'var(--pnl-green)', stroke: '#fff', strokeWidth: 1.5 }} />
-                </LineChart>
-              </ResponsiveContainer>
+              {tl.length === 0 ? (
+                <div className="h-[150px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
+              ) : (
+                <ChartErrorBoundary height={150}>
+                  <ResponsiveContainer width="100%" height={150}>
+                    <LineChart data={tl} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                      <CartesianGrid vertical={false} stroke={cGrid2} />
+                      <XAxis dataKey="date" tick={cTick2}
+                        tickFormatter={(v:string)=>v.slice(5)} axisLine={false} tickLine={false}
+                        interval={Math.max(0, Math.floor(tl.length/8))} />
+                      <YAxis tick={cTick2}
+                        axisLine={false} tickLine={false} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'color-mix(in srgb, var(--pnl-green) 30%, transparent)', strokeWidth: 1 }} />
+                      <Line type="monotone" dataKey="clicks" name="Clicks"
+                        stroke="var(--pnl-green)" strokeWidth={2.5} dot={false}
+                        activeDot={{ r: 4, fill: 'var(--pnl-green)', stroke: '#fff', strokeWidth: 1.5 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartErrorBoundary>
+              )}
               <div className="mt-3 pt-3 border-t border-[var(--pnl-hair)] flex justify-between text-[10px] text-[var(--pnl-text-3)]">
                 <span>Impresiones totales</span>
                 <span className="text-[var(--pnl-text-3)]">{NUM(s.impressions)}</span>
@@ -699,34 +720,40 @@ export default function DashboardPage() {
                     {ARS(ordersData?.summary.totalRevenue ?? 0)}
                   </span>
                 </div>
-                <ResponsiveContainer width="100%" height={180}>
-                  <AreaChart
-                    data={ordersData?.timeline ?? []}
-                    margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="prodGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%"   stopColor={AC_HEX} stopOpacity={0.4} />
-                        <stop offset="100%" stopColor={AC_HEX} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} stroke={cGrid2} />
-                    <XAxis dataKey="date" tick={cTick2}
-                      tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
-                      interval={Math.max(0, Math.floor((ordersData?.timeline.length??1)/10))} />
-                    <YAxis tick={cTick2}
-                      tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
-                      axisLine={false} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{ background:'var(--pnl-panel)', border:`1px solid ${AC_HEX}33`, borderRadius:10, fontSize:11 }}
-                      formatter={(v:unknown) => [ARS(Number(v)), 'Ingresos']}
-                      cursor={{ stroke:`${AC_HEX}4d`, strokeWidth:1 }}
-                    />
-                    <Area type="monotone" dataKey="revenue" stroke={AC_HEX} strokeWidth={2}
-                      fill="url(#prodGrad)" dot={false}
-                      activeDot={{ r:3, fill:'var(--pnl-amber)', strokeWidth:0 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {(ordersData?.timeline ?? []).length === 0 ? (
+                  <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos en el período</div>
+                ) : (
+                  <ChartErrorBoundary height={180}>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <AreaChart
+                        data={ordersData?.timeline ?? []}
+                        margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient id="prodGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%"   stopColor={AC_HEX} stopOpacity={0.4} />
+                            <stop offset="100%" stopColor={AC_HEX} stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid vertical={false} stroke={cGrid2} />
+                        <XAxis dataKey="date" tick={cTick2}
+                          tickFormatter={(v:string) => v.slice(5)} axisLine={false} tickLine={false}
+                          interval={Math.max(0, Math.floor((ordersData?.timeline.length??1)/10))} />
+                        <YAxis tick={cTick2}
+                          tickFormatter={(v:number) => `$${(v/1000).toFixed(0)}k`}
+                          axisLine={false} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{ background:'var(--pnl-panel)', border:`1px solid ${AC_HEX}33`, borderRadius:10, fontSize:11 }}
+                          formatter={(v:unknown) => [ARS(Number(v)), 'Ingresos']}
+                          cursor={{ stroke:`${AC_HEX}4d`, strokeWidth:1 }}
+                        />
+                        <Area type="monotone" dataKey="revenue" stroke={AC_HEX} strokeWidth={2}
+                          fill="url(#prodGrad)" dot={false}
+                          activeDot={{ r:3, fill:'var(--pnl-amber)', strokeWidth:0 }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </ChartErrorBoundary>
+                )}
                 {/* Ticket promedio */}
                 <div className="mt-3 pt-3 border-t border-[var(--pnl-hair)] flex justify-between text-[10px] text-[var(--pnl-text-3)]">
                   <span>Ticket promedio</span>
@@ -748,7 +775,7 @@ export default function DashboardPage() {
                 </p>
                 {ordersLoading
                   ? <div className="text-[var(--pnl-text-3)] text-xs py-16 text-center">Cargando...</div>
-                  : <PaymentDonut data={ordersData?.payments ?? []} />
+                  : <ChartErrorBoundary height={160}><PaymentDonut data={ordersData?.payments ?? []} /></ChartErrorBoundary>
                 }
               </div>
 
@@ -823,7 +850,7 @@ export default function DashboardPage() {
                 )}
               </div>
               {usage && usage.series?.length
-                ? <ClaudeUsageChart data={usage.series} />
+                ? <ChartErrorBoundary height={200}><ClaudeUsageChart data={usage.series} /></ChartErrorBoundary>
                 : <div className="h-[200px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">
                     {usage ? 'Sin consumo registrado todavía' : 'Cargando...'}
                   </div>
@@ -850,7 +877,7 @@ export default function DashboardPage() {
                 )}
               </div>
               {monthly
-                ? <MonthlyRevenueChart data={monthly.series} />
+                ? <ChartErrorBoundary height={220}><MonthlyRevenueChart data={monthly.series} /></ChartErrorBoundary>
                 : <div className="h-[220px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
               }
             </div>
@@ -861,7 +888,7 @@ export default function DashboardPage() {
               <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
                 <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5 flex items-center">ROAS y CAC mensual<Ayuda>ROAS mide el retorno de la inversión publicitaria. CAC es cuánto cuesta adquirir cada cliente nuevo. Si el ROAS baja o el CAC sube mes a mes, los anuncios están perdiendo eficiencia.</Ayuda></h3>
                 {monthly
-                  ? <RoasCacChart data={monthly.series} />
+                  ? <ChartErrorBoundary height={180}><RoasCacChart data={monthly.series} /></ChartErrorBoundary>
                   : <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
                 }
                 <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">ROAS baja = Meta se encarece · CAC sube = cuesta más adquirir cada cliente</p>
@@ -870,7 +897,7 @@ export default function DashboardPage() {
               <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-6">
                 <h3 className="text-[10px] uppercase tracking-[0.18em] text-[var(--pnl-text-2)] mb-5 flex items-center">Ticket y volumen<Ayuda>Ticket promedio = valor promedio por orden. Órdenes = cantidad de ventas. Si el ticket sube sin más órdenes, estás vendiendo productos más caros. Si suben las órdenes, hay más demanda.</Ayuda></h3>
                 {monthly
-                  ? <AvgTicketChart data={monthly.series} />
+                  ? <ChartErrorBoundary height={160}><AvgTicketChart data={monthly.series} /></ChartErrorBoundary>
                   : <div className="h-[160px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Cargando...</div>
                 }
                 <p className="text-[9px] text-[var(--pnl-text-3)] mt-2">Ticket baja + órdenes suben = ventas más accesibles · Ticket sube = clientes de mayor valor</p>

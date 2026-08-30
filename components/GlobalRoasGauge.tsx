@@ -1,6 +1,7 @@
 'use client'
 import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import { Ayuda } from '@/components/panel/Primitivos'
+import { ChartErrorBoundary } from '@/components/ChartErrorBoundary'
 
 const ARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -20,17 +21,19 @@ export function GlobalRoasGauge({
   return (
     <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5 flex flex-col sm:flex-row items-center gap-4">
       <div className="relative w-[180px] h-[110px] flex-shrink-0">
-        <ResponsiveContainer width="100%" height="100%">
-          <RadialBarChart
-            cx="50%" cy="100%" innerRadius="130%" outerRadius="180%"
-            startAngle={180} endAngle={0}
-            data={data}
-          >
-            <PolarAngleAxis type="number" domain={[0, GAUGE_MAX]} tick={false} />
-            <RadialBar dataKey="value" background={{ fill: 'var(--pnl-track)' }}
-              cornerRadius={8} />
-          </RadialBarChart>
-        </ResponsiveContainer>
+        <ChartErrorBoundary height="100%">
+          <ResponsiveContainer width="100%" height="100%">
+            <RadialBarChart
+              cx="50%" cy="100%" innerRadius="130%" outerRadius="180%"
+              startAngle={180} endAngle={0}
+              data={data}
+            >
+              <PolarAngleAxis type="number" domain={[0, GAUGE_MAX]} tick={false} />
+              <RadialBar dataKey="value" background={{ fill: 'var(--pnl-track)' }}
+                cornerRadius={8} />
+            </RadialBarChart>
+          </ResponsiveContainer>
+        </ChartErrorBoundary>
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-1 pointer-events-none">
           <p className="text-3xl font-bold font-mono" style={{ color }}>
             {roasGlobal > 0 ? `${roasGlobal.toFixed(1)}x` : '—'}

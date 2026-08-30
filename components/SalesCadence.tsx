@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts'
 import { Ayuda } from '@/components/panel/Primitivos'
+import { ChartErrorBoundary } from '@/components/ChartErrorBoundary'
 
 type DayBin    = { date: string; orders: number }
 type CadenceData = {
@@ -140,32 +141,34 @@ export function SalesCadence({ since, until, acHex = 'var(--pnl-amber)' }: Props
               Órdenes por {data.binDays >= 7 ? 'semana' : 'día'}
             </p>
             {data.daily.length > 0 ? (
-              <ResponsiveContainer width="100%" height={90}>
-                <BarChart data={data.daily} margin={{ top: 2, right: 2, left: -32, bottom: 0 }} barCategoryGap="15%">
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fill: 'var(--pnl-text-3)', fontSize: 9 }}
-                    tickFormatter={d => tickLabel(d, data.binDays ?? 1)}
-                    axisLine={false} tickLine={false}
-                    interval={Math.max(0, Math.floor(data.daily.length / 8))}
-                  />
-                  <YAxis hide />
-                  <Tooltip
-                    contentStyle={{ background: 'var(--pnl-panel)', border: '1px solid var(--pnl-hair)', borderRadius: 8, fontSize: 11 }}
-                    formatter={(v: unknown) => [String(v), 'órdenes']}
-                    labelFormatter={l => String(l)}
-                    cursor={{ fill: 'var(--pnl-panel-2)' }}
-                  />
-                  <Bar dataKey="orders" radius={[2, 2, 0, 0]} maxBarSize={24}>
-                    {data.daily.map((entry, i) => (
-                      <Cell
-                        key={i}
-                        fill={entry.orders >= maxOrders * 0.7 ? acHex : `${acHex}55`}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <ChartErrorBoundary height={90}>
+                <ResponsiveContainer width="100%" height={90}>
+                  <BarChart data={data.daily} margin={{ top: 2, right: 2, left: -32, bottom: 0 }} barCategoryGap="15%">
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fill: 'var(--pnl-text-3)', fontSize: 9 }}
+                      tickFormatter={d => tickLabel(d, data.binDays ?? 1)}
+                      axisLine={false} tickLine={false}
+                      interval={Math.max(0, Math.floor(data.daily.length / 8))}
+                    />
+                    <YAxis hide />
+                    <Tooltip
+                      contentStyle={{ background: 'var(--pnl-panel)', border: '1px solid var(--pnl-hair)', borderRadius: 8, fontSize: 11 }}
+                      formatter={(v: unknown) => [String(v), 'órdenes']}
+                      labelFormatter={l => String(l)}
+                      cursor={{ fill: 'var(--pnl-panel-2)' }}
+                    />
+                    <Bar dataKey="orders" radius={[2, 2, 0, 0]} maxBarSize={24}>
+                      {data.daily.map((entry, i) => (
+                        <Cell
+                          key={i}
+                          fill={entry.orders >= maxOrders * 0.7 ? acHex : `${acHex}55`}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartErrorBoundary>
             ) : (
               <div className="h-[90px] flex items-center justify-center text-[11px] text-[var(--pnl-text-3)]">
                 Sin datos para el gráfico

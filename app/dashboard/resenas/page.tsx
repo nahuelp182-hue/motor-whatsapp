@@ -11,6 +11,7 @@ import { NumeroRodante } from '@/components/widgets/NumeroRodante'
 import { PanelShell } from '@/components/PanelShell'
 import { Banda, Seccion as PanelSeccion } from '@/components/panel/Primitivos'
 import { Button } from '@/components/ui/button'
+import { ChartErrorBoundary } from '@/components/ChartErrorBoundary'
 
 // Moderación de reseñas. Las del formulario público nacen pendientes y no se muestran en el
 // sitio hasta que se aprueban acá. Las de WhatsApp/Google entran ya aprobadas (son verificadas),
@@ -300,27 +301,33 @@ export default function ResenasPage() {
               Cuántas llegan por mes (barras) y con qué puntaje promedio (línea). Un mes en cero
               no es un bache de opinión: es que nadie pidió la reseña.
             </p>
-            <ResponsiveContainer width="100%" height={200}>
-              <ComposedChart data={resumen?.meses ?? []} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="var(--pnl-hair)" />
-                <XAxis dataKey="label" tick={{ fill: 'var(--pnl-text-3)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fill: 'var(--pnl-text-3)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="p" orientation="right" domain={[0, 5]} ticks={[0, 5]} tick={{ fill: 'var(--pnl-text-3)', fontSize: 10 }} axisLine={false} tickLine={false} width={22} />
-                <Tooltip content={<TooltipChart />} cursor={{ fill: 'rgba(245,166,35,.04)' }} />
-                <Bar dataKey="n" name="Reseñas" fill="var(--pnl-lilac)" opacity={0.85} radius={[3, 3, 0, 0]} />
-                <Line
-                  yAxisId="p"
-                  type="monotone"
-                  dataKey="promedio"
-                  name="Promedio"
-                  connectNulls
-                  stroke={DORADO}
-                  strokeWidth={2}
-                  dot={{ r: 3, fill: DORADO, strokeWidth: 0 }}
-                  activeDot={{ r: 4 }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
+            {(resumen?.meses ?? []).length === 0 ? (
+              <div className="h-[200px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos todavía</div>
+            ) : (
+              <ChartErrorBoundary height={200}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <ComposedChart data={resumen?.meses ?? []} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                    <CartesianGrid vertical={false} stroke="var(--pnl-hair)" />
+                    <XAxis dataKey="label" tick={{ fill: 'var(--pnl-text-3)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fill: 'var(--pnl-text-3)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="p" orientation="right" domain={[0, 5]} ticks={[0, 5]} tick={{ fill: 'var(--pnl-text-3)', fontSize: 10 }} axisLine={false} tickLine={false} width={22} />
+                    <Tooltip content={<TooltipChart />} cursor={{ fill: 'rgba(245,166,35,.04)' }} />
+                    <Bar dataKey="n" name="Reseñas" fill="var(--pnl-lilac)" opacity={0.85} radius={[3, 3, 0, 0]} />
+                    <Line
+                      yAxisId="p"
+                      type="monotone"
+                      dataKey="promedio"
+                      name="Promedio"
+                      connectNulls
+                      stroke={DORADO}
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: DORADO, strokeWidth: 0 }}
+                      activeDot={{ r: 4 }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </ChartErrorBoundary>
+            )}
           </div>
 
           <div className={`${CARD} p-5`}>

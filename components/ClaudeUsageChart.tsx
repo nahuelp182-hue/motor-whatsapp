@@ -33,6 +33,9 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function ClaudeUsageChart({ data }: { data: UsageDay[] }) {
+  if (!data.length) return (
+    <div className="h-[200px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos</div>
+  )
   return (
     <ResponsiveContainer width="100%" height={200}>
       <BarChart data={data} margin={{ top: 4, right: 4, left: -12, bottom: 0 }} barCategoryGap={2}>

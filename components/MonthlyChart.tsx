@@ -33,6 +33,9 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function MonthlyRevenueChart({ data }: { data: MonthStat[] }) {
+  if (!data.length) return (
+    <div className="h-[220px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos</div>
+  )
   return (
     <ResponsiveContainer width="100%" height={220}>
       <ComposedChart data={data} margin={{ top: 4, right: 4, left: -15, bottom: 0 }} barGap={2}>
@@ -64,6 +67,9 @@ export function MonthlyRevenueChart({ data }: { data: MonthStat[] }) {
 }
 
 export function RoasCacChart({ data }: { data: MonthStat[] }) {
+  if (!data.length) return (
+    <div className="h-[180px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos</div>
+  )
   return (
     <ResponsiveContainer width="100%" height={180}>
       <ComposedChart data={data} margin={{ top: 4, right: 40, left: -15, bottom: 0 }}>
@@ -92,6 +98,9 @@ export function RoasCacChart({ data }: { data: MonthStat[] }) {
 }
 
 export function AvgTicketChart({ data }: { data: MonthStat[] }) {
+  if (!data.length) return (
+    <div className="h-[160px] flex items-center justify-center text-[var(--pnl-text-3)] text-xs">Sin datos</div>
+  )
   return (
     <ResponsiveContainer width="100%" height={160}>
       <ComposedChart data={data} margin={{ top: 4, right: 4, left: -15, bottom: 0 }}>
