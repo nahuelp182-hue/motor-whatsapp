@@ -9,6 +9,7 @@ import { put } from '@vercel/blob'
 import { prisma } from '@/lib/prisma'
 import { consumirLimite, ipDe, limpiarVencidos, respuesta429 } from '@/lib/ratelimit'
 import { productosTN } from '@/lib/widgets/productos'
+import { MARCA } from '@/lib/marca'
 
 export const runtime = 'nodejs'
 
@@ -17,14 +18,23 @@ const FOTO_TIPOS = ['image/jpeg', 'image/webp', 'image/png']
 const FOTO_TOPE = 4 * 1024 * 1024 // el navegador ya la achica a ~1200px; esto es el techo duro
 
 // Mismo criterio que /api/lead: solo el storefront y la capa de guías pueden postear acá.
-const ORIGENES = [
-  'https://infomicelium.com.ar',
-  'https://www.infomicelium.com.ar',
-  'https://micelium2.mitiendanube.com',
-  'https://mw-micelium.vercel.app',
-  'https://guias.infomicelium.com.ar',
-  'https://guia.infomicelium.com.ar',
-]
+// La lista depende de la instancia: en Osamayor los dominios de Micelium no existen, y sin
+// el suyo propio el formulario de reseñas de la tienda no podría postear (CORS lo cortaría).
+const ORIGENES = MARCA.clave === 'osamayor'
+  ? [
+      'https://www.tiendaosamayor.com.ar',
+      'https://tiendaosamayor.com.ar',
+      'https://emuna23.mitiendanube.com',
+      'https://osamayor-nine.vercel.app',
+    ]
+  : [
+      'https://infomicelium.com.ar',
+      'https://www.infomicelium.com.ar',
+      'https://micelium2.mitiendanube.com',
+      'https://mw-micelium.vercel.app',
+      'https://guias.infomicelium.com.ar',
+      'https://guia.infomicelium.com.ar',
+    ]
 
 function cors(req: NextRequest): Record<string, string> {
   const origen = req.headers.get('origin') ?? ''

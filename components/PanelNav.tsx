@@ -15,6 +15,7 @@ import {
   X,
   Activity,
 } from 'lucide-react'
+import { MARCA, seccionHabilitada } from '@/lib/marca'
 
 // Navegación del panel. Reemplaza a SidebarNav resolviendo tres cosas que
 // aquella no tenía:
@@ -37,6 +38,9 @@ const ITEMS = [
   { href: '/sistema', label: 'Sistema', icon: Activity },
 ] as const
 
+// Cada instancia ve solo sus secciones (ver lib/marca.ts). Micelium las ve todas.
+const ITEMS_VISIBLES = ITEMS.filter(i => seccionHabilitada(i.href))
+
 // `/dashboard` es prefijo de `/dashboard/widgets`, así que la coincidencia
 // exacta va primero: si no, Métricas queda activa en las tres.
 function esActivo(href: string, path: string) {
@@ -50,7 +54,7 @@ function Items({ riel, onNavegar }: { riel?: boolean; onNavegar?: () => void }) 
 
   return (
     <nav className="flex flex-col gap-0.5 px-3" aria-label="Secciones del panel">
-      {ITEMS.map(({ href, label, icon: Icono }) => {
+      {ITEMS_VISIBLES.map(({ href, label, icon: Icono }) => {
         const activo = esActivo(href, path)
         return (
           <Link
@@ -90,9 +94,9 @@ function Marca({ riel }: { riel?: boolean }) {
       ].join(' ')}
     >
       <span className="grid size-[26px] shrink-0 place-items-center rounded-md bg-gradient-to-br from-[var(--pnl-amber)] to-[var(--pnl-amber-soft)] text-[13px] font-bold text-[#23262F]">
-        M
+        {MARCA.inicial}
       </span>
-      {!riel && <span className="whitespace-nowrap text-[13.5px] font-semibold">Micelium®</span>}
+      {!riel && <span className="whitespace-nowrap text-[13.5px] font-semibold">{MARCA.nombre}</span>}
     </div>
   )
 }

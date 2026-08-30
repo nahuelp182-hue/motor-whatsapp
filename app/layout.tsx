@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Manrope, DM_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
+import { MARCA } from "@/lib/marca";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -25,9 +26,11 @@ const dmMono = DM_Mono({
   display: "swap",
 });
 
+// El título sale de la marca de la instancia: el mismo repo sirve varios paneles y la
+// pestaña del navegador no puede decir "Micelium" en la tienda de otro.
 export const metadata: Metadata = {
-  title: "Motor WhatsApp — Micelium",
-  description: "Dashboard de métricas",
+  title: MARCA.clave === 'micelium' ? "Motor WhatsApp — Micelium" : `Panel — ${MARCA.nombre}`,
+  description: MARCA.subtitulo,
 };
 
 export default function RootLayout({

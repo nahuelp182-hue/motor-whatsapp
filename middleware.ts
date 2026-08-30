@@ -5,6 +5,7 @@ import {
   COOKIE_CLIENTE_NOMBRE,
   verificarSesionCliente,
 } from '@/lib/session'
+import { MARCA } from '@/lib/marca'
 
 // Assets del storefront que se sirven a cualquiera (van embebidos en Tiendanube).
 const PUBLICOS = new Set([
@@ -42,6 +43,38 @@ const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/
 // '/e' es la entrada pre-autenticada: llega sin sesión por definición (el token ES la
 // credencial) y se valida sola, así que no puede quedar detrás de la contraseña del panel.
 const PREFIJOS_PUBLICOS = ['/guia', '/acceso', '/contacto', '/e']
+
+// ── Recorte por marca ────────────────────────────────────────────────────────
+// El mismo repo se despliega en varios proyectos de Vercel. Una instancia acotada
+// (Osamayor) solo debe poder llegar a SUS secciones: el resto del panel muestra datos de
+// Micelium (Meta Ads, MercadoLibre, apicultura, conversaciones) y no puede quedar accesible
+// escribiendo la URL a mano, aunque quien lo intente tenga la clave de esa instancia.
+//
+// Es una ALLOWLIST y no una lista de bloqueo a propósito: una ruta nueva del panel nace
+// bloqueada en las instancias acotadas en vez de nacer expuesta y depender de que alguien
+// se acuerde de agregarla acá.
+//
+// La comprobación va DESPUÉS de validar la sesión (más abajo), así que un visitante sin
+// clave ve exactamente lo mismo que antes y no puede sondear qué rutas existen.
+const PREFIJOS_MARCA: readonly string[] | null = MARCA.secciones === null
+  ? null
+  : [
+      ...MARCA.secciones,
+      // APIs que consumen esas pantallas.
+      '/api/widgets/admin',
+      '/api/resenas',
+      // Infraestructura común, no específica de una tienda.
+      '/api/auth',
+      '/api/tiendanube',
+    ]
+
+function permitidoParaLaMarca(pathname: string): boolean {
+  if (PREFIJOS_MARCA === null) return true          // Micelium: panel completo.
+  // '/404-marca' es el destino del rewrite de más abajo: si no estuviera exento, el propio
+  // corte lo bloquearía y el rewrite entraría en bucle.
+  if (pathname === '/' || pathname === '/login' || pathname === '/404-marca') return true
+  return PREFIJOS_MARCA.some(p => pathname === p || pathname.startsWith(p + '/'))
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -98,7 +131,17 @@ export async function middleware(request: NextRequest) {
   }
 
   const sesion = await verificarSesion(request.cookies.get(COOKIE_SESION)?.value, password)
-  if (sesion) return NextResponse.next()
+  if (sesion) {
+    // Sesión válida, pero la instancia puede no tener habilitada esta sección.
+    // 404 y no 403: para esta instancia la ruta directamente no existe.
+    if (!permitidoParaLaMarca(pathname)) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+      }
+      return NextResponse.rewrite(new URL('/404-marca', request.url), { status: 404 })
+    }
+    return NextResponse.next()
+  }
 
   if (pathname.startsWith('/api/')) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })

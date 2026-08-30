@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { MARCA, seccionHabilitada } from '@/lib/marca'
 
 function LoginForm() {
   const [password, setPassword]   = useState('')
@@ -11,7 +12,10 @@ function LoginForm() {
   const inputRef                  = useRef<HTMLInputElement>(null)
   const router                    = useRouter()
   const searchParams              = useSearchParams()
-  const from                      = searchParams.get('from') ?? '/dashboard'
+  // Cada instancia arranca en su propia sección: en una acotada (Osamayor) '/dashboard'
+  // está bloqueado por el middleware, así que el default no puede ser fijo.
+  const pedido                    = searchParams.get('from')
+  const from                      = pedido && seccionHabilitada(pedido) ? pedido : MARCA.inicio
 
   useEffect(() => { inputRef.current?.focus() }, [])
 
@@ -59,8 +63,8 @@ function LoginForm() {
 
         {/* Logo / título */}
         <div className="text-center mb-8">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-orange-400/60 mb-1">Motor WhatsApp</p>
-          <h1 className="text-lg font-bold text-white">Panel de métricas</h1>
+          <p className="text-[10px] uppercase tracking-[0.22em] text-orange-400/60 mb-1">{MARCA.nombre}</p>
+          <h1 className="text-lg font-bold text-white">{MARCA.subtitulo}</h1>
           <p className="text-xs text-white/35 mt-1">Acceso restringido — ingresá tu clave</p>
         </div>
 

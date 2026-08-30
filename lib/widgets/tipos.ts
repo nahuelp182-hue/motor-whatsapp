@@ -1,3 +1,5 @@
+import { MARCA } from '@/lib/marca'
+
 // Registro de tipos de widget.
 //
 // ESTE ARCHIVO ES EL CONTRATO. Un tipo declara qué campos tiene; el panel arma el
@@ -235,17 +237,25 @@ export const UBICACIONES = [...UBICACIONES_TEXTO, ...UBICACIONES_FICHA] as const
 // ── Destinos de enlace ───────────────────────────────────────────────────────
 // Lista cerrada de destinos reales. Evita tener que escribir direcciones a mano (y que
 // una dirección mal tipeada mande a los visitantes a una página que no existe).
-export const DESTINOS = [
-  { value: '', label: 'Sin enlace (el botón no aparece)' },
-  { value: 'https://infomicelium.com.ar', label: 'Tienda — portada' },
-  { value: 'https://infomicelium.com.ar/productos', label: 'Tienda — todos los productos' },
-  { value: 'https://infomicelium.com.ar/productos/pack-oferta-incubadora-automatica-inc101/', label: 'Producto — Incubadora INC101 (pack)' },
-  { value: '/guia', label: 'Guías — índice' },
-  { value: '/guia/asistente', label: 'Guías — asistente' },
-  { value: '/contacto', label: 'Contacto' },
-  { value: '/acceso', label: 'Mi equipo (área de clientes)' },
-  { value: 'https://wa.me/543512145521', label: 'WhatsApp de Micelium' },
-] as const
+// Los destinos son propios de cada tienda: ofrecerle a OSA MAYOR un enlace a
+// infomicelium.com.ar mandaría a sus visitantes a otro negocio.
+export const DESTINOS = MARCA.clave === 'osamayor'
+  ? ([
+      { value: '', label: 'Sin enlace (el botón no aparece)' },
+      { value: 'https://www.tiendaosamayor.com.ar', label: 'Tienda — portada' },
+      { value: 'https://www.tiendaosamayor.com.ar/productos', label: 'Tienda — todos los productos' },
+    ] as const)
+  : ([
+      { value: '', label: 'Sin enlace (el botón no aparece)' },
+      { value: 'https://infomicelium.com.ar', label: 'Tienda — portada' },
+      { value: 'https://infomicelium.com.ar/productos', label: 'Tienda — todos los productos' },
+      { value: 'https://infomicelium.com.ar/productos/pack-oferta-incubadora-automatica-inc101/', label: 'Producto — Incubadora INC101 (pack)' },
+      { value: '/guia', label: 'Guías — índice' },
+      { value: '/guia/asistente', label: 'Guías — asistente' },
+      { value: '/contacto', label: 'Contacto' },
+      { value: '/acceso', label: 'Mi equipo (área de clientes)' },
+      { value: 'https://wa.me/543512145521', label: 'WhatsApp de Micelium' },
+    ] as const)
 
 // Emojis que se usan de verdad en la marca. Que la lista sea corta es la gracia: evita el
 // desfile de emojis que hace ver improvisado a un sitio.

@@ -7,6 +7,7 @@ import { VistaPrevia, type Resenas } from '@/components/widgets/VistaPrevia'
 import { Metricas } from '@/components/widgets/Metricas'
 import { CARD, LABEL, AYUDA, AVISO, ACENTO, SECCION, SECCION_SUB, SUBSECCION, TONOS, type TonoKey, CATEGORIAS, catDe, iconoDe } from '@/components/widgets/ui'
 import { NumeroRodante } from '@/components/widgets/NumeroRodante'
+import { MARCA } from '@/lib/marca'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
@@ -41,11 +42,19 @@ type Metricas = Record<string, { impresion: number; interaccion: number; convers
 type Pagina = { ruta: string; titulo: string }
 type Producto = { id: string; nombre: string; precio: number; imagen: string | null }
 
-const CONTEXTOS: { key: Contexto; label: string; icono: string; donde: string }[] = [
-  { key: 'guias', label: 'Guías', icono: '📚', donde: 'Las notas y guías de guias.infomicelium.com.ar' },
-  { key: 'tienda', label: 'Tienda', icono: '🏪', donde: 'Portada y listados de infomicelium.com.ar' },
-  { key: 'producto', label: 'Ficha de producto', icono: '🏷️', donde: 'La página de un producto, donde se decide la compra' },
-]
+// El contexto "guías" es la capa de contenido de Micelium; en otra tienda no existe, y
+// los dominios de ejemplo tienen que ser los suyos.
+const CONTEXTOS: { key: Contexto; label: string; icono: string; donde: string }[] =
+  MARCA.clave === 'osamayor'
+    ? [
+        { key: 'tienda', label: 'Tienda', icono: '🏪', donde: 'Portada y listados de tiendaosamayor.com.ar' },
+        { key: 'producto', label: 'Ficha de producto', icono: '🏷️', donde: 'La página de un producto, donde se decide la compra' },
+      ]
+    : [
+        { key: 'guias', label: 'Guías', icono: '📚', donde: 'Las notas y guías de guias.infomicelium.com.ar' },
+        { key: 'tienda', label: 'Tienda', icono: '🏪', donde: 'Portada y listados de infomicelium.com.ar' },
+        { key: 'producto', label: 'Ficha de producto', icono: '🏷️', donde: 'La página de un producto, donde se decide la compra' },
+      ]
 
 const NUM = (n: number) => new Intl.NumberFormat('es-AR').format(n)
 
@@ -58,7 +67,9 @@ export default function WidgetsPage() {
   // Reseñas publicadas: viajan al panel solo para que la vista previa del widget de reseñas
   // dibuje las de verdad. No se editan desde acá.
   const [resenas, setResenas] = useState<Resenas>({ items: [], promedio: null, total: 0 })
-  const [ctx, setCtx] = useState<Contexto>('guias')
+  // El contexto inicial sale de la lista real y no de la constante 'guias': en una tienda
+  // sin capa de guías ese contexto no existe, y `ctxActual` quedaba undefined.
+  const [ctx, setCtx] = useState<Contexto>(CONTEXTOS[0].key)
   const [editando, setEditando] = useState<Widget | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [cargando, setCargando] = useState(true)
@@ -142,7 +153,9 @@ export default function WidgetsPage() {
     }
   }, [delCtx, metricas])
 
-  const ctxActual = CONTEXTOS.find(c => c.key === ctx)!
+  // Sin el `?? CONTEXTOS[0]`, un `ctx` que no esté en la lista (contexto retirado, estado
+  // viejo) rompe la página entera al leer `.donde` de undefined.
+  const ctxActual = CONTEXTOS.find(c => c.key === ctx) ?? CONTEXTOS[0]
 
   return (
     <PanelShell
