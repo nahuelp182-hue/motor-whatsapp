@@ -55,25 +55,21 @@ function LoginForm() {
   }
 
   return (
-    <main
-      className="min-h-screen flex items-center justify-center p-4 font-sans"
-      style={{ background: 'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(249,115,22,0.08) 0%, transparent 60%), #07070f' }}
-    >
+    <main className="panel-root min-h-screen flex items-center justify-center p-4 font-sans">
       <div className="w-full max-w-xs">
 
         {/* Logo / título */}
         <div className="text-center mb-8">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-orange-400/60 mb-1">{MARCA.nombre}</p>
-          <h1 className="text-lg font-bold text-white">{MARCA.subtitulo}</h1>
-          <p className="text-xs text-white/35 mt-1">Acceso restringido — ingresá tu clave</p>
+          <p className="text-[10px] uppercase tracking-[0.22em] mb-1" style={{ color: 'var(--pnl-amber)' }}>{MARCA.nombre}</p>
+          <h1 className="text-lg font-bold" style={{ color: 'var(--pnl-text)' }}>{MARCA.subtitulo}</h1>
+          <p className="text-xs mt-1" style={{ color: 'var(--pnl-text-3)' }}>Acceso restringido — ingresá tu clave</p>
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl border border-white/[0.08] p-6"
-          style={{ background: '#111119' }}>
+        <div className="rounded-2xl p-6" style={{ background: 'var(--pnl-panel)', border: '1px solid var(--pnl-hair)' }}>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[10px] uppercase tracking-[0.15em] text-white/40 mb-2">
+              <label className="block text-[10px] uppercase tracking-[0.15em] mb-2" style={{ color: 'var(--pnl-text-3)' }}>
                 Contraseña
               </label>
               <input
@@ -82,15 +78,20 @@ function LoginForm() {
                 value={password}
                 onChange={e => { setPassword(e.target.value); setError('') }}
                 placeholder="••••••••"
-                className="w-full rounded-xl border border-white/10 bg-[#14141c] px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-orange-500/40 focus:bg-[#191922] transition-all"
+                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none transition-all"
+                style={{
+                  background:  'var(--pnl-panel-2)',
+                  border:      '1px solid var(--pnl-hair)',
+                  color:       'var(--pnl-text)',
+                }}
                 autoComplete="current-password"
                 disabled={loading}
               />
             </div>
 
             {error && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
-                <p className="text-xs text-red-400">{error}</p>
+              <div className="rounded-lg px-3 py-2" style={{ background: 'rgba(232,80,58,0.08)', border: '1px solid rgba(232,80,58,0.25)' }}>
+                <p className="text-xs" style={{ color: 'var(--pnl-red-text)' }}>{error}</p>
               </div>
             )}
 
@@ -99,9 +100,9 @@ function LoginForm() {
               disabled={loading || !password}
               className="w-full rounded-xl py-3 text-sm font-semibold transition-all disabled:opacity-40"
               style={{
-                background:   'rgba(249,115,22,0.18)',
-                border:       '1px solid rgba(249,115,22,0.28)',
-                color:        '#fb923c',
+                background:   'rgba(245,166,35,0.16)',
+                border:       '1px solid rgba(245,166,35,0.30)',
+                color:        'var(--pnl-amber-soft)',
               }}
             >
               {loading
@@ -111,7 +112,7 @@ function LoginForm() {
           </form>
         </div>
 
-        <p className="text-center text-[10px] text-white/15 mt-5">
+        <p className="text-center text-[10px] mt-5" style={{ color: 'var(--pnl-text-3)', opacity: 0.6 }}>
           {MARCA.pie} © {new Date().getFullYear()}
         </p>
       </div>
