@@ -47,7 +47,10 @@ function fmtHours(h: number): string {
 
 export async function GET(req: NextRequest) {
   try {
-    if (!TN_TOKEN) return NextResponse.json({ error: 'TN_ACCESS_TOKEN not configured' })
+    if (!TN_TOKEN) return NextResponse.json({
+      error: 'TN_ACCESS_TOKEN not configured',
+      avg: null, best: null, worst: null, lastOrderAt: null, totalOrders: 0, daily: [],
+    })
 
     const p     = req.nextUrl.searchParams
     const today = new Date().toISOString().slice(0, 10)
@@ -123,6 +126,9 @@ export async function GET(req: NextRequest) {
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({
+      error: msg,
+      avg: null, best: null, worst: null, lastOrderAt: null, totalOrders: 0, daily: [],
+    }, { status: 500 })
   }
 }

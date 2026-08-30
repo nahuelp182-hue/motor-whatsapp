@@ -65,7 +65,10 @@ export function SalesCadence({ since, until, acHex = 'var(--pnl-amber)' }: Props
   }, [])
 
   const avgColor = data?.avg ? cadenceColor(data.avg.hours) : 'var(--pnl-text-3)'
-  const maxOrders = data ? Math.max(...data.daily.map(d => d.orders), 1) : 1
+  // El endpoint devuelve solo { error } cuando falta configuración (ej. TN_ACCESS_TOKEN en
+  // una instancia nueva): sin `daily`, un .map directo revienta el componente entero antes
+  // de llegar al chequeo de `data.error` de más abajo.
+  const maxOrders = data?.daily ? Math.max(...data.daily.map(d => d.orders), 1) : 1
 
   return (
     <div className="rounded-2xl border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] p-5">
@@ -178,7 +181,7 @@ export function SalesCadence({ since, until, acHex = 'var(--pnl-amber)' }: Props
         </div>
       )}
 
-      {!loading && !data && (
+      {!loading && (!data || data.error) && (
         <p className="text-[11px] text-[var(--pnl-text-3)] py-4">Sin datos disponibles</p>
       )}
     </div>
