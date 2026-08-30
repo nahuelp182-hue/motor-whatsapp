@@ -297,3 +297,93 @@ export function ErrorFuente({ que, detalle, onReintentar }: { que: string; detal
     </div>
   )
 }
+
+/* ── Rubro ────────────────────────────────────────────────────────────────
+   Sección colapsable con un resumen de una línea visible siempre, aunque esté
+   cerrada. El dashboard antes cargaba las 17 secciones abiertas de una: había
+   que scrollear diez pantallas para llegar a "métodos de pago". Colapsado por
+   default salvo `abiertoPorDefecto` — el primer rubro (resultado del negocio)
+   se pasa siempre abierto porque es lo que se mira todos los días. */
+export function Rubro({
+  n,
+  titulo,
+  resumen,
+  abiertoPorDefecto = false,
+  children,
+}: {
+  n: string
+  titulo: string
+  resumen?: ReactNode
+  abiertoPorDefecto?: boolean
+  children: ReactNode
+}) {
+  const [abierto, setAbierto] = useState(abiertoPorDefecto)
+  const id = useId()
+
+  return (
+    <div className="rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel)]">
+      <button
+        type="button"
+        onClick={() => setAbierto(v => !v)}
+        aria-expanded={abierto}
+        aria-controls={id}
+        className="flex w-full min-h-14 items-center gap-4 px-4 py-3 text-left hover:bg-[var(--pnl-panel-2)] transition-colors"
+      >
+        <span className="whitespace-nowrap text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--pnl-text-3)]">
+          <span className="mr-2 text-[var(--pnl-amber)]">{n}</span>
+          {titulo}
+        </span>
+        {!abierto && resumen && (
+          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--pnl-text-2)]">{resumen}</span>
+        )}
+        <span
+          aria-hidden
+          className={`ml-auto shrink-0 text-[var(--pnl-text-3)] transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`}
+        >
+          ▾
+        </span>
+      </button>
+      {abierto && (
+        <div id={id} className="flex flex-col gap-4 border-t border-[var(--pnl-hair)] p-4">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Pestañas ─────────────────────────────────────────────────────────────
+   Tabs internas de un Rubro para cuando un mismo tema tiene varios
+   sub-bloques (ej. "Publicidad y tráfico" = Meta / Atribución / Curiosos).
+   Solo se monta el contenido de la pestaña activa: evita que Recharts
+   dibuje 3 gráficos pesados cuando el usuario solo está mirando uno. */
+export function Pestanas({
+  tabs,
+  activa,
+  onCambiar,
+}: {
+  tabs: { id: string; label: string }[]
+  activa: string
+  onCambiar: (id: string) => void
+}) {
+  return (
+    <div role="tablist" className="flex flex-wrap gap-1 border-b border-[var(--pnl-hair)] pb-2">
+      {tabs.map(t => (
+        <button
+          key={t.id}
+          role="tab"
+          aria-selected={activa === t.id}
+          onClick={() => onCambiar(t.id)}
+          className={[
+            'min-h-9 rounded-md px-3 text-[12px] font-medium transition-all border',
+            activa === t.id
+              ? 'border-[color-mix(in_srgb,var(--pnl-amber)_30%,transparent)] bg-[color-mix(in_srgb,var(--pnl-amber)_15%,transparent)] text-[var(--pnl-amber)]'
+              : 'border-transparent text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)]',
+          ].join(' ')}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  )
+}
