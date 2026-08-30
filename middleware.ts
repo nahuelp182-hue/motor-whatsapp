@@ -60,8 +60,12 @@ const PREFIJOS_MARCA: readonly string[] | null = MARCA.secciones === null
   ? null
   : [
       ...MARCA.secciones,
-      // APIs que consumen esas pantallas.
-      '/api/widgets/admin',
+      // APIs que consumen esas pantallas. Va '/api/widgets' entero y no una lista de
+      // sub-rutas: enumerarlas a mano ya dejó afuera /metricas y /media (la pantalla
+      // quedaba en "Cargando…" y no se podían subir imágenes), y toda ruta futura del
+      // motor de widgets tendría el mismo problema. Todas son del motor de widgets, que
+      // es justamente lo que esta instancia sí administra.
+      '/api/widgets',
       '/api/resenas',
       // Infraestructura común, no específica de una tienda.
       '/api/auth',
