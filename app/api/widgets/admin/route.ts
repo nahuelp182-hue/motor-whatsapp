@@ -4,6 +4,7 @@ import { porSlug, configPorDefecto, sanearConfig, sanearReglas, TIPOS, type Cont
 import { GUIAS_PUBLICAS } from '@/lib/guias'
 import { productosTN } from '@/lib/widgets/productos'
 import { resenasPublicas } from '@/lib/widgets/datos'
+import { MARCA } from '@/lib/marca'
 
 // CRUD del panel. NO figura en API_ABIERTAS del middleware, así que exige sesión de
 // dashboard como cualquier otra ruta privada.
@@ -13,15 +14,24 @@ const CONTEXTOS: Contexto[] = ['guias', 'tienda', 'producto']
 
 // Páginas reales donde se puede acotar un widget. Se manda al panel para que la regla de
 // rutas se elija con casillas y no escribiendo direcciones a mano.
-const PAGINAS = [
-  { ruta: '/guia', titulo: 'Índice de guías' },
-  ...GUIAS_PUBLICAS.map(g => ({ ruta: `/guia/${g.slug}`, titulo: g.titulo })),
-  // El blog de Tiendanube (/blog/posts/...) corre como contexto "tienda" (LS.template =
-  // "blog-post"). Prefijo /blog = todos los posts. Es el tráfico orgánico de alta intención
-  // (51% de las impresiones del sitio) que hoy no se deriva al producto.
-  { ruta: '/blog', titulo: 'Blog (todos los posts)' },
-  { ruta: '/contacto', titulo: 'Contacto' },
-]
+//
+// Son propias de cada tienda, igual que CONTEXTOS (app/dashboard/widgets/page.tsx) y
+// DESTINOS (lib/widgets/tipos.ts): las guías, el blog y /contacto son de infomicelium.com.ar
+// y no existen en tiendaosamayor.com.ar. Antes esta lista era una sola para las dos marcas,
+// así que en el panel de OSA MAYOR aparecía "Índice de guías" y cada guía de Micelium como
+// si fueran páginas de su propia tienda — confuso y, si se marcaban, una regla de rutas que
+// nunca iba a matchear nada ahí.
+const PAGINAS = MARCA.clave === 'osamayor'
+  ? []
+  : [
+      { ruta: '/guia', titulo: 'Índice de guías' },
+      ...GUIAS_PUBLICAS.map(g => ({ ruta: `/guia/${g.slug}`, titulo: g.titulo })),
+      // El blog de Tiendanube (/blog/posts/...) corre como contexto "tienda" (LS.template =
+      // "blog-post"). Prefijo /blog = todos los posts. Es el tráfico orgánico de alta intención
+      // (51% de las impresiones del sitio) que hoy no se deriva al producto.
+      { ruta: '/blog', titulo: 'Blog (todos los posts)' },
+      { ruta: '/contacto', titulo: 'Contacto' },
+    ]
 
 /**
  * Las fichas de producto también son páginas donde acotar un widget, y son las únicas que

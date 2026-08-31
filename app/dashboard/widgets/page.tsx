@@ -17,7 +17,7 @@ import { Banda, Seccion as PanelSeccion } from '@/components/panel/Primitivos'
 import { Acordeon } from '@/components/widgets/Acordeon'
 import { resumenDeGrupo } from '@/components/widgets/resumen'
 import { validarConfig } from '@/lib/widgets/validacion'
-import { campoVisible, agruparCampos, GRUPOS } from '@/lib/widgets/tipos'
+import { campoVisible, agruparCampos, GRUPOS, claveEstilo } from '@/lib/widgets/tipos'
 import type { TipoWidget, Contexto } from '@/lib/widgets/tipos'
 import { RefreshCw, Plus, Trash2, Check } from 'lucide-react'
 
@@ -698,6 +698,7 @@ function Editor({
                     config={widget.config}
                     contexto={widget.contexto}
                     onChange={v => onCambio({ ...widget, config: { ...widget.config, [c.key]: v } })}
+                    onChangeEstilo={v => onCambio({ ...widget, config: { ...widget.config, [claveEstilo(c.key)]: v } })}
                   />
                 ))}
               </Acordeon>

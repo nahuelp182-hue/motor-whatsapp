@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import {
   PALETA,
   UBICACIONES_TEXTO,
@@ -7,8 +8,12 @@ import {
   DESTINOS,
   EMOJIS,
   PROPORCIONES,
+  FUENTES,
+  claveEstilo,
   type Campo,
+  type EstiloTexto,
 } from '@/lib/widgets/tipos'
+import { buscarEmojis } from './emojis'
 import { SubirMedia } from './SubirMedia'
 import { OpcionVisual, tieneDibujo } from './OpcionVisual'
 import { cn } from '@/lib/utils'
@@ -24,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowUp, ArrowDown, Trash2, Plus } from 'lucide-react'
+import { ArrowUp, ArrowDown, Trash2, Plus, Search, X } from 'lucide-react'
 
 // Formulario genérico: dibuja UN campo a partir de su declaración en lib/widgets/tipos.ts.
 // Ningún tipo de widget tiene formulario propio. Agregar un tipo nuevo no toca este archivo
@@ -48,6 +53,9 @@ type Props = {
    *  las ranuras de la ficha de producto o las del texto según esto. */
   contexto?: string
   onChange: (v: unknown) => void
+  /** Solo para campos con `formato: true`: guarda el objeto de estilo (cursiva, fuente,
+   *  color) en `config[claveEstilo(campo.key)]`, aparte del valor de texto del campo. */
+  onChangeEstilo?: (v: EstiloTexto) => void
 }
 
 // Traducción de las ubicaciones viejas (genéricas) a la ranura concreta de la ficha. Es la
@@ -97,7 +105,7 @@ function SelectCampo({
   )
 }
 
-export function CampoEditor({ campo, valor, productos = [], config, contexto, onChange }: Props) {
+export function CampoEditor({ campo, valor, productos = [], config, contexto, onChange, onChangeEstilo }: Props) {
   const ayuda = campo.ayuda ? <p className={AYUDA}>{campo.ayuda}</p> : null
 
   // ── Booleano: switch de shadcn ────────────────────────────────────────────
@@ -273,13 +281,19 @@ export function CampoEditor({ campo, valor, productos = [], config, contexto, on
     )
   }
 
-  // ── Emoji: paleta corta de marca ───────────────────────────────────────────
+  // ── Emoji: favoritos de marca + buscador completo ──────────────────────────
+  // Los 18 de siempre quedan sueltos, un clic. Para el resto ("Más emojis…") se abre un
+  // buscador sobre un catálogo bastante más amplio (components/widgets/emojis.ts) — la
+  // validación del servidor (lib/widgets/tipos.ts, sanearConfig) ya no exige que el valor
+  // esté en la lista corta, solo que sea un emoji real, así que cualquiera de los dos
+  // caminos guarda sin que el campo se resetee.
   if (campo.tipo === 'emoji') {
     const chip = (activo: boolean) =>
       cn(
         'flex h-9 w-9 items-center justify-center rounded-lg border leading-none transition-all',
         activo ? 'border-primary/55 bg-primary/8 ring-2 ring-primary/15' : 'border-border bg-card hover:border-foreground/20',
       )
+    const esFavorito = (EMOJIS as readonly string[]).includes(String(valor ?? ''))
     return (
       <div>
         {etiqueta}
@@ -292,6 +306,11 @@ export function CampoEditor({ campo, valor, productos = [], config, contexto, on
               {e}
             </button>
           ))}
+          <SelectorEmoji
+            valorActual={String(valor ?? '')}
+            resaltado={!esFavorito && !!valor}
+            onElegir={onChange}
+          />
         </div>
         {ayuda}
       </div>
@@ -407,13 +426,21 @@ export function CampoEditor({ campo, valor, productos = [], config, contexto, on
                     campo={sub}
                     valor={item[sub.key]}
                     productos={productos}
-                    // La config del widget, no la del ítem: la medida sugerida de una imagen
-                    // del carrusel sale de la proporción elegida para TODAS las tarjetas.
-                    config={config}
+                    // La config del widget, no la del ítem, para casi todo: la medida
+                    // sugerida de una imagen del carrusel sale de la proporción elegida para
+                    // TODAS las tarjetas. El estilo de texto es la excepción — cada ítem de
+                    // la lista tiene el suyo — así que se inyecta acá adentro del ítem, con
+                    // la misma clave `${key}_estilo` que usa un campo suelto.
+                    config={{ ...config, [claveEstilo(sub.key)]: item[claveEstilo(sub.key)] }}
                     contexto={contexto}
                     onChange={v => {
                       const c = [...items]
                       c[i] = { ...c[i], [sub.key]: v }
+                      onChange(c)
+                    }}
+                    onChangeEstilo={v => {
+                      const c = [...items]
+                      c[i] = { ...c[i], [claveEstilo(sub.key)]: v }
                       onChange(c)
                     }}
                   />
@@ -508,7 +535,196 @@ export function CampoEditor({ campo, valor, productos = [], config, contexto, on
       ) : (
         <Input type="text" value={String(valor ?? '')} placeholder={campo.placeholder} onChange={e => onChange(e.target.value)} />
       )}
+      {campo.formato && (campo.tipo === 'texto' || campo.tipo === 'textarea') && onChangeEstilo && (
+        <FormatoTexto
+          estilo={(config?.[claveEstilo(campo.key)] as EstiloTexto | undefined) ?? {}}
+          onChange={onChangeEstilo}
+        />
+      )}
       {ayuda}
+    </div>
+  )
+}
+
+/**
+ * Mini-toolbar de cursiva, tipografía y color para un campo `texto`/`textarea` con
+ * `formato: true`. Aplica al campo entero, no a una selección de palabras — ver el comentario
+ * de `Campo.formato` en lib/widgets/tipos.ts para el porqué.
+ */
+function FormatoTexto({ estilo, onChange }: { estilo: EstiloTexto; onChange: (v: EstiloTexto) => void }) {
+  const set = (patch: Partial<EstiloTexto>) => onChange({ ...estilo, ...patch })
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 p-2">
+      <button
+        type="button"
+        onClick={() => set({ cursiva: !estilo.cursiva })}
+        title="Cursiva"
+        aria-pressed={!!estilo.cursiva}
+        className={cn(
+          'flex h-7 w-7 items-center justify-center rounded-md border font-serif text-sm italic transition-all',
+          estilo.cursiva ? 'border-primary/55 bg-primary/10 text-foreground' : 'border-border text-muted-foreground hover:text-foreground',
+        )}
+      >
+        I
+      </button>
+      <span className="h-5 w-px bg-border" />
+      <div className="flex items-center gap-1">
+        {FUENTES.map(f => (
+          <button
+            key={f.value}
+            type="button"
+            onClick={() => set({ fuente: f.value })}
+            title={f.label}
+            style={{ fontFamily: f.css }}
+            className={cn(
+              'flex h-7 items-center rounded-md border px-2 text-xs transition-all',
+              (estilo.fuente ?? 'sans') === f.value
+                ? 'border-primary/55 bg-primary/10 text-foreground'
+                : 'border-border text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Aa
+          </button>
+        ))}
+      </div>
+      <span className="h-5 w-px bg-border" />
+      <div className="flex items-center gap-1.5">
+        {PALETA.map(p => (
+          <button
+            key={p.value}
+            type="button"
+            title={p.label}
+            onClick={() => set({ color: p.value })}
+            className="h-6 w-6 rounded-full border-2 transition-all"
+            style={{
+              background: p.hex,
+              borderColor: estilo.color === p.value ? 'var(--foreground)' : 'var(--border)',
+            }}
+          />
+        ))}
+        <label
+          className={cn(
+            'flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border-2',
+            String(estilo.color ?? '').startsWith('#') ? 'border-foreground' : 'border-border',
+          )}
+          title="Color propio"
+        >
+          <input
+            type="color"
+            className="h-0 w-0 opacity-0"
+            value={String(estilo.color ?? '').startsWith('#') ? String(estilo.color) : '#6f8a5f'}
+            onChange={e => set({ color: e.target.value })}
+          />
+          <span className="text-[10px] leading-none text-muted-foreground">+</span>
+        </label>
+        {estilo.color && (
+          <button
+            type="button"
+            onClick={() => set({ color: undefined })}
+            title="Quitar color (vuelve al color del widget)"
+            className="text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Botón "Más emojis…" que abre un desplegable con buscador sobre el catálogo amplio. Sin
+ * librería de popover en el proyecto: se cierra solo con un click afuera o con Escape, como
+ * cualquier menú de este tipo.
+ */
+function SelectorEmoji({
+  valorActual,
+  resaltado,
+  onElegir,
+}: {
+  valorActual: string
+  resaltado: boolean
+  onElegir: (v: string) => void
+}) {
+  const [abierto, setAbierto] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false)
+    }
+    const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false) }
+    document.addEventListener('mousedown', fuera)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('mousedown', fuera)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [abierto])
+
+  const resultados = buscarEmojis(busqueda)
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setAbierto(v => !v)}
+        title={resaltado ? `Elegido: ${valorActual}` : 'Buscar entre todos los emojis'}
+        className={cn(
+          'flex h-9 items-center gap-1 rounded-lg border px-2.5 text-xs transition-all',
+          resaltado || abierto
+            ? 'border-primary/55 bg-primary/8 text-foreground ring-2 ring-primary/15'
+            : 'border-dashed border-border text-muted-foreground hover:border-foreground/25 hover:text-foreground',
+        )}
+      >
+        {resaltado ? <span className="text-base leading-none">{valorActual}</span> : <Search className="size-3.5" />}
+        Más emojis…
+      </button>
+      {abierto && (
+        <div className="absolute left-0 top-full z-20 mt-1.5 w-72 rounded-xl border border-border bg-popover p-2.5 shadow-lg">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              autoFocus
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              placeholder="Buscar por palabra (ej: camión, corazón)…"
+              className="h-8 pl-7 text-xs"
+            />
+            {busqueda && (
+              <button
+                type="button"
+                onClick={() => setBusqueda('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Limpiar búsqueda"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="mt-2 grid max-h-56 grid-cols-8 gap-1 overflow-y-auto">
+            {resultados.map(e => (
+              <button
+                key={e.char}
+                type="button"
+                title={e.kw}
+                onClick={() => { onElegir(e.char); setAbierto(false); setBusqueda('') }}
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-md text-lg leading-none transition-colors hover:bg-accent',
+                  valorActual === e.char && 'bg-primary/10 ring-1 ring-primary/40',
+                )}
+              >
+                {e.char}
+              </button>
+            ))}
+            {resultados.length === 0 && (
+              <p className="col-span-8 py-3 text-center text-xs text-muted-foreground">Sin resultados.</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

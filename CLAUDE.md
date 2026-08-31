@@ -91,6 +91,16 @@ toque la base hasta que esto se separe (bloque B).**
   `mw-micelium.vercel.app/dashboard`.
 - **Tiendanube escapa `<script>`** en external-codes: usar `<img onerror>` + un `.js` en
   `public/`, y agregar la ruta a `PUBLICOS` en `middleware.ts`.
+- **El filtro por marca (`MARCA.clave === 'osamayor'`) es un `if` copiado, no una garantía.**
+  Hoy vive en 6 lugares (`grep -rn "MARCA.clave ===" lib app`): `DESTINOS` y `TN_UA`
+  (`lib/widgets/tipos.ts`, `lib/widgets/productos.ts`), `PAGINAS` y `ORIGENES`
+  (`app/api/widgets/admin/route.ts`, `app/api/widgets/resena/route.ts`), `CONTEXTOS`
+  (`app/dashboard/widgets/page.tsx`) y el `<title>` (`app/layout.tsx`). Encontré `PAGINAS`
+  sin el filtro el 31/08/2026: el panel de OSA MAYOR ofrecía las guías y el blog de
+  infomicelium.com.ar como páginas propias. **Cada vez que se agrega una lista o constante
+  con contenido específico de Micelium (URLs, textos, nombres de página), repasar esos 6
+  puntos como checklist** — no hay chequeo automático que lo atrape, así que agregar un
+  séptimo lugar sin el filtro no rompe el build ni los tests.
 
 ---
 

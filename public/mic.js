@@ -110,6 +110,30 @@
     });
   }
 
+  var FUENTES_TXT = {
+    sans: 'ui-sans-serif, system-ui, "Segoe UI", Helvetica, Arial, sans-serif',
+    serif: 'ui-serif, Georgia, "Times New Roman", serif',
+    monoespaciada: 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace'
+  };
+
+  /* Texto escapado (esc) envuelto en un <span style="…"> cuando el campo tiene formato
+     propio (cursiva / tipografía / color — panel: CampoEditor.tsx, campo `${key}_estilo`).
+     El contenido del usuario sigue yendo por esc() como siempre; lo único que cambia es el
+     `style`, y ese sale de una tabla fija (FUENTES_TXT) más un color validado por paleta(),
+     nunca de un string libre — es la misma razón por la que esc() existe: nada que venga
+     del panel llega al HTML del sitio sin pasar por un filtro. Sin estilo, el resultado es
+     textualmente el mismo <span>esc(texto)</span> de antes, así que un campo sin `_estilo`
+     no cambia un píxel. */
+  function escStyle(s, estilo) {
+    var texto = esc(s);
+    if (!estilo) return texto;
+    var css = '';
+    if (estilo.cursiva) css += 'font-style:italic;';
+    if (estilo.fuente && FUENTES_TXT[estilo.fuente]) css += 'font-family:' + FUENTES_TXT[estilo.fuente] + ';';
+    if (estilo.color) css += 'color:' + paleta(estilo.color).bg + ';';
+    return css ? '<span style="' + css + '">' + texto + '</span>' : texto;
+  }
+
   /* Mismo vid que curiosos.js (clave __cur_vid, ver public/curiosos.js): así un
      WidgetEvent puede cruzarse por vid con el Visitor que ya cose curiosos_cosido.py.
      Fallback a la clave vieja __mic_vid solo de lectura, para no perder de golpe la
@@ -357,33 +381,44 @@
     return true;
   }
 
-  /* ── Recuadro ──
-     Borde alrededor del widget entero, para destacarlo del texto que lo rodea. Se aplica
-     acá, sobre el host del Shadow DOM, y no dentro de cada dibujo: así vale para todos los
-     tipos de bloque con una sola función, y un tipo nuevo lo hereda sin escribir nada.
+  /* ── Recuadro y espaciado ──
+     Borde y separación arriba/abajo del widget entero, para destacarlo del texto que lo
+     rodea y no quedar pegado al párrafo o bloque de al lado. Se aplica acá, sobre el host
+     del Shadow DOM, y no dentro de cada dibujo: así vale para todos los tipos de bloque con
+     una sola función, y un tipo nuevo lo hereda sin escribir nada.
      Va DESPUÉS de insertar, porque la rama de la ficha de producto pisa el style del host. */
   var LINEAS = { solida: 'solid', rayada: 'dashed', punteada: 'dotted', doble: 'double' };
+  // Misma tabla que ESPACIADO_PX en lib/widgets/tipos.ts (una sola fuente de la verdad —
+  // acá porque mic.js es el único que corre en el sitio, no importa el bundle de Next).
+  var ESPACIADO_PX = { ninguno: 0, chico: 12, normal: 22, grande: 40 };
 
   function aplicarRecuadro(host, c) {
-    var forma = c && c.recuadro;
+    c = c || {};
+    var forma = c.recuadro;
+    // El margen se aplica siempre —haya o no recuadro— porque el problema que resuelve
+    // (el widget pegado al párrafo anterior o siguiente) existe con y sin marco. 'normal'
+    // (22px) es el valor de siempre cuando no se eligió nada, así que un widget ya
+    // configurado sin tocar este campo se sigue viendo exactamente igual.
+    var espacio = ESPACIADO_PX.hasOwnProperty(c.espaciado) ? ESPACIADO_PX[c.espaciado] : ESPACIADO_PX.normal;
+    // El BASE_CSS del Shadow DOM arranca con `:host{all:initial}`, y eso deja al host en
+    // `display:inline`. Un borde o margen vertical sobre una caja en línea no se aplica bien
+    // (los extremos del borde se parten, el margen se ignora). Hay que pedir bloque siempre,
+    // no solo cuando hay recuadro.
+    host.style.display = 'block';
+    host.style.margin = espacio + 'px 0';
     if (!forma || forma === 'ninguno') return;
     // Sin color propio sigue al color principal del widget: el caso normal es que el marco
     // sea del mismo color que el resto, y así no hay que elegirlo dos veces.
     var p = paleta(c.recuadro_color || c.color);
     var g = Math.min(8, Math.max(1, Number(c.recuadro_grosor) || 2));
     var linea = LINEAS[c.recuadro_linea] || 'solid';
-    // El BASE_CSS del Shadow DOM arranca con `:host{all:initial}`, y eso deja al host en
-    // `display:inline`. Un borde sobre una caja en línea se parte en pedazos: se ven los
-    // extremos y nada de los tramos rectos. Hay que pedir bloque explícitamente.
-    host.style.display = 'block';
     host.style.border = g + 'px ' + linea + ' ' + p.bg;
     host.style.borderRadius = forma === 'redondo' ? '14px' : '0';
-    // El borde ya corta el colapso de márgenes, así que los márgenes que cada widget trae
+    // El borde corta el colapso de márgenes, así que los márgenes que cada widget trae
     // adentro (los 20px de sus cajas) quedan como aire interno. Acá se agrega el costado, que
     // ningún widget aporta, y un respiro arriba y abajo para los que empiezan con un título
     // sin margen —si no, el título queda pegado al trazo.
     host.style.padding = '8px 16px';
-    host.style.margin = '22px 0';
     if (c.recuadro_fondo) host.style.background = p.suave;
   }
 
@@ -621,7 +656,7 @@
       '.b.on{opacity:1;transform:none}',
       '<a class="b" target="_blank" rel="noopener"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">' +
       '<path d="M12 2a10 10 0 00-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1012 2zm5.8 14.2c-.2.7-1.4 1.3-2 1.4-.5.1-1.1.1-1.8-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.5-1.2-2.9s.7-2 1-2.3c.2-.3.5-.4.7-.4h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.5-.3.3c-.1.1-.2.3 0 .5.2.3.8 1.3 1.7 2.1 1.1 1 2 1.3 2.3 1.4.2.1.4.1.5-.1l.8-.9c.2-.2.3-.2.5-.1l2 .9c.2.1.4.2.4.3.1.1.1.6-.1 1.2z"/>' +
-      '</svg><span>' + esc(c.etiqueta || 'Consultanos') + '</span></a>');
+      '</svg><span>' + escStyle(c.etiqueta || 'Consultanos', c.etiqueta_estilo) + '</span></a>');
 
     var a = sh.querySelector('.b');
     var num = String(c.numero || '').replace(/\D/g, '');
@@ -655,10 +690,10 @@
       'font-weight:600;font-size:15px;text-decoration:none}',
       '<div class="c">' +
       (c.titulo || finales.length
-        ? '<h3>' + esc(c.titulo || '') + (finales.length ? ' <span class="alt"></span>' : '') + '</h3>'
+        ? '<h3>' + escStyle(c.titulo || '', c.titulo_estilo) + (finales.length ? ' <span class="alt"></span>' : '') + '</h3>'
         : '') +
-      (c.texto ? '<p>' + esc(c.texto) + '</p>' : '') +
-      (c.url ? '<a href="' + esc(c.url) + '">' + esc(c.etiqueta || 'Ver más') + '</a>' : '') + '</div>');
+      (c.texto ? '<p>' + escStyle(c.texto, c.texto_estilo) + '</p>' : '') +
+      (c.url ? '<a href="' + esc(c.url) + '">' + escStyle(c.etiqueta || 'Ver más', c.etiqueta_estilo) + '</a>' : '') + '</div>');
 
     if (finales.length) {
       rotarTexto(sh.querySelector('.alt'), finales, c.titulo_efecto || 'subir',
@@ -674,14 +709,14 @@
     var c = w.config, p = paleta(c.color);
     var sh = montar(w, false); if (!sh) return;
     var items = (c.items || []).map(function (i) {
-      return '<li><span class="i">' + esc(i.icono || '•') + '</span><span>' + esc(i.texto) + '</span></li>';
+      return '<li><span class="i">' + esc(i.icono || '•') + '</span><span>' + escStyle(i.texto, i.texto_estilo) + '</span></li>';
     }).join('');
     pintar(sh,
       'ul{list-style:none;margin:24px 0;padding:0;display:grid;gap:11px}' +
       'li{display:flex;gap:11px;align-items:flex-start;font-size:15px;line-height:1.5;color:#3a352e}' +
       '.i{flex:0 0 auto;font-size:17px}' +
       'h3{margin:0 0 14px;font-size:18px;color:' + p.bg + '}',
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') + '<ul>' + items + '</ul>');
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') + '<ul>' + items + '</ul>');
     verUnaVez(sh, w.id, c.animacion);
   };
 
@@ -694,7 +729,7 @@
       'b{display:block;font-size:15px;color:#2a2620;margin-bottom:3px}' +
       'span.t{font-size:13.5px;line-height:1.55;color:#5a534a}',
       '<div class="g"><div class="e">' + esc(c.icono || '🛡️') + '</div><div>' +
-      '<b>' + esc(c.titulo) + '</b><span class="t">' + esc(c.texto) + '</span></div></div>');
+      '<b>' + escStyle(c.titulo, c.titulo_estilo) + '</b><span class="t">' + escStyle(c.texto, c.texto_estilo) + '</span></div></div>');
     verUnaVez(sh, w.id, c.animacion);
   };
 
@@ -702,7 +737,7 @@
     var c = w.config, p = paleta(c.color);
     var sh = montar(w, false); if (!sh) return;
     var items = (c.items || []).map(function (i) {
-      return '<details><summary>' + esc(i.pregunta) + '</summary><div>' + esc(i.respuesta) + '</div></details>';
+      return '<details><summary>' + escStyle(i.pregunta, i.pregunta_estilo) + '</summary><div>' + escStyle(i.respuesta, i.respuesta_estilo) + '</div></details>';
     }).join('');
     pintar(sh,
       'h3{margin:0 0 16px;font-size:20px;color:#2a2620}' +
@@ -712,7 +747,7 @@
       'summary:after{content:"+";position:absolute;right:4px;top:13px;font-size:19px;color:#b5aca0}' +
       'details[open] summary:after{content:"–"}' +
       'div{padding:0 0 16px;font-size:14.5px;line-height:1.65;color:#4e4840;white-space:pre-wrap}',
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') + items);
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') + items);
 
     sh.querySelectorAll('summary').forEach(function (s) {
       s.addEventListener('click', function () { evento(w.id, 'interaccion'); }, { once: true });
@@ -804,7 +839,7 @@
     }
 
     var boton = conForm
-      ? '<button class="wr">' + esc(c.botonTexto || 'Escribir reseña') + '</button>'
+      ? '<button class="wr">' + escStyle(c.botonTexto || 'Escribir reseña', c.botonTexto_estilo) + '</button>'
       : '';
 
     var campoFoto = (conForm && c.permitirFoto)
@@ -866,8 +901,8 @@
       // Lightbox
       '.lb{display:none;position:fixed;inset:0;z-index:100000;background:rgba(10,9,7,.88);align-items:center;justify-content:center;padding:20px;cursor:zoom-out}' +
       '.lb.on{display:flex}.lb img{max-width:100%;max-height:100%;border-radius:8px}',
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
-      (c.subtitulo ? '<div class="sub">' + esc(c.subtitulo) + '</div>' : '') +
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') +
+      (c.subtitulo ? '<div class="sub">' + escStyle(c.subtitulo, c.subtitulo_estilo) + '</div>' : '') +
       '<div class="top">' + cab + boton + '</div>' +
       '<div class="g">' + cards + '</div>' + form + lightbox);
 
@@ -949,7 +984,7 @@
       // dejar una reseña de prueba esperando moderación.
       if (PREVIEW) {
         msg.className = 'msg ok';
-        msg.textContent = c.mensajeGracias || '¡Gracias! Tu reseña se publicará luego de una breve revisión.';
+        msg.innerHTML = escStyle(c.mensajeGracias || '¡Gracias! Tu reseña se publicará luego de una breve revisión.', c.mensajeGracias_estilo);
         return;
       }
 
@@ -964,7 +999,7 @@
         .then(function (r) { return r.json(); }).then(function (d) {
           if (d && d.ok) {
             msg.className = 'msg ok';
-            msg.textContent = c.mensajeGracias || '¡Gracias! Tu reseña se publicará luego de una breve revisión.';
+            msg.innerHTML = escStyle(c.mensajeGracias || '¡Gracias! Tu reseña se publicará luego de una breve revisión.', c.mensajeGracias_estilo);
             evento(w.id, 'conversion');
             var oc = ['.pick', '.nm', '.tx', '.fol', '.fop'];
             for (var k = 0; k < oc.length; k++) { var el = sh.querySelector(oc[k]); if (el) el.style.display = 'none'; }
@@ -999,7 +1034,7 @@
       '.b.on{transform:none}' +
       '.p{flex:1;font-size:16px;font-weight:700;color:#2a2620}' +
       'button{background:' + p.bg + ';color:' + p.texto + ';padding:13px 22px;border-radius:9px;font-size:15px;font-weight:700}',
-      '<div class="b"><div class="p">' + esc(precio) + '</div><button>' + esc(c.etiqueta || 'Agregar al carrito') + '</button></div>');
+      '<div class="b"><div class="p">' + esc(precio) + '</div><button>' + escStyle(c.etiqueta || 'Agregar al carrito', c.etiqueta_estilo) + '</button></div>');
 
     var barra = sh.querySelector('.b');
     sh.querySelector('button').addEventListener('click', function () {
@@ -1031,11 +1066,11 @@
 
     var form =
       '<form><input class="e" type="email" required placeholder="tu@email.com">' +
-      '<button type="submit">' + esc(c.etiqueta || 'Enviar') + '</button><div class="m"></div></form>';
+      '<button type="submit">' + escStyle(c.etiqueta || 'Enviar', c.etiqueta_estilo) + '</button><div class="m"></div></form>';
     var cuerpo =
       '<div class="cont">' + (popup ? '<button class="x" aria-label="Cerrar">×</button>' : '') +
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
-      (c.texto ? '<p>' + esc(c.texto) + '</p>' : '') + form + '</div>';
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') +
+      (c.texto ? '<p>' + escStyle(c.texto, c.texto_estilo) + '</p>' : '') + form + '</div>';
 
     pintar(sh,
       (popup
@@ -1060,7 +1095,7 @@
       evento(w.id, 'interaccion');
       // En vista previa se muestra el mensaje de gracias pero NO se da de alta el correo:
       // probar el formulario mientras se edita no puede ensuciar la lista de suscriptores.
-      if (PREVIEW) { msg.textContent = c.gracias || '¡Listo!'; return; }
+      if (PREVIEW) { msg.innerHTML = escStyle(c.gracias || '¡Listo!', c.gracias_estilo); return; }
       fetch(BASE + '/api/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1077,7 +1112,7 @@
             server: 'No se pudo enviar. Probá de nuevo en un minuto.'
           };
           if (d && d.error) { msg.textContent = ERRORES[d.error] || 'No se pudo enviar.'; return; }
-          msg.textContent = c.gracias || '¡Listo!';
+          msg.innerHTML = escStyle(c.gracias || '¡Listo!', c.gracias_estilo);
           evento(w.id, 'conversion');
           try { localStorage.setItem(clave, '1'); } catch (e) {}
           if (popup) setTimeout(cerrar, 2200);
@@ -1177,7 +1212,7 @@
       'b{font-size:20px;color:' + p.bg + '}' +
       'span{font-size:13px;color:#5a534a}',
       '<div class="c"><b>' + n + ' cuotas de ' + esc(pesos(total / n)) + '</b>' +
-      '<span>' + esc(c.texto || '') + '</span></div>');
+      '<span>' + escStyle(c.texto || '', c.texto_estilo) + '</span></div>');
     verUnaVez(sh, w.id, c.animacion);
   };
 
@@ -1248,9 +1283,9 @@
       return '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">' + SVG[clave] + '</svg>';
     }
 
-    function paso(clave, emoji, titulo, fecha, extra) {
+    function paso(clave, emoji, titulo, fecha, extra, estiloTitulo) {
       return '<div class="p"><span class="ic">' + icono(clave, emoji) + '</span>' +
-        '<span class="t">' + esc(titulo) + '</span>' +
+        '<span class="t">' + escStyle(titulo, estiloTitulo) + '</span>' +
         '<span class="f">' + esc(fecha) + '</span>' +
         (extra ? '<span class="lim">' + esc(extra) + '</span>' : '') + '</div>';
     }
@@ -1270,13 +1305,13 @@
       '.ln{flex:0 1 60px;height:1px;background:' + p.bg + ';opacity:.45;margin-top:12px}' +
       '.nota{margin:12px 0 0;text-align:center;font-size:11.5px;color:#8a8177}',
       '<div class="c"><div class="fila">' +
-      paso('compra', '🛒', c.et_compra || 'Compra', relativo(base), limite) +
+      paso('compra', '🛒', c.et_compra || 'Compra', relativo(base), limite, c.et_compra_estilo) +
       '<span class="ln"></span>' +
-      paso('envio', '🚚', c.et_envio || 'Envío', relativo(envio), '') +
+      paso('envio', '🚚', c.et_envio || 'Envío', relativo(envio), '', c.et_envio_estilo) +
       '<span class="ln"></span>' +
-      paso('entrega', '✅', c.et_entrega || 'Entrega', textoEntrega, '') +
+      paso('entrega', '✅', c.et_entrega || 'Entrega', textoEntrega, '', c.et_entrega_estilo) +
       '</div>' +
-      (c.nota ? '<p class="nota">' + esc(c.nota) + '</p>' : '') +
+      (c.nota ? '<p class="nota">' + escStyle(c.nota, c.nota_estilo) + '</p>' : '') +
       '</div>');
 
     verUnaVez(sh, w.id, c.animacion);
@@ -1286,8 +1321,8 @@
     var c = w.config, p = paleta(c.color);
     var sh = montar(w, false); if (!sh) return;
     var items = (c.items || []).map(function (i, n) {
-      return '<li><span class="n">' + (n + 1) + '</span><div><b>' + esc(i.titulo) + '</b>' +
-        '<span>' + esc(i.texto) + '</span></div></li>';
+      return '<li><span class="n">' + (n + 1) + '</span><div><b>' + escStyle(i.titulo, i.titulo_estilo) + '</b>' +
+        '<span>' + escStyle(i.texto, i.texto_estilo) + '</span></div></li>';
     }).join('');
     pintar(sh,
       'h3{margin:0 0 16px;font-size:20px;color:#2a2620}' +
@@ -1298,7 +1333,7 @@
       'display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}' +
       'b{display:block;font-size:15.5px;color:#2a2620;margin-bottom:2px}' +
       'span{font-size:14px;line-height:1.55;color:#5a534a}',
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') + '<ol>' + items + '</ol>');
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') + '<ol>' + items + '</ol>');
     verUnaVez(sh, w.id, c.animacion);
   };
 
@@ -1307,7 +1342,7 @@
     var sh = montar(w, false); if (!sh) return;
     var items = (c.items || []).map(function (i) {
       return '<div class="it"><span class="e">' + esc(i.icono || '•') + '</span>' +
-        '<b>' + esc(i.titulo) + '</b><span class="t">' + esc(i.texto) + '</span></div>';
+        '<b>' + escStyle(i.titulo, i.titulo_estilo) + '</b><span class="t">' + escStyle(i.texto, i.texto_estilo) + '</span></div>';
     }).join('');
     pintar(sh,
       '.g{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));' +
@@ -1324,7 +1359,7 @@
     var c = w.config, p = paleta(c.color);
     var sh = montar(w, false); if (!sh) return;
     var filas = (c.items || []).map(function (i) {
-      return '<tr><th>' + esc(i.tema) + '</th><td>' + esc(i.a) + '</td><td class="b">' + esc(i.b) + '</td></tr>';
+      return '<tr><th>' + escStyle(i.tema, i.tema_estilo) + '</th><td>' + escStyle(i.a, i.a_estilo) + '</td><td class="b">' + escStyle(i.b, i.b_estilo) + '</td></tr>';
     }).join('');
     pintar(sh,
       'h3{margin:0 0 16px;font-size:20px;color:#2a2620}' +
@@ -1335,9 +1370,9 @@
       'th{text-align:left;padding:11px 10px;color:#2a2620;font-weight:600;vertical-align:top;width:26%}' +
       'td{padding:11px 10px;color:#5a534a;line-height:1.5;vertical-align:top;border-top:1px solid #e6e2da}' +
       'td.b{background:' + p.suave + ';color:#2a2620}',
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
-      '<div class="w"><table><thead><tr><th></th><th>' + esc(c.col_a) + '</th>' +
-      '<th class="b">' + esc(c.col_b) + '</th></tr></thead><tbody>' + filas + '</tbody></table></div>');
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') +
+      '<div class="w"><table><thead><tr><th></th><th>' + escStyle(c.col_a, c.col_a_estilo) + '</th>' +
+      '<th class="b">' + escStyle(c.col_b, c.col_b_estilo) + '</th></tr></thead><tbody>' + filas + '</tbody></table></div>');
     verUnaVez(sh, w.id, c.animacion);
   };
 
@@ -1378,7 +1413,7 @@
 
     var filas = items.map(function (i, n) {
       return '<tr>' +
-        '<td><b>' + esc(i.nombre) + '</b>' + (i.detalle ? '<small>' + esc(i.detalle) + '</small>' : '') + '</td>' +
+        '<td><b>' + escStyle(i.nombre, i.nombre_estilo) + '</b>' + (i.detalle ? '<small>' + escStyle(i.detalle, i.detalle_estilo) + '</small>' : '') + '</td>' +
         (valores.length ? '<td class="n">' + esc(pesos(valores[n])) + '</td>' : '') +
         '</tr>';
     }).join('');
@@ -1386,9 +1421,9 @@
     var pie = '';
     if (valores.length && hayAhorro) {
       pie =
-        '<tr class="t"><td>' + esc(c.etiqueta_total || 'Valor por separado') + '</td>' +
+        '<tr class="t"><td>' + escStyle(c.etiqueta_total || 'Valor por separado', c.etiqueta_total_estilo) + '</td>' +
         '<td class="n tach">' + esc(pesos(base)) + '</td></tr>' +
-        '<tr class="pk"><td><b>' + esc(c.etiqueta_pack || 'Precio del pack') + '</b></td>' +
+        '<tr class="pk"><td><b>' + escStyle(c.etiqueta_pack || 'Precio del pack', c.etiqueta_pack_estilo) + '</b></td>' +
         '<td class="n"><b>' + esc(pesos(pagando)) + '</b></td></tr>';
 
       // El mejor precio real de la tienda. Va como fila propia porque el renglón nativo de
@@ -1424,11 +1459,11 @@
       '.tf b{color:' + p.bg + '}' +
       '.ah{text-align:center;margin:14px 0 2px;font-size:14px;color:' + p.bg + '}' +
       '.nt{text-align:center;margin:0;font-size:12px;color:#6a6157}',
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
-      (c.intro ? '<p class="in">' + esc(c.intro) + '</p>' : '') +
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') +
+      (c.intro ? '<p class="in">' + escStyle(c.intro, c.intro_estilo) + '</p>' : '') +
       '<div class="w"><table><tbody>' + filas + pie + '</tbody></table></div>' +
       ahorroTxt +
-      (c.nota ? '<p class="nt">' + esc(c.nota) + '</p>' : ''));
+      (c.nota ? '<p class="nt">' + escStyle(c.nota, c.nota_estilo) + '</p>' : ''));
     verUnaVez(sh, w.id, c.animacion);
   };
 
@@ -1436,7 +1471,7 @@
     var c = w.config, p = paleta(c.color);
     var sh = montar(w, false); if (!sh) return;
     var filas = (c.items || []).map(function (i) {
-      return '<div class="f"><dt>' + esc(i.dato) + '</dt><dd>' + esc(i.valor) + '</dd></div>';
+      return '<div class="f"><dt>' + escStyle(i.dato, i.dato_estilo) + '</dt><dd>' + escStyle(i.valor, i.valor_estilo) + '</dd></div>';
     }).join('');
     pintar(sh,
       'h3{margin:0 0 14px;font-size:20px;color:#2a2620}' +
@@ -1445,7 +1480,7 @@
       'dt{flex:0 0 42%;margin:0;font-size:14px;color:#6a6157}' +
       'dd{margin:0;font-size:14px;color:#2a2620;font-weight:500}' +
       'h3{color:' + p.bg + '}',
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') + '<dl>' + filas + '</dl>');
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') + '<dl>' + filas + '</dl>');
     verUnaVez(sh, w.id, c.animacion);
   };
 
@@ -1639,6 +1674,8 @@
     var nombreDia = comoDia(pr.ms);
     var titulo = llenar(abierto ? c.titulo_abierto : c.titulo_cerrado, nombreDia);
     var nota   = llenar(abierto ? c.nota_abierta   : c.nota_cerrada,   nombreDia);
+    var estiloTitulo = abierto ? c.titulo_abierto_estilo : c.titulo_cerrado_estilo;
+    var estiloNota   = abierto ? c.nota_abierta_estilo   : c.nota_cerrada_estilo;
 
     var sh = montar(w, false); if (!sh) return;
     pintar(sh,
@@ -1653,7 +1690,7 @@
         'font-variant-numeric:tabular-nums;font-size:15px;font-weight:700;white-space:nowrap}' +
       '@media(max-width:420px){.c{flex-wrap:wrap}.rl{order:3}}',
       '<div class="c"><span class="ic">' + (abierto ? '🕒' : '📦') + '</span>' +
-      '<span class="tx"><b>' + esc(titulo) + '</b>' + (nota ? '<small>' + esc(nota) + '</small>' : '') + '</span>' +
+      '<span class="tx"><b>' + escStyle(titulo, estiloTitulo) + '</b>' + (nota ? '<small>' + escStyle(nota, estiloNota) + '</small>' : '') + '</span>' +
       (abierto ? '<span class="rl"></span>' : '') + '</div>');
 
     if (abierto) {
@@ -1690,8 +1727,8 @@
       '.u i{display:block;font-style:normal;font-size:20px;font-weight:700;line-height:1.1}' +
       '.u s{display:block;text-decoration:none;font-size:10.5px;opacity:.85}' +
       '.t{margin:10px 0 0;font-size:13px;color:#5a534a}',
-      '<div class="c"><b>' + esc(c.titulo) + '</b><div class="r"></div>' +
-      (c.texto ? '<p class="t">' + esc(c.texto) + '</p>' : '') + '</div>');
+      '<div class="c"><b>' + escStyle(c.titulo, c.titulo_estilo) + '</b><div class="r"></div>' +
+      (c.texto ? '<p class="t">' + escStyle(c.texto, c.texto_estilo) + '</p>' : '') + '</div>');
 
     var r = sh.querySelector('.r');
     function tic() {
@@ -1729,7 +1766,7 @@
       '.p{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}' +
       '.p span{width:62px;height:62px;border-radius:999px;background:rgba(0,0,0,.65);color:#fff;' +
       'display:flex;align-items:center;justify-content:center;font-size:22px;padding-left:4px}',
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') +
       '<div class="v"><img loading="lazy" src="https://i.ytimg.com/vi/' + id + '/hqdefault.jpg" alt="">' +
       '<div class="p"><span>▶</span></div></div>');
 
@@ -1806,8 +1843,8 @@
       // Al cruzar el umbral, el texto muta con un crossfade en vez de saltar de golpe.
       conTransicion(txt, 'mic-prog-' + w.id, function () {
         txt.innerHTML = falta > 0
-          ? esc(c.texto_falta || 'Te falta') + ' <b>' + esc(pesos(falta)) + '</b>'
-          : '<b>' + esc(c.texto_logrado || '¡Envío gratis!') + '</b>';
+          ? escStyle(c.texto_falta || 'Te falta', c.texto_falta_estilo) + ' <b>' + esc(pesos(falta)) + '</b>'
+          : '<b>' + escStyle(c.texto_logrado || '¡Envío gratis!', c.texto_logrado_estilo) + '</b>';
       });
       if (!contado) { contado = true; evento(w.id, 'impresion'); }
     });
@@ -1827,8 +1864,8 @@
     var filas = items.map(function (it, i) {
       return '<label class="it"><input type="checkbox" checked data-id="' + esc(it.id) + '" data-precio="' + it.precio + '">' +
         (it.imagen ? '<img src="' + esc(it.imagen) + '" alt="">' : '<span class="ph"></span>') +
-        '<span class="d"><b>' + esc(it.nombre) + '</b>' +
-        (it.nota ? '<span class="n">' + esc(it.nota) + '</span>' : '') + '</span>' +
+        '<span class="d"><b>' + escStyle(it.nombre, it.nombre_estilo) + '</b>' +
+        (it.nota ? '<span class="n">' + escStyle(it.nota, it.nota_estilo) + '</span>' : '') + '</span>' +
         '<span class="pr">' + esc(pesos(it.precio)) + '</span></label>';
     }).join('');
 
@@ -1846,10 +1883,10 @@
       '.tot b{font-size:18px;color:' + p.bg + '}' +
       'button{width:100%;padding:13px;background:' + p.bg + ';color:' + p.texto + ';border-radius:9px;font-size:15px;font-weight:700}' +
       'button:disabled{opacity:.5}',
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') +
       '<div class="c">' + filas +
       '<div class="tot"><span>Total de lo seleccionado</span><b class="s">—</b></div>' +
-      '<button>' + esc(c.etiqueta || 'Agregar al carrito') + '</button></div>');
+      '<button>' + escStyle(c.etiqueta || 'Agregar al carrito', c.etiqueta_estilo) + '</button></div>');
 
     var casillas = [].slice.call(sh.querySelectorAll('input[type=checkbox]'));
     var suma = sh.querySelector('.s');
@@ -2034,7 +2071,7 @@
 
     var sh = montar(w, false); if (!sh) return;
     var bullets = (c.items || []).filter(function (i) { return i.texto; }).map(function (i) {
-      return '<li>' + esc(i.texto) + '</li>';
+      return '<li>' + escStyle(i.texto, i.texto_estilo) + '</li>';
     }).join('');
 
     pintar(sh,
@@ -2051,10 +2088,10 @@
       'button{width:100%;padding:13px;background:' + p.bg + ';color:' + p.texto + ';border-radius:9px;font-size:15px;font-weight:700}',
       '<div class="c"><div class="top">' +
       (sup.imagen ? '<img src="' + esc(sup.imagen) + '" alt="">' : '') +
-      '<div><h3>' + esc(c.titulo) + '</h3><div class="nom">' + esc(sup.nombre) + '</div></div></div>' +
+      '<div><h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3><div class="nom">' + esc(sup.nombre) + '</div></div></div>' +
       '<div class="dif">+ ' + esc(pesos(sup.precio - actual)) + ' <small>sobre lo que estás viendo</small></div>' +
       (bullets ? '<ul>' + bullets + '</ul>' : '') +
-      '<button>' + esc(c.etiqueta || 'Quiero la versión completa') + '</button></div>');
+      '<button>' + escStyle(c.etiqueta || 'Quiero la versión completa', c.etiqueta_estilo) + '</button></div>');
 
     sh.querySelector('button').addEventListener('click', function () {
       var b = sh.querySelector('button');
@@ -2109,7 +2146,7 @@
           '.n{font-size:12.5px;color:#6a6157;line-height:1.4}' +
           '.pr{font-size:14px;font-weight:600;white-space:nowrap;margin-right:8px}' +
           'button{padding:8px 14px;background:' + p.bg + ';color:' + p.texto + ';border-radius:8px;font-size:13px;font-weight:600;white-space:nowrap}',
-          '<div class="c"><h3>' + esc(c.titulo) + '</h3><div class="lista"></div></div>');
+          '<div class="c"><h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3><div class="lista"></div></div>');
         verUnaVez(sh, w.id, c.animacion);
       }
 
@@ -2118,9 +2155,9 @@
         return '<div class="it">' +
           (x.p.imagen ? '<img src="' + esc(x.p.imagen) + '" alt="">' : '<span class="ph"></span>') +
           '<span class="d"><b>' + esc(x.p.nombre) + '</b>' +
-          (x.nota ? '<span class="n">' + esc(x.nota) + '</span>' : '') + '</span>' +
+          (x.nota ? '<span class="n">' + escStyle(x.nota, x.nota_estilo) + '</span>' : '') + '</span>' +
           '<span class="pr">' + esc(pesos(x.p.precio)) + '</span>' +
-          '<button data-id="' + esc(x.p.id) + '" data-precio="' + x.p.precio + '">' + esc(c.etiqueta || 'Sumar') + '</button></div>';
+          '<button data-id="' + esc(x.p.id) + '" data-precio="' + x.p.precio + '">' + escStyle(c.etiqueta || 'Sumar', c.etiqueta_estilo) + '</button></div>';
       }).join('');
 
       [].slice.call(sh.querySelectorAll('button')).forEach(function (b) {
@@ -2172,13 +2209,13 @@
         'button{width:100%;padding:13px;background:' + p.bg + ';color:' + p.texto + ';border-radius:9px;font-size:15px;font-weight:700}' +
         '.no{display:block;width:100%;margin-top:10px;background:none;color:#8a8177;font-size:13px;font-weight:400;padding:6px}',
         '<div class="ov"><div class="c">' +
-        '<h3>' + esc(c.titulo) + '</h3>' +
-        (c.texto ? '<p class="t">' + esc(c.texto) + '</p>' : '') +
+        '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' +
+        (c.texto ? '<p class="t">' + escStyle(c.texto, c.texto_estilo) + '</p>' : '') +
         (pr.imagen ? '<img src="' + esc(pr.imagen) + '" alt="">' : '') +
         '<div class="nom">' + esc(pr.nombre) + '</div>' +
         '<div class="pr">' + esc(pesos(pr.precio)) + '</div>' +
-        '<button class="si">' + esc(c.etiqueta || 'Sumarlo a mi pedido') + '</button>' +
-        '<button class="no">' + esc(c.rechazo || 'No, gracias') + '</button>' +
+        '<button class="si">' + escStyle(c.etiqueta || 'Sumarlo a mi pedido', c.etiqueta_estilo) + '</button>' +
+        '<button class="no">' + escStyle(c.rechazo || 'No, gracias', c.rechazo_estilo) + '</button>' +
         '</div></div>');
 
       var ov = sh.querySelector('.ov');
@@ -2250,7 +2287,7 @@
         ? '<video src="' + esc(c.archivo) + '" autoplay loop muted playsinline preload="metadata" aria-label="' + alt + '"></video>'
         : '<img src="' + esc(c.archivo) + '" alt="' + alt + '" loading="lazy" decoding="async">') +
       '</div>' +
-      (c.epigrafe ? '<figcaption>' + esc(c.epigrafe) + '</figcaption>' : '') +
+      (c.epigrafe ? '<figcaption>' + escStyle(c.epigrafe, c.epigrafe_estilo) + '</figcaption>' : '') +
       '</figure>');
 
     // El video arranca recién cuando entra en pantalla: reproducir algo que nadie está
@@ -2305,8 +2342,8 @@
         ? '<img src="' + esc(it.archivo) + '" alt="' + alt + '" decoding="async">'
         : '<img data-src="' + esc(it.archivo) + '" alt="' + alt + '" loading="lazy" decoding="async">';
       var pie = (it.titulo || it.texto)
-        ? '<figcaption>' + (it.titulo ? '<b>' + esc(it.titulo) + '</b>' : '') +
-          (it.texto ? '<span>' + esc(it.texto) + '</span>' : '') + '</figcaption>'
+        ? '<figcaption>' + (it.titulo ? '<b>' + escStyle(it.titulo, it.titulo_estilo) + '</b>' : '') +
+          (it.texto ? '<span>' + escStyle(it.texto, it.texto_estilo) + '</span>' : '') + '</figcaption>'
         : '';
       return '<figure class="s" role="group" aria-label="' + (n + 1) + ' de ' + items.length + '">' +
         '<div class="m">' + img + '</div>' + pie +
@@ -2355,8 +2392,8 @@
       'align-items:center;justify-content:center;padding:20px;cursor:zoom-out}' +
       '.lb.on{display:flex}.lb img{max-width:100%;max-height:100%;width:auto;height:auto;border-radius:10px;object-fit:contain}',
 
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
-      (c.subtitulo ? '<p class="sub">' + esc(c.subtitulo) + '</p>' : '') +
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') +
+      (c.subtitulo ? '<p class="sub">' + escStyle(c.subtitulo, c.subtitulo_estilo) + '</p>' : '') +
       '<div class="marco">' +
       (conFlechas ? '<button class="fl ant" aria-label="Anterior">‹</button>' : '') +
       '<div class="pista" tabindex="0" role="group" aria-roledescription="carrusel" aria-label="' +
@@ -2592,17 +2629,17 @@
       '.et.a{top:12px;left:12px}.et.d{top:12px;right:12px}' +
       'figcaption{margin-top:10px;font-size:13px;line-height:1.5;color:#6a6157;text-align:center}',
 
-      (c.titulo ? '<h3>' + esc(c.titulo) + '</h3>' : '') +
+      (c.titulo ? '<h3>' + escStyle(c.titulo, c.titulo_estilo) + '</h3>' : '') +
       '<figure><div class="cj" tabindex="0" role="slider" aria-label="' +
       esc((c.et_antes || 'antes') + ' contra ' + (c.et_despues || 'después')) +
       '" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pos + '">' +
       '<img src="' + esc(c.despues) + '" alt="' + esc(c.et_despues || 'Después') + '">' +
       '<div class="tapa"><img src="' + esc(c.antes) + '" alt="' + esc(c.et_antes || 'Antes') + '"></div>' +
-      (c.et_antes ? '<span class="et a">' + esc(c.et_antes) + '</span>' : '') +
-      (c.et_despues ? '<span class="et d">' + esc(c.et_despues) + '</span>' : '') +
+      (c.et_antes ? '<span class="et a">' + escStyle(c.et_antes, c.et_antes_estilo) + '</span>' : '') +
+      (c.et_despues ? '<span class="et d">' + escStyle(c.et_despues, c.et_despues_estilo) + '</span>' : '') +
       '<div class="mango"><span class="bola">⇄</span></div>' +
       '</div>' +
-      (c.pie ? '<figcaption>' + esc(c.pie) + '</figcaption>' : '') +
+      (c.pie ? '<figcaption>' + escStyle(c.pie, c.pie_estilo) + '</figcaption>' : '') +
       '</figure>');
 
     var cj = sh.querySelector('.cj');

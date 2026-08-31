@@ -74,7 +74,41 @@ export type Campo = {
    * ninguno.
    */
   visibleSi?: { key: string; igualA?: string; distintoDe?: string }
+  /**
+   * Solo para `texto` y `textarea`: suma un mini-toolbar de cursiva, tipografía y color debajo
+   * del campo. Aplica al CAMPO ENTERO, no a una selección de palabras dentro del texto — un
+   * editor de selección guardaría HTML en la config, y mic.js escapa todo lo que viene del
+   * panel a propósito (nunca innerHTML con contenido editable). El estilo se guarda aparte,
+   * en `${key}_estilo` (ver `claveEstilo`), así que declarar `formato: true` no cambia el tipo
+   * del valor del campo — sigue siendo un string plano — y no rompe nada de lo que ya lee ese
+   * campo en el motor.
+   */
+  formato?: boolean
 }
+
+/** Estilo de un campo de texto con `formato: true`. Vive en `config[claveEstilo(key)]`. */
+export type EstiloTexto = {
+  cursiva?: boolean
+  fuente?: FuenteKey
+  color?: string // token de PALETA o '#rrggbb', igual que un campo `color` común
+}
+
+/** Clave donde vive el estilo de un campo `key` con `formato: true`. Un solo lugar para no
+ *  repetir el sufijo `_estilo` a mano en el panel, la validación y mic.js. */
+export const claveEstilo = (key: string) => `${key}_estilo`
+
+// Tipografías ofrecidas para texto con formato. El widget vive en un Shadow DOM inyectado
+// por mic.js en infomicelium.com.ar (Tiendanube, otro proyecto) y hoy no carga ninguna
+// fuente propia — solo la pila del sistema (ver BASE_CSS en public/mic.js). Cargar Fraunces
+// o Manrope ahí de nuevo sería peso extra por cada visita solo para un campo de texto, así
+// que las opciones son variantes de la MISMA pila del sistema (nada que descargar), no
+// familias distintas.
+export const FUENTES = [
+  { value: 'sans', label: 'Estándar (paloseco)', css: 'ui-sans-serif, system-ui, "Segoe UI", Helvetica, Arial, sans-serif' },
+  { value: 'serif', label: 'Con serifa', css: 'ui-serif, Georgia, "Times New Roman", serif' },
+  { value: 'monoespaciada', label: 'Monoespaciada', css: 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace' },
+] as const
+export type FuenteKey = (typeof FUENTES)[number]['value']
 
 /** ¿Corresponde mostrar este campo con la config actual? La usan el panel y la validación. */
 export function campoVisible(campo: Campo, config: Record<string, unknown> | undefined): boolean {
@@ -257,12 +291,25 @@ export const DESTINOS = MARCA.clave === 'osamayor'
       { value: 'https://wa.me/543512145521', label: 'WhatsApp de Micelium' },
     ] as const)
 
-// Emojis que se usan de verdad en la marca. Que la lista sea corta es la gracia: evita el
-// desfile de emojis que hace ver improvisado a un sitio.
+// Emojis "de marca": los que se usan de verdad, y por eso aparecen primero, sueltos, en el
+// picker (components/widgets/CampoEditor.tsx). No son la única opción — el picker suma un
+// buscador con un catálogo mucho más amplio (components/widgets/emojis.ts) para el resto de
+// los casos — pero siguen siendo el camino corto para lo de siempre.
 export const EMOJIS = [
   '🌱', '🍃', '🛡️', '✅', '📦', '🚚', '💬', '⏱️', '🌡️', '💧',
   '🔧', '⭐', '📋', '🏠', '🔬', '📈', '🤝', '💡',
 ] as const
+
+// Un emoji real, no un string cualquiera: exige al menos un carácter del bloque Unicode de
+// símbolos/pictogramas (incluye combinaciones con selector de variación y ZWJ, como "🛡️" o
+// "❤️‍🔥"). Reemplaza el whitelist cerrado de EMOJIS en la validación — la lista de marca
+// sigue siendo la sugerida en el panel, pero el campo ya no se resetea si alguien elige uno
+// de fuera de esas 18.
+const RE_EMOJI = /\p{Extended_Pictographic}/u
+export const esEmoji = (v: unknown): v is string => {
+  const s = String(v ?? '')
+  return s.length > 0 && s.length <= 8 && RE_EMOJI.test(s)
+}
 
 const CAMPO_COLOR: Campo = {
   key: 'color',
@@ -357,7 +404,31 @@ const CAMPOS_RECUADRO: Campo[] = [
     ayuda: 'Rellena el marco con la versión clara del color. Destaca más, pero solo conviene en uno.',
     visibleSi: { key: 'recuadro', distintoDe: 'ninguno' },
   },
+  {
+    key: 'espaciado',
+    label: 'Separación con lo de arriba y abajo',
+    tipo: 'select',
+    porDefecto: 'normal',
+    grupo: 'marco',
+    ayuda:
+      'Aire por fuera del widget para no quedar pegado al párrafo o al bloque anterior/siguiente. Con recuadro, este espacio se suma al que ya trae el marco.',
+    opciones: [
+      { value: 'ninguno', label: 'Sin separación' },
+      { value: 'chico', label: 'Chico' },
+      { value: 'normal', label: 'Normal' },
+      { value: 'grande', label: 'Grande' },
+    ],
+  },
 ]
+
+/** Alto del espacio en px, por opción de `espaciado`. La usa mic.js (copia propia, mismos
+ *  valores — ver ESPACIADO_PX en public/mic.js) para el margen del host en el sitio real. */
+export const ESPACIADO_PX: Record<string, number> = {
+  ninguno: 0,
+  chico: 12,
+  normal: 22,
+  grande: 40,
+}
 
 // ── Gráfico de fondo ─────────────────────────────────────────────────────────
 // Con qué dibujo se pinta la caja del widget por detrás del texto.
@@ -476,6 +547,8 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'numero',
         label: 'Número de WhatsApp',
         tipo: 'texto',
+        // Sin `formato`: es un destino técnico (el teléfono al que se abre el chat), nunca
+        // se dibuja como texto en pantalla — cursiva o color no tendrían nada sobre qué caer.
         placeholder: '5493512145521',
         ayuda:
           'Con código de país y área, sin el signo + ni espacios ni guiones. Para Córdoba: 54 9 351 y el número. Es el destino de la conversación.',
@@ -484,6 +557,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'etiqueta',
         label: 'Texto del botón',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Consultanos',
         ayuda: 'Lo que se lee al lado del ícono. Corto: dos o tres palabras, si no en celular se corta.',
       },
@@ -491,6 +565,8 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'mensaje',
         label: 'Mensaje precargado',
         tipo: 'textarea',
+        // Sin `formato`: va codificado en la URL de WhatsApp (wa.me/...?text=...), nunca se
+        // dibuja como texto en pantalla — mismo motivo que `numero`, arriba en este archivo.
         porDefecto: 'Hola, quería hacer una consulta sobre el equipo.',
         ayuda:
           'Aparece ya escrito en el chat del visitante; él solo aprieta enviar. Conviene que diga de qué página viene, así sabés qué estaba mirando.',
@@ -543,6 +619,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo',
         label: 'Título',
         tipo: 'texto',
+        formato: true,
         ayuda: 'La frase grande del recuadro. Funciona mejor si continúa lo que la persona venía leyendo.',
       },
       {
@@ -553,7 +630,7 @@ const TIPOS_BASE: TipoWidget[] = [
         ayuda:
           'El título queda fijo y solo cambia la última parte, que se reemplaza sola cada tantos segundos. Sirve para decir tres cosas en el lugar de una: «Empezá hoy con…» → «una cosecha en 21 días» / «el equipo que se maneja solo» / «asesoría por WhatsApp». Vacío = el título no se mueve.',
         campos: [
-          { key: 'texto', label: 'Final', tipo: 'texto', ayuda: 'Dos o tres palabras. Que todos entren en el mismo renglón: si uno es mucho más largo, el título salta de alto al cambiar.' },
+          { key: 'texto', label: 'Final', tipo: 'texto', formato: true, ayuda: 'Dos o tres palabras. Que todos entren en el mismo renglón: si uno es mucho más largo, el título salta de alto al cambiar.' },
         ],
       },
       {
@@ -579,12 +656,14 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'texto',
         label: 'Texto',
         tipo: 'textarea',
+        formato: true,
         ayuda: 'Dos o tres renglones. Explica qué gana haciendo clic, no qué es el producto.',
       },
       {
         key: 'etiqueta',
         label: 'Texto del botón',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Ver el equipo',
         ayuda: 'Lo que dice el botón. Que describa la acción concreta, no un genérico tipo "Clic acá".',
       },
@@ -611,6 +690,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'etiqueta',
         label: 'Texto del botón',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Agregar al carrito',
         ayuda: 'Conviene que diga lo mismo que el botón original, para que no parezcan dos acciones distintas.',
       },
@@ -659,6 +739,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo',
         label: 'Título',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Lo que dicen quienes ya lo usan',
         ayuda: 'Encabezado de la sección. Vacío = sin encabezado.',
       },
@@ -666,6 +747,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'subtitulo',
         label: 'Subtítulo',
         tipo: 'texto',
+        formato: true,
         porDefecto: '',
         ayuda: 'Línea chica bajo el título. Vacío = sin subtítulo.',
       },
@@ -722,6 +804,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'botonTexto',
         label: 'Texto del botón',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Escribir reseña',
         ayuda: 'Solo se usa si el botón está activado.',
       },
@@ -729,6 +812,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'mensajeGracias',
         label: 'Mensaje al enviar',
         tipo: 'texto',
+        formato: true,
         porDefecto: '¡Gracias! Tu reseña se publicará luego de una breve revisión.',
         ayuda: 'Lo que ve la persona después de enviar su reseña.',
       },
@@ -847,6 +931,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo',
         label: 'Título',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Preguntas frecuentes',
         ayuda: 'Encabezado de la sección. Vacío = sin encabezado.',
       },
@@ -862,12 +947,14 @@ const TIPOS_BASE: TipoWidget[] = [
             key: 'pregunta',
             label: 'Pregunta',
             tipo: 'texto',
+            formato: true,
             ayuda: 'Es lo único visible hasta que la tocan. Escribila como la haría el cliente.',
           },
           {
             key: 'respuesta',
             label: 'Respuesta',
             tipo: 'textarea',
+            formato: true,
             ayuda: 'Se ve al desplegar. Los saltos de línea que pongas se respetan.',
           },
         ],
@@ -890,6 +977,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo',
         label: 'Título',
         tipo: 'texto',
+        formato: true,
         ayuda: 'Opcional. Si lo dejás vacío, la lista arranca directamente.',
       },
       {
@@ -917,6 +1005,7 @@ const TIPOS_BASE: TipoWidget[] = [
             key: 'texto',
             label: 'Texto',
             tipo: 'texto',
+            formato: true,
             ayuda: 'Un renglón. Que se entienda leyendo solo esa línea, sin las demás.',
           },
         ],
@@ -946,6 +1035,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo',
         label: 'Título',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Garantía de 1 año',
         ayuda: 'La línea en negrita. Concreta y verificable: un plazo, una cobertura.',
       },
@@ -953,6 +1043,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'texto',
         label: 'Texto',
         tipo: 'textarea',
+        formato: true,
         ayuda: 'Un renglón o dos explicando qué cubre y a quién le escribe si pasa algo.',
       },
       {
@@ -982,18 +1073,21 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo',
         label: 'Título',
         tipo: 'texto',
+        formato: true,
         ayuda: 'La promesa, en una línea. Qué recibe, no qué le pedís.',
       },
       {
         key: 'texto',
         label: 'Texto',
         tipo: 'textarea',
+        formato: true,
         ayuda: 'Dos renglones sobre qué va a encontrar adentro. Concreto rinde más que entusiasta.',
       },
       {
         key: 'etiqueta',
         label: 'Texto del botón',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Quiero recibirla',
         ayuda: 'Mejor en primera persona ("Quiero recibirla") que imperativo ("Enviar").',
       },
@@ -1040,6 +1134,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'gracias',
         label: 'Mensaje de agradecimiento',
         tipo: 'texto',
+        formato: true,
         porDefecto: '¡Listo! Revisá tu correo.',
         ayuda: 'Lo que se lee después de enviar. Conviene aclarar que el material llega por correo y no se descarga acá.',
       },
@@ -1077,6 +1172,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'texto',
         label: 'Aclaración',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'sin interés con tarjeta de crédito',
         ayuda: 'Va chiquito al lado del monto. Sirve para aclarar la condición sin ensuciar el número.',
       },
@@ -1156,6 +1252,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'nota',
         label: 'Aclaración al pie',
         tipo: 'texto',
+        formato: true,
         porDefecto: '* Fechas aproximadas',
         ayuda: 'Vacío = sin aclaración. Conviene dejarla: es lo que evita el reclamo por un día de diferencia.',
       },
@@ -1163,6 +1260,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'et_compra',
         label: 'Nombre del primer paso',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Compra',
         ayuda: 'Debajo aparece «Hoy» o «Mañana», según la hora de corte.',
       },
@@ -1170,6 +1268,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'et_envio',
         label: 'Nombre del segundo paso',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Envío',
         ayuda: 'El momento en que sale de acá.',
       },
@@ -1177,6 +1276,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'et_entrega',
         label: 'Nombre del tercer paso',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Entrega',
         ayuda: 'Cuándo lo tiene en la mano.',
       },
@@ -1235,7 +1335,7 @@ const TIPOS_BASE: TipoWidget[] = [
         porDefecto: 'medio',
         ayuda: 'Se elige de la lista: no hay que tocar el HTML de ninguna página.',
       },
-      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: 'Cómo funciona', ayuda: 'Vacío = sin encabezado.' },
+      { key: 'titulo', label: 'Título', tipo: 'texto', formato: true, porDefecto: 'Cómo funciona', ayuda: 'Vacío = sin encabezado.' },
       {
         key: 'items',
         label: 'Pasos',
@@ -1243,8 +1343,8 @@ const TIPOS_BASE: TipoWidget[] = [
         maxItems: 5,
         ayuda: 'Tres pasos es lo que mejor funciona. Con más de cuatro deja de leerse como algo simple, que es justo lo contrario de lo que buscás.',
         campos: [
-          { key: 'titulo', label: 'Título del paso', tipo: 'texto', ayuda: 'Dos o tres palabras. Un verbo adelante.' },
-          { key: 'texto', label: 'Explicación', tipo: 'texto', ayuda: 'Un renglón. Lo que hace la persona, no lo que hace el equipo.' },
+          { key: 'titulo', label: 'Título del paso', tipo: 'texto', formato: true, ayuda: 'Dos o tres palabras. Un verbo adelante.' },
+          { key: 'texto', label: 'Explicación', tipo: 'texto', formato: true, ayuda: 'Un renglón. Lo que hace la persona, no lo que hace el equipo.' },
         ],
       },
       CAMPO_COLOR,
@@ -1275,8 +1375,8 @@ const TIPOS_BASE: TipoWidget[] = [
         ayuda: 'Tres o cuatro. Cada una tiene que ser verificable: una promesa vaga acá resta en vez de sumar.',
         campos: [
           { key: 'icono', label: 'Emoji', tipo: 'emoji', ayuda: 'Se elige de la lista.' },
-          { key: 'titulo', label: 'Título', tipo: 'texto', ayuda: 'Dos o tres palabras, en negrita.' },
-          { key: 'texto', label: 'Detalle', tipo: 'texto', ayuda: 'Media línea. El dato concreto que respalda el título.' },
+          { key: 'titulo', label: 'Título', tipo: 'texto', formato: true, ayuda: 'Dos o tres palabras, en negrita.' },
+          { key: 'texto', label: 'Detalle', tipo: 'texto', formato: true, ayuda: 'Media línea. El dato concreto que respalda el título.' },
         ],
       },
       CAMPO_COLOR,
@@ -1301,9 +1401,9 @@ const TIPOS_BASE: TipoWidget[] = [
         porDefecto: 'medio',
         ayuda: 'Se elige de la lista.',
       },
-      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: 'Las dos maneras de hacerlo', ayuda: 'Vacío = sin encabezado.' },
-      { key: 'col_a', label: 'Título de la columna izquierda', tipo: 'texto', porDefecto: 'Por las suyas', ayuda: 'La alternativa. Descriptiva, no despectiva.' },
-      { key: 'col_b', label: 'Título de la columna derecha', tipo: 'texto', porDefecto: 'Con el equipo', ayuda: 'La opción que ofrecés. Va destacada.' },
+      { key: 'titulo', label: 'Título', tipo: 'texto', formato: true, porDefecto: 'Las dos maneras de hacerlo', ayuda: 'Vacío = sin encabezado.' },
+      { key: 'col_a', label: 'Título de la columna izquierda', tipo: 'texto', formato: true, porDefecto: 'Por las suyas', ayuda: 'La alternativa. Descriptiva, no despectiva.' },
+      { key: 'col_b', label: 'Título de la columna derecha', tipo: 'texto', formato: true, porDefecto: 'Con el equipo', ayuda: 'La opción que ofrecés. Va destacada.' },
       {
         key: 'items',
         label: 'Filas de comparación',
@@ -1311,9 +1411,9 @@ const TIPOS_BASE: TipoWidget[] = [
         maxItems: 8,
         ayuda: 'Cuatro o cinco alcanzan. Cada fila es un aspecto: tiempo, resultado, qué pasa si falla.',
         campos: [
-          { key: 'tema', label: 'Aspecto', tipo: 'texto', ayuda: 'Una o dos palabras: "Tiempo", "Si algo falla".' },
-          { key: 'a', label: 'Columna izquierda', tipo: 'texto', ayuda: 'Cómo es sin el equipo. Honesto, sin exagerar.' },
-          { key: 'b', label: 'Columna derecha', tipo: 'texto', ayuda: 'Cómo es con el equipo.' },
+          { key: 'tema', label: 'Aspecto', tipo: 'texto', formato: true, ayuda: 'Una o dos palabras: "Tiempo", "Si algo falla".' },
+          { key: 'a', label: 'Columna izquierda', tipo: 'texto', formato: true, ayuda: 'Cómo es sin el equipo. Honesto, sin exagerar.' },
+          { key: 'b', label: 'Columna derecha', tipo: 'texto', formato: true, ayuda: 'Cómo es con el equipo.' },
         ],
       },
       CAMPO_COLOR,
@@ -1339,11 +1439,12 @@ const TIPOS_BASE: TipoWidget[] = [
         porDefecto: 'medio',
         ayuda: 'Va bien después de la comparativa: primero por qué conviene, después cuánto vale.',
       },
-      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: 'Lo que incluye este pack', ayuda: 'Vacío = sin encabezado.' },
+      { key: 'titulo', label: 'Título', tipo: 'texto', formato: true, porDefecto: 'Lo que incluye este pack', ayuda: 'Vacío = sin encabezado.' },
       {
         key: 'intro',
         label: 'Bajada',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Tres piezas que se venden juntas y trabajan como un solo equipo.',
         ayuda: 'Una línea abajo del título. Vacío = no se muestra.',
       },
@@ -1354,8 +1455,8 @@ const TIPOS_BASE: TipoWidget[] = [
         maxItems: 6,
         ayuda: 'Se muestran en este orden. La pieza principal va primero.',
         campos: [
-          { key: 'nombre', label: 'Pieza', tipo: 'texto', ayuda: 'Cómo se llama en la caja.' },
-          { key: 'detalle', label: 'Qué hace', tipo: 'texto', ayuda: 'Media línea. Es lo que convierte una lista de nombres en una razón para pagar.' },
+          { key: 'nombre', label: 'Pieza', tipo: 'texto', formato: true, ayuda: 'Cómo se llama en la caja.' },
+          { key: 'detalle', label: 'Qué hace', tipo: 'texto', formato: true, ayuda: 'Media línea. Es lo que convierte una lista de nombres en una razón para pagar.' },
           {
             key: 'peso',
             label: 'Cuánto pesa en el precio',
@@ -1371,6 +1472,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'etiqueta_total',
         label: 'Cómo llamar a la suma',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Valor de las 3 piezas',
         ayuda: 'La fila tachada. Es el precio de lista de la página, no un número aparte.',
       },
@@ -1378,6 +1480,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'etiqueta_pack',
         label: 'Cómo llamar al precio final',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Precio del pack completo',
         ayuda: 'La fila destacada, con el precio que realmente se paga hoy.',
       },
@@ -1399,6 +1502,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'nota',
         label: 'Nota al pie',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Las tres se despachan juntas en el mismo envío. No se venden por separado.',
         ayuda: 'Si las piezas no están publicadas sueltas, conviene decirlo: alguien que las busca y no las encuentra desconfía del precio.',
       },
@@ -1424,7 +1528,7 @@ const TIPOS_BASE: TipoWidget[] = [
         porDefecto: 'antes_final',
         ayuda: 'Abajo: la busca quien ya está decidiendo, no quien recién llega.',
       },
-      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: 'Ficha técnica', ayuda: 'Vacío = sin encabezado.' },
+      { key: 'titulo', label: 'Título', tipo: 'texto', formato: true, porDefecto: 'Ficha técnica', ayuda: 'Vacío = sin encabezado.' },
       {
         key: 'items',
         label: 'Datos',
@@ -1432,8 +1536,8 @@ const TIPOS_BASE: TipoWidget[] = [
         maxItems: 20,
         ayuda: 'Se muestran en este orden. Lo que más se pregunta va primero.',
         campos: [
-          { key: 'dato', label: 'Dato', tipo: 'texto', ayuda: 'El nombre: "Consumo", "Medidas", "Capacidad".' },
-          { key: 'valor', label: 'Valor', tipo: 'texto', ayuda: 'Con su unidad. Concreto y verificable.' },
+          { key: 'dato', label: 'Dato', tipo: 'texto', formato: true, ayuda: 'El nombre: "Consumo", "Medidas", "Capacidad".' },
+          { key: 'valor', label: 'Valor', tipo: 'texto', formato: true, ayuda: 'Con su unidad. Concreto y verificable.' },
         ],
       },
       CAMPO_COLOR,
@@ -1454,7 +1558,7 @@ const TIPOS_BASE: TipoWidget[] = [
         tipo: 'lista',
         maxItems: 5,
         ayuda: 'Rotan uno tras otro. Con dos o tres alcanza: más mensajes es menos chance de que lean el que importa.',
-        campos: [{ key: 'texto', label: 'Mensaje', tipo: 'texto', ayuda: 'Una línea corta. Un beneficio concreto por mensaje.' }],
+        campos: [{ key: 'texto', label: 'Mensaje', tipo: 'texto', formato: true, ayuda: 'Una línea corta. Un beneficio concreto por mensaje.' }],
       },
       {
         key: 'movimiento',
@@ -1544,6 +1648,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo_abierto',
         label: 'Título — entra en el despacho de hoy',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Sale hoy',
         ayuda: 'Corto. Es lo único que se lee seguro.',
       },
@@ -1551,6 +1656,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'nota_abierta',
         label: 'Nota — entra en el despacho de hoy',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Cierre del despacho a las {hora}. Después entra en el del {proximo}.',
         ayuda:
           'Podés usar {hora} (la hora de corte), {proximo} (el día del despacho siguiente, sin artículo) y {dia} (hoy). Se reemplazan solos.',
@@ -1559,6 +1665,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo_cerrado',
         label: 'Título — ya cerró el de hoy',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Sale {dia}',
         ayuda:
           '{dia} ya trae el artículo puesto y se resuelve como «mañana» o «el martes» según corresponda, así que escribilo sin «el» delante. Acá no hay urgencia real que mostrar: lo que convence es la fecha concreta.',
@@ -1567,6 +1674,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'nota_cerrada',
         label: 'Nota — ya cerró el de hoy',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Lo despachamos {dia} y Andreani lo retira ese mismo día.',
         ayuda: 'Mismos reemplazos: {dia} es el próximo despacho, {hora} la hora de corte.',
       },
@@ -1574,6 +1682,8 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'feriados',
         label: 'Feriados y días sin despacho',
         tipo: 'textarea',
+        // Sin `formato`: lista de fechas para calcular el próximo día de despacho, nunca se
+        // dibuja tal cual en pantalla.
         placeholder: '2026-08-17\n2026-10-12\n2026-11-23',
         // Feriados nacionales de descanso obligatorio, tomados del calendario «Laboral»
         // (fuente Argentina.gob.ar + FEHGRA). Los cinco de 2026 que faltaban caen en día de
@@ -1620,15 +1730,17 @@ const TIPOS_BASE: TipoWidget[] = [
         porDefecto: 'inicio',
         ayuda: 'Se elige de la lista.',
       },
-      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: 'La preventa cierra en', ayuda: 'Qué es lo que termina. Concreto.' },
+      { key: 'titulo', label: 'Título', tipo: 'texto', formato: true, porDefecto: 'La preventa cierra en', ayuda: 'Qué es lo que termina. Concreto.' },
       {
         key: 'hasta',
         label: 'Fecha y hora de cierre',
         tipo: 'texto',
+        // Sin `formato`: es un dato para calcular la cuenta regresiva, nunca se dibuja tal
+        // cual en pantalla.
         placeholder: '2026-08-15 23:59',
         ayuda: 'Formato año-mes-día y hora, por ejemplo 2026-08-15 23:59. Al pasar esa fecha el widget deja de mostrarse.',
       },
-      { key: 'texto', label: 'Texto debajo del reloj', tipo: 'texto', ayuda: 'Opcional. Qué pasa cuando termina.' },
+      { key: 'texto', label: 'Texto debajo del reloj', tipo: 'texto', formato: true, ayuda: 'Opcional. Qué pasa cuando termina.' },
       CAMPO_COLOR,
     ],
   },
@@ -1650,11 +1762,12 @@ const TIPOS_BASE: TipoWidget[] = [
         porDefecto: 'medio',
         ayuda: 'Se elige de la lista.',
       },
-      { key: 'titulo', label: 'Título', tipo: 'texto', ayuda: 'Opcional, va arriba del video.' },
+      { key: 'titulo', label: 'Título', tipo: 'texto', formato: true, ayuda: 'Opcional, va arriba del video.' },
       {
         key: 'youtube',
         label: 'Dirección del video en YouTube',
         tipo: 'texto',
+        // Sin `formato`: es una URL, nunca se dibuja como texto en pantalla.
         placeholder: 'https://www.youtube.com/watch?v=...',
         ayuda: 'Pegá la dirección tal cual la copiás de YouTube. También sirve la corta (youtu.be/...). Es lo único que hay que pegar en todo el panel.',
       },
@@ -1694,6 +1807,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'texto_falta',
         label: 'Mensaje mientras falta',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Te falta',
         ayuda: 'El monto que falta se agrega solo después de este texto.',
       },
@@ -1701,6 +1815,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'texto_logrado',
         label: 'Mensaje al llegar',
         tipo: 'texto',
+        formato: true,
         porDefecto: '¡Listo! Tenés envío gratis',
         ayuda: 'Lo que se lee cuando ya superó el monto. Corto y celebratorio.',
       },
@@ -1739,6 +1854,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo',
         label: 'Título',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Sumá lo que te va a hacer falta',
         ayuda: 'Que hable de la necesidad, no de la venta.',
       },
@@ -1759,6 +1875,7 @@ const TIPOS_BASE: TipoWidget[] = [
             key: 'nota',
             label: 'Por qué conviene',
             tipo: 'texto',
+            formato: true,
             ayuda: 'Media línea explicando para qué le sirve. Sin esto es solo otro producto más.',
           },
         ],
@@ -1767,6 +1884,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'etiqueta',
         label: 'Texto del botón',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Agregar al carrito',
         ayuda: 'El botón agrega los tildados y lleva al carrito.',
       },
@@ -1797,6 +1915,9 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'plantilla',
         label: 'Texto',
         tipo: 'texto',
+        // Sin `formato`: mic.js le hace concordancia singular/plural sobre la marcha
+        // (reemplaza "personas"/"están" según {n}) con textContent plano — envolverlo en un
+        // <span style> complicaría esa lógica para un campo de una sola frase corta.
         porDefecto: '{n} personas están viendo este producto',
         ayuda: 'Escribí {n} donde va el número. Si queda en 1, el texto se ajusta solo al singular.',
       },
@@ -1855,6 +1976,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo',
         label: 'Título',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Por un poco más, la versión completa',
         ayuda: 'Que el foco sea la diferencia, no el precio total.',
       },
@@ -1871,13 +1993,14 @@ const TIPOS_BASE: TipoWidget[] = [
         maxItems: 5,
         ayuda: 'Solo las diferencias, no la lista completa de características. Tres bastan.',
         campos: [
-          { key: 'texto', label: 'Diferencia', tipo: 'texto', ayuda: 'Un renglón, en positivo: qué gana.' },
+          { key: 'texto', label: 'Diferencia', tipo: 'texto', formato: true, ayuda: 'Un renglón, en positivo: qué gana.' },
         ],
       },
       {
         key: 'etiqueta',
         label: 'Texto del botón',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Quiero la versión completa',
         ayuda: 'En primera persona rinde más que un "Comprar".',
       },
@@ -1908,6 +2031,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo',
         label: 'Título',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Con lo que llevás, esto te va a hacer falta',
         ayuda: 'Que hable de su compra, no de la tuya.',
       },
@@ -1934,6 +2058,7 @@ const TIPOS_BASE: TipoWidget[] = [
             key: 'nota',
             label: 'Por qué',
             tipo: 'texto',
+            formato: true,
             ayuda: 'Media línea que explique la relación entre los dos. Sin esto es solo otro producto.',
           },
         ],
@@ -1942,6 +2067,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'etiqueta',
         label: 'Texto del botón',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Sumar al carrito',
         ayuda: 'Agrega sin sacar al visitante de donde está.',
       },
@@ -1964,6 +2090,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'titulo',
         label: 'Título',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Antes de seguir…',
         ayuda: 'Corto. Ya tiene la atención, no hace falta pelearla.',
       },
@@ -1971,6 +2098,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'texto',
         label: 'Texto',
         tipo: 'textarea',
+        formato: true,
         ayuda: 'Un renglón sobre por qué le sirve junto con lo que acaba de agregar.',
       },
       {
@@ -1983,6 +2111,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'etiqueta',
         label: 'Texto del botón',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Sumarlo a mi pedido',
         ayuda: 'Agrega el producto y cierra la ventana, sin sacarlo de donde estaba.',
       },
@@ -1990,6 +2119,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'rechazo',
         label: 'Texto para rechazar',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'No, gracias',
         ayuda: 'Tiene que estar y ser fácil de encontrar. Esconder la salida convierte una oferta en una trampa.',
       },
@@ -2063,12 +2193,15 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'epigrafe',
         label: 'Epígrafe',
         tipo: 'texto',
+        formato: true,
         ayuda: 'Opcional, va debajo. Sirve para aclarar qué se está viendo; también lo leen los buscadores.',
       },
       {
         key: 'alt',
         label: 'Descripción para quien no puede verla',
         tipo: 'texto',
+        // Sin `formato`: va en el atributo alt="" de la imagen, nunca se ve en pantalla —
+        // lo lee un lector de pantalla, que ignora cualquier estilo.
         ayuda:
           'Qué se ve, en una frase. Lo usan los lectores de pantalla y los buscadores. Si queda vacío, se usa el epígrafe.',
       },
@@ -2108,11 +2241,12 @@ const TIPOS_BASE: TipoWidget[] = [
         porDefecto: 'final',
         ayuda: 'Se elige de la lista.',
       },
-      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: '', ayuda: 'Encabezado del bloque. Vacío = sin encabezado.' },
+      { key: 'titulo', label: 'Título', tipo: 'texto', formato: true, porDefecto: '', ayuda: 'Encabezado del bloque. Vacío = sin encabezado.' },
       {
         key: 'subtitulo',
         label: 'Subtítulo',
         tipo: 'texto',
+        formato: true,
         porDefecto: '',
         ayuda: 'Línea chica bajo el título. Sirve para decir de dónde salen las imágenes («Mensajes de clientes tras recibir el equipo»).',
       },
@@ -2137,18 +2271,21 @@ const TIPOS_BASE: TipoWidget[] = [
             key: 'titulo',
             label: 'Título sobre la imagen',
             tipo: 'texto',
+            formato: true,
             ayuda: 'Opcional. Va debajo de la imagen, en negrita. Con capturas de WhatsApp funciona el nombre de pila y la ciudad.',
           },
           {
             key: 'texto',
             label: 'Texto al pie',
             tipo: 'texto',
+            formato: true,
             ayuda: 'Opcional. Un renglón que ubique lo que se está viendo.',
           },
           {
             key: 'alt',
             label: 'Descripción para quien no puede verla',
             tipo: 'texto',
+            // Sin `formato`: mismo motivo que el otro campo `alt` de este archivo.
             ayuda: 'Qué se ve, en una frase. La usan los lectores de pantalla y los buscadores. Vacía, se usa el título.',
           },
         ],
@@ -2297,7 +2434,7 @@ const TIPOS_BASE: TipoWidget[] = [
         porDefecto: 'medio',
         ayuda: 'Se elige de la lista.',
       },
-      { key: 'titulo', label: 'Título', tipo: 'texto', porDefecto: '', ayuda: 'Encabezado del bloque. Vacío = sin encabezado.' },
+      { key: 'titulo', label: 'Título', tipo: 'texto', formato: true, porDefecto: '', ayuda: 'Encabezado del bloque. Vacío = sin encabezado.' },
       {
         key: 'antes',
         label: 'Imagen de antes',
@@ -2316,6 +2453,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'et_antes',
         label: 'Etiqueta de la primera',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Día 1',
         ayuda: 'El cartelito sobre la imagen. Un dato concreto (un día, una medida) convence más que la palabra «antes».',
       },
@@ -2323,6 +2461,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'et_despues',
         label: 'Etiqueta de la segunda',
         tipo: 'texto',
+        formato: true,
         porDefecto: 'Día 21',
         ayuda: 'Ídem. Si son días, que sean los que de verdad tarda: una promesa de calendario se verifica sola.',
       },
@@ -2330,6 +2469,7 @@ const TIPOS_BASE: TipoWidget[] = [
         key: 'pie',
         label: 'Texto al pie',
         tipo: 'texto',
+        formato: true,
         porDefecto: '',
         ayuda: 'Opcional. Dónde y cuándo se sacaron las fotos. Sumar el contexto es lo que la vuelve creíble.',
       },
@@ -2466,6 +2606,21 @@ export function sanearConfig(tipo: TipoWidget, entrada: unknown): Record<string,
   const src = (entrada ?? {}) as Record<string, unknown>
   const out: Record<string, unknown> = {}
 
+  // El estilo de un campo con `formato: true` (cursiva, fuente, color) es metadata aparte
+  // que acompaña al valor, no un tipo de campo distinto: se sanea con las mismas reglas que
+  // un campo `color` común. Declarada antes de `valor` porque el caso `lista` la usa.
+  const estilo = (v: unknown): EstiloTexto => {
+    const s = (v ?? {}) as Record<string, unknown>
+    const out: EstiloTexto = {}
+    if (s.cursiva === true || s.cursiva === 'true') out.cursiva = true
+    if (FUENTES.some(f => f.value === s.fuente)) out.fuente = s.fuente as FuenteKey
+    const color = String(s.color ?? '').trim().toLowerCase()
+    if (PALETA.some(p => p.value === s.color)) out.color = s.color as string
+    else if (/^#[0-9a-f]{6}$/.test(color)) out.color = color
+    else if (/^#[0-9a-f]{3}$/.test(color)) out.color = '#' + color.slice(1).split('').map(x => x + x).join('')
+    return out
+  }
+
   const valor = (c: Campo, v: unknown): unknown => {
     switch (c.tipo) {
       case 'booleano':
@@ -2502,7 +2657,7 @@ export function sanearConfig(tipo: TipoWidget, entrada: unknown): Record<string,
       case 'ubicacion':
         return UBICACIONES.some(u => u.value === v) ? v : (c.porDefecto ?? 'final')
       case 'emoji':
-        return EMOJIS.includes(v as (typeof EMOJIS)[number]) ? v : (c.porDefecto ?? '')
+        return esEmoji(v) ? v : (c.porDefecto ?? '')
       case 'enlace':
         return DESTINOS.some(d => d.value === v) ? v : ''
       case 'url': {
@@ -2517,6 +2672,10 @@ export function sanearConfig(tipo: TipoWidget, entrada: unknown): Record<string,
           const o: Record<string, unknown> = {}
           for (const sub of c.campos ?? []) {
             o[sub.key] = valor(sub, (item as Record<string, unknown>)?.[sub.key])
+            // Estilo por ítem, misma regla que el estilo de un campo suelto más abajo.
+            if (sub.formato && (sub.tipo === 'texto' || sub.tipo === 'textarea')) {
+              o[claveEstilo(sub.key)] = estilo((item as Record<string, unknown>)?.[claveEstilo(sub.key)])
+            }
           }
           return o
         })
@@ -2526,7 +2685,12 @@ export function sanearConfig(tipo: TipoWidget, entrada: unknown): Record<string,
     }
   }
 
-  for (const c of tipo.campos) out[c.key] = valor(c, src[c.key])
+  for (const c of tipo.campos) {
+    out[c.key] = valor(c, src[c.key])
+    if (c.formato && (c.tipo === 'texto' || c.tipo === 'textarea')) {
+      out[claveEstilo(c.key)] = estilo(src[claveEstilo(c.key)])
+    }
+  }
   return out
 }
 

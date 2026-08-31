@@ -88,6 +88,11 @@ export default function ConversacionesPage() {
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
   const [sel, setSel] = useState<string | null>(null)
+  // En móvil la lista y el hilo comparten la pantalla, así que abrir uno tapa el otro. Pero
+  // solo si el hilo se abrió a propósito: la autoselección de la primera conversación es una
+  // comodidad de escritorio, y en el teléfono hacía que entrar al panel dejara al usuario
+  // clavado en el primer chat sin ver que había más. Se distingue el clic del automatismo.
+  const [abiertoEnMovil, setAbiertoEnMovil] = useState(false)
   const [filtro, setFiltro] = useState<FiltroId>('todos')
   const [canal, setCanal] = useState<CanalId>('todos')
   const [q, setQ] = useState('')
@@ -123,15 +128,48 @@ export default function ConversacionesPage() {
   // La clave lleva el canal: dos plataformas podrían repetir un identificador, y
   // seleccionar el hilo equivocado sería peor que no mostrarlo.
   const claveDe = (c: Conversacion) => `${c.canal}:${c.sender}`
-  const actual = convs.find((c) => claveDe(c) === sel) ?? null
+  const indiceActual = convs.findIndex((c) => claveDe(c) === sel)
+  const actual = indiceActual >= 0 ? convs[indiceActual] : null
+
+  // Abrir una conversación es siempre un acto explícito: marca el hilo como abierto en móvil
+  // y deja el foco listo para moverse con el teclado.
+  const abrir = useCallback((clave: string) => {
+    setSel(clave)
+    setAbiertoEnMovil(true)
+  }, [])
 
   // Si lo seleccionado no está en la lista visible —al entrar, al cambiar de canal, al
   // filtrar o al buscar— se abre la primera. Antes el panel derecho decía "elegí una
   // conversación" teniendo una sola al lado, y había que hacer un clic de más.
+  //
+  // La dependencia es la CLAVE de la primera conversación, no el array: `convs` se rearma en
+  // cada render, así que depender de él relanzaba el efecto sin parar. Y la autoselección no
+  // marca `abiertoEnMovil`: en el teléfono se sigue viendo la lista hasta que se toca un hilo.
+  const primeraClave = convs.length ? claveDe(convs[0]) : null
   useEffect(() => {
-    if (!convs.length || actual) return
-    setSel(claveDe(convs[0]))
-  }, [convs, actual])
+    if (primeraClave && indiceActual < 0) setSel(primeraClave)
+  }, [primeraClave, indiceActual])
+
+  // Navegar entre conversaciones sin soltar el teclado. ↑/↓ mueve por la lista filtrada y
+  // Escape vuelve a la lista en móvil. Se ignora mientras se escribe en un campo: si no,
+  // redactar una respuesta con flechas saltaría de chat y se perdería lo tipeado.
+  useEffect(() => {
+    if (vista !== 'bot') return
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+      if (e.key === 'Escape') { setAbiertoEnMovil(false); return }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+      if (!convs.length) return
+      e.preventDefault()
+      const paso = e.key === 'ArrowDown' ? 1 : -1
+      const base = indiceActual < 0 ? 0 : indiceActual + paso
+      const i = Math.min(convs.length - 1, Math.max(0, base))
+      setSel(claveDe(convs[i]))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [vista, convs, indiceActual])
   const conteo = (f: (c: Conversacion) => boolean) => todas.filter(f).length
 
   const titulo = vista === 'bot'
@@ -151,7 +189,7 @@ export default function ConversacionesPage() {
               {RANGOS.map((r) => (
                 <button
                   key={r.days}
-                  onClick={() => { setDays(r.days); setSel(null) }}
+                  onClick={() => { setDays(r.days); setSel(null); setAbiertoEnMovil(false) }}
                   aria-pressed={days === r.days}
                   className={`min-h-9 rounded-md px-3 text-xs transition-colors ${days === r.days ? 'bg-[var(--pnl-track)] text-[var(--pnl-text)]' : 'text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)]'}`}
                 >
@@ -207,7 +245,7 @@ export default function ConversacionesPage() {
               return (
                 <button
                   key={ch.id}
-                  onClick={() => { setCanal(ch.id); setSel(null) }}
+                  onClick={() => { setCanal(ch.id); setSel(null); setAbiertoEnMovil(false) }}
                   style={activo ? { borderColor: ch.color, background: `${ch.color}1a` } : undefined}
                   className={`flex min-h-11 items-center justify-between gap-2 rounded-md border px-3 text-left transition-colors ${
                     activo
@@ -240,7 +278,7 @@ export default function ConversacionesPage() {
               return (
                 <button
                   key={f.id}
-                  onClick={() => { setFiltro(f.id); setSel(null) }}
+                  onClick={() => { setFiltro(f.id); setSel(null); setAbiertoEnMovil(false) }}
                   aria-pressed={activo}
                   className={`flex min-h-9 items-center gap-2 rounded-full border px-3 text-xs transition-colors ${
                     activo ? 'border-[var(--pnl-track)] bg-[var(--pnl-panel-2)] text-[var(--pnl-text)]' : 'border-[var(--pnl-hair)] bg-[var(--pnl-panel)] text-[var(--pnl-text-2)] hover:text-[var(--pnl-text)]'
@@ -255,7 +293,7 @@ export default function ConversacionesPage() {
           </div>
           <input
             value={q}
-            onChange={(e) => { setQ(e.target.value); setSel(null) }}
+            onChange={(e) => { setQ(e.target.value); setSel(null); setAbiertoEnMovil(false) }}
             placeholder="Buscar por nombre, número o texto del mensaje…"
             className="min-h-11 w-full rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] px-3 text-sm text-[var(--pnl-text)] placeholder:text-[var(--pnl-text-3)] focus-visible:border-[var(--pnl-track)] focus-visible:outline-2 focus-visible:outline-[var(--pnl-amber)] sm:max-w-md"
           />
@@ -271,12 +309,16 @@ export default function ConversacionesPage() {
 
       {vista === 'bot' && !loading && convs.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-          {/* Lista */}
-          <div className={`flex flex-col gap-1.5 ${actual ? 'hidden lg:flex' : ''}`}>
+          {/* Lista. En escritorio (lg+) siempre visible junto al hilo; en móvil se esconde
+              SOLO cuando un hilo se abrió a propósito (abiertoEnMovil), nunca por la
+              autoselección de la primera conversación — si no, entrar al panel en el
+              teléfono dejaba a quien atiende encerrado en el primer chat sin ver que había
+              más, y parecía que "el chat se tildó". */}
+          <div className={`flex flex-col gap-1.5 ${abiertoEnMovil ? 'hidden lg:flex' : ''}`}>
             {convs.map((c) => (
               <button
                 key={claveDe(c)}
-                onClick={() => setSel(claveDe(c))}
+                onClick={() => abrir(claveDe(c))}
                 className={`w-full rounded-md border p-3 text-left transition-colors ${
                   sel === claveDe(c)
                     ? 'border-[var(--pnl-track)] bg-[var(--pnl-panel-2)]'
@@ -308,8 +350,9 @@ export default function ConversacionesPage() {
             ))}
           </div>
 
-          {/* Hilo */}
-          <div className={`rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] ${actual ? '' : 'hidden lg:block'}`}>
+          {/* Hilo. En móvil se muestra cuando hay conversación Y se abrió a propósito —
+              la autoselección por sí sola ya no alcanza para tapar la lista. */}
+          <div className={`rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel)] ${actual && abiertoEnMovil ? '' : 'hidden lg:block'}`}>
             {actual ? (
               <div className="flex h-full flex-col">
                 <div className="flex items-center justify-between gap-2 border-b border-[var(--pnl-hair)] p-4">
@@ -336,7 +379,7 @@ export default function ConversacionesPage() {
                       </span>
                     )}
                   </div>
-                  <button onClick={() => setSel(null)} className="min-h-9 text-xs text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)] lg:hidden">
+                  <button onClick={() => setAbiertoEnMovil(false)} className="min-h-9 text-xs text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)] lg:hidden">
                     ← Lista
                   </button>
                 </div>
