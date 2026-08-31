@@ -583,12 +583,21 @@
    * Va turnando `frases` dentro de `el`. Devuelve la función para frenarlo.
    * `modo`: 'fundido' | 'subir' | 'escribir'.
    */
-  function rotarTexto(el, frases, modo, ms) {
+  /* `estilos[i]` es el `_estilo` (cursiva/fuente/color) del ítem `frases[i]`, en el mismo
+     orden — opcional: sin ese argumento se comporta exactamente igual que antes. Escribe con
+     innerHTML + escStyle en vez de textContent porque el estilo por ítem (CampoEditor.tsx,
+     `FormatoTexto`) tiene que verse acá igual que en el resto de los widgets; el modo
+     'escribir' es la excepción — la máquina de escribir letra por letra ya construye nodos de
+     texto a mano y envolverla en un <span> por cada frase es más riesgo que lo que vale un
+     efecto de detalle, así que ese modo sigue sin estilo. */
+  function rotarTexto(el, frases, modo, ms, estilos) {
     var nada = function () {};
     if (!el) return nada;
-    frases = (frases || []).filter(function (x) { return x; });
+    var pares = (frases || []).map(function (f, i) { return { texto: f, estilo: estilos && estilos[i] }; })
+      .filter(function (p) { return p.texto; });
+    frases = pares.map(function (p) { return p.texto; });
     if (!frases.length) return nada;
-    if (frases.length === 1 || menosMovimiento()) { el.textContent = frases[0]; return nada; }
+    if (frases.length === 1 || menosMovimiento()) { el.innerHTML = escStyle(frases[0], pares[0].estilo); return nada; }
 
     var i = 0, vivo = true, timer = null;
     // Se SUMAN las clases, no se reemplazan: el elemento suele traer la suya (`.alt` en el
@@ -596,7 +605,7 @@
     // pisarla dejaba el texto que cambia idéntico al que no cambia.
     el.classList.add('mic-tx');
     if (modo === 'subir') el.classList.add('mic-sube');
-    el.textContent = frases[0];
+    el.innerHTML = escStyle(frases[0], pares[0].estilo);
 
     function escribir(txt) {
       el.textContent = '';
@@ -627,7 +636,7 @@
         el.style.transition = 'none';
         el.classList.remove('mic-fuera');
         el.classList.add('mic-entra');
-        el.textContent = frases[i];
+        el.innerHTML = escStyle(frases[i], pares[i].estilo);
         void el.offsetWidth;
         el.style.transition = '';
         el.classList.remove('mic-entra');
@@ -675,8 +684,9 @@
     /* El título puede terminar en una parte que se va turnando: «Empezá hoy con…» y después
        «una cosecha en 21 días» / «el equipo que se maneja solo» / «asesoría por WhatsApp».
        Es decir tres cosas en el lugar de una, sin agrandar el bloque ni pedir otro clic. */
-    var finales = (c.titulo_alterna || []).map(function (x) { return x.texto; })
-      .filter(function (x) { return x; });
+    var alternas = (c.titulo_alterna || []).filter(function (x) { return x.texto; });
+    var finales = alternas.map(function (x) { return x.texto; });
+    var finalesEstilo = alternas.map(function (x) { return x.texto_estilo; });
 
     pintar(sh,
       CSS_TEXTO +
@@ -697,7 +707,7 @@
 
     if (finales.length) {
       rotarTexto(sh.querySelector('.alt'), finales, c.titulo_efecto || 'subir',
-                 (Number(c.titulo_segundos) || 3) * 1000);
+                 (Number(c.titulo_segundos) || 3) * 1000, finalesEstilo);
     }
 
     var a = sh.querySelector('a');
@@ -1502,11 +1512,12 @@
        `rotarTexto`, y en la cinta lo apaga el @media de abajo. */
     var modo = c.movimiento || 'fundido';
     var textos = items.map(function (i) { return i.texto; });
+    var textosEstilo = items.map(function (i) { return i.texto_estilo; });
     var cinta = modo === 'pasante' && textos.length > 1 && !menosMovimiento();
     // Un mensaje tarda `segundos` en cruzar; la vuelta entera es la suma de todos.
     var vuelta = Math.max(2, Number(c.segundos) || 5) * textos.length;
-    var tira = textos.concat(textos).map(function (t) {
-      return '<span class="u">' + esc(t) + '</span>';
+    var tira = items.concat(items).map(function (i) {
+      return '<span class="u">' + escStyle(i.texto, i.texto_estilo) + '</span>';
     }).join('<span class="pt">•</span>');
 
     pintar(sh,
@@ -1533,7 +1544,7 @@
       '<div class="b">' +
       (cinta
         ? '<div class="cinta"><div class="tira">' + tira + '</div></div>'
-        : '<span class="m on">' + esc(textos[0]) + '</span>') +
+        : '<span class="m on">' + escStyle(textos[0], textosEstilo[0]) + '</span>') +
       (c.cerrable ? '<button class="x" aria-label="Cerrar">×</button>' : '') + '</div>');
 
     // Empuja el contenido para no tapar el encabezado del sitio.
@@ -1549,12 +1560,12 @@
         setInterval(function () {
           conTransicion(m, 'mic-ban-' + w.id, function () {
             n = (n + 1) % textos.length;
-            m.textContent = textos[n];
+            m.innerHTML = escStyle(textos[n], textosEstilo[n]);
           });
         }, Math.max(2, Number(c.segundos) || 5) * 1000);
       } else {
         rotarTexto(m, textos, modo === 'pasante' ? 'fundido' : modo,
-                   Math.max(2, Number(c.segundos) || 5) * 1000);
+                   Math.max(2, Number(c.segundos) || 5) * 1000, textosEstilo);
       }
     }
     var x = sh.querySelector('.x');
@@ -2124,7 +2135,7 @@
         var pr = prod(w, regla.ofrecer);
         if (!pr) return;
         vistos[regla.ofrecer] = true;
-        salida.push({ p: pr, nota: regla.nota || '' });
+        salida.push({ p: pr, nota: regla.nota || '', nota_estilo: regla.nota_estilo });
       });
       return salida;
     }
