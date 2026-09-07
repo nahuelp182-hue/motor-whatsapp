@@ -6,6 +6,7 @@ import { MARCA, seccionHabilitada } from '@/lib/marca'
 
 function LoginForm() {
   const [password, setPassword]   = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError]         = useState('')
   const [loading, setLoading]     = useState(false)
   const [dots, setDots]           = useState(0)
@@ -72,21 +73,43 @@ function LoginForm() {
               <label className="block text-[10px] uppercase tracking-[0.15em] mb-2" style={{ color: 'var(--pnl-text-3)' }}>
                 Contraseña
               </label>
-              <input
-                ref={inputRef}
-                type="password"
-                value={password}
-                onChange={e => { setPassword(e.target.value); setError('') }}
-                placeholder="••••••••"
-                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none transition-all"
-                style={{
-                  background:  'var(--pnl-panel-2)',
-                  border:      '1px solid var(--pnl-hair)',
-                  color:       'var(--pnl-text)',
-                }}
-                autoComplete="current-password"
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  ref={inputRef}
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => { setPassword(e.target.value); setError('') }}
+                  placeholder="••••••••"
+                  className="w-full rounded-xl pl-4 pr-11 py-3 text-sm focus:outline-none transition-all"
+                  style={{
+                    background:  'var(--pnl-panel-2)',
+                    border:      '1px solid var(--pnl-hair)',
+                    color:       'var(--pnl-text)',
+                  }}
+                  autoComplete="current-password"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(s => !s)}
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  className="absolute right-0 top-0 h-full px-3 flex items-center"
+                  style={{ color: 'var(--pnl-text-3)' }}
+                >
+                  {showPassword ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-10-8-10-8a18.4 18.4 0 0 1 4.22-5.77M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.42 18.42 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s3-8 11-8 11 8 11 8-3 8-11 8-11-8-11-8Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             {error && (
