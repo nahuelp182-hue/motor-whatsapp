@@ -6,16 +6,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { leerProduccion, guardarConteo } from '@/lib/operacion/produccion'
+import { parseRango } from '@/lib/operacion/rango'
 import { log, traceId } from '@/lib/log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
+const rangoDe = (req: NextRequest) =>
+  parseRango(req.nextUrl.searchParams.get('desde'), req.nextUrl.searchParams.get('hasta'))
+
 export async function GET(req: NextRequest) {
   const trace = traceId(req)
   try {
-    return NextResponse.json(await leerProduccion())
+    return NextResponse.json(await leerProduccion(rangoDe(req)))
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'error desconocido'
     log.error('no se pudo leer producción', { ambito: 'operacion', trace_id: trace }, e)
@@ -45,7 +49,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'la fecha del conteo no puede ser futura' }, { status: 400 })
     }
     await guardarConteo(unidades, cuando, nota)
-    return NextResponse.json(await leerProduccion())
+    // Se responde con el estado ya recalculado sobre el MISMO rango que está mirando la
+    // pantalla: devolver el default haría que, tras cargar un conteo, la cobertura saltara a
+    // otra ventana sin que nadie tocara el filtro.
+    return NextResponse.json(await leerProduccion(rangoDe(req)))
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'error desconocido'
     log.error('no se pudo guardar el conteo', { ambito: 'operacion', trace_id: trace }, e)

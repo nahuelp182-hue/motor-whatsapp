@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { chequearCron } from '@/lib/cron-auth'
 import { leerCaja } from '@/lib/operacion/caja'
+import { parseRango } from '@/lib/operacion/rango'
 import { marcarHeartbeat } from '@/lib/cron-heartbeat'
 import { log, traceId } from '@/lib/log'
 
@@ -17,7 +18,11 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   const trace = traceId(req)
   try {
-    return NextResponse.json(await leerCaja())
+    const rango = parseRango(
+      req.nextUrl.searchParams.get('desde'),
+      req.nextUrl.searchParams.get('hasta'),
+    )
+    return NextResponse.json(await leerCaja(rango))
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'error desconocido'
     log.error('no se pudo leer caja', { ambito: 'operacion', trace_id: trace }, e)

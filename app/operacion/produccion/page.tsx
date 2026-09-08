@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Package, Factory, Gauge, ClipboardList } from 'lucide-react'
 import { PanelShell } from '@/components/PanelShell'
 import { RailOperacion } from '@/components/operacion/Rail'
+import { FiltroMaestro, useRangoMaestro } from '@/components/operacion/FiltroMaestro'
 import {
   Tarjeta, Kpi, Medidor, Encabezado, Aviso,
   DOMINIO, TONO, ars, dec, num, type EstadoTarjeta,
@@ -22,7 +23,9 @@ const CONTEO_VIEJO = 7
 type Produccion = {
   conteo: { unidades: number; fecha: string; nota: string | null; antiguedadDias: number } | null
   ritmoDiario: number | null
-  pedidos30: number
+  pedidos: number
+  ventanaDias: number
+  etiqueta: string
   coberturaDias: number | null
   puntoReposicion: number | null
   quiebre: string | null
@@ -39,6 +42,7 @@ const fechaLarga = (iso: string) =>
   new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
 export default function ProduccionPage() {
+  const { rango, aplicar } = useRangoMaestro()
   const [datos, setDatos] = useState<Produccion | null>(null)
   const [cargando, setCargando] = useState(true)
   const [fallo, setFallo] = useState<string | null>(null)
@@ -50,10 +54,12 @@ export default function ProduccionPage() {
   const [avisoForm, setAvisoForm] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!rango) return
     let vivo = true
+    setCargando(true)
     void (async () => {
       try {
-        const res = await fetch('/api/operacion/produccion')
+        const res = await fetch(`/api/operacion/produccion?desde=${rango.desde}&hasta=${rango.hasta}`)
         const j = (await res.json()) as Produccion
         if (!res.ok) throw new Error(j.error ?? `respuesta ${res.status}`)
         if (vivo) { setDatos(j); setFallo(null) }
@@ -64,7 +70,7 @@ export default function ProduccionPage() {
       }
     })()
     return () => { vivo = false }
-  }, [recarga])
+  }, [rango, recarga])
 
   const recargar = useCallback(() => { setCargando(true); setRecarga(n => n + 1) }, [])
 
@@ -77,7 +83,7 @@ export default function ProduccionPage() {
     setGuardando(true)
     setAvisoForm(null)
     try {
-      const res = await fetch('/api/operacion/produccion', {
+      const res = await fetch(`/api/operacion/produccion?desde=${rango?.desde}&hasta=${rango?.hasta}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ unidades: n, nota: nota || undefined }),
@@ -117,6 +123,12 @@ export default function ProduccionPage() {
       }
     >
       <RailOperacion />
+
+      <FiltroMaestro
+        rango={rango}
+        onCambio={aplicar}
+        nota="El ritmo de venta se calcula sobre los días del rango, y de él salen la cobertura, el punto de reposición y la fecha de quiebre. Con ventanas cortas el ritmo es ruidoso: una semana sin pedidos dispara la cobertura a meses."
+      />
 
       {fallo && datos && (
         <Aviso tono="warn" mensaje={`No se pudo actualizar: ${fallo}. Lo de abajo es el último dato bueno.`} />
@@ -193,7 +205,7 @@ export default function ProduccionPage() {
         />
         <Kpi
           dominio="web" icono={<Factory className="size-4" />}
-          valor={d ? `${num(d.pedidos30)} / ${num(d.capacidad)}` : '—'} unidad="u"
+          valor={d ? `${num(d.pedidos)} / ${num(d.capacidad)}` : '—'} unidad="u"
           etiqueta="Pedidos del mes contra la capacidad"
           pie="el techo es la demanda, no la fábrica"
         />
@@ -215,7 +227,7 @@ export default function ProduccionPage() {
           falta={
             !d?.conteo
               ? 'Falta el primer conteo de stock. Cargalo arriba: sin ese número no hay cobertura, ni punto de reposición, ni alerta de quiebre.'
-              : 'No hubo pedidos pagos en los últimos 30 días, así que no hay ritmo de venta con el que dividir. La cobertura sería infinita y diría "hay de sobra" justo cuando no se está vendiendo.'
+              : 'No hubo pedidos pagos en el período elegido, así que no hay ritmo de venta con el que dividir. La cobertura sería infinita y diría "hay de sobra" justo cuando no se está vendiendo. Probá con un rango más largo.'
           }
           error={fallo}
           onReintentar={recargar}
@@ -226,7 +238,7 @@ export default function ProduccionPage() {
                 {[
                   { n: dec(d.coberturaDias!), u: 'días', l: 'Cobertura al ritmo actual', c: urgente ? TONO.crit : TONO.ok },
                   { n: dec(d.puntoReposicion!), u: 'u', l: 'Punto de reposición', c: TONO.warn },
-                  { n: dec(d.ritmoDiario, 2), u: 'u/día', l: 'Ritmo de venta (30 días)', c: 'var(--pnl-text)' },
+                  { n: dec(d.ritmoDiario, 2), u: 'u/día', l: `Ritmo de venta (${d.ventanaDias} días)`, c: 'var(--pnl-text)' },
                 ].map(b => (
                   <div key={b.l} className="flex flex-col gap-1 rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] p-3">
                     <span className="num text-xl font-bold leading-tight" style={{ color: b.c }}>
@@ -259,7 +271,7 @@ export default function ProduccionPage() {
           titulo="Lo que la capacidad ociosa deja sobre la mesa"
           sub="No es una pérdida contable: es margen que existiría si hubiera demanda para las 65 unidades."
           estado={estadoBase === 'normal' && d?.ociosa == null ? 'sin_fuente' : estadoBase}
-          falta="Sin pedidos en los últimos 30 días no hay con qué comparar la capacidad."
+          falta="Sin pedidos en el período elegido no hay con qué comparar la capacidad."
           error={fallo}
           onReintentar={recargar}
         >
@@ -268,7 +280,9 @@ export default function ProduccionPage() {
               <div className="flex flex-col gap-2">
                 {[
                   { k: 'Capacidad instalada', v: `${num(d.capacidad)} u/mes`, n: 'el máximo que se puede armar' },
-                  { k: 'Pedidos del mes', v: `${num(d.pedidos30)} u/mes`, n: `${dec((d.pedidos30 / d.capacidad) * 100)} % de la capacidad` },
+                  // Mensualizado: la capacidad es por mes, así que comparar contra los
+                  // pedidos crudos de una ventana de 7 días diría que sobra capacidad siempre.
+                  { k: 'Pedidos (ritmo mensual)', v: `${num(Math.round((d.ritmoDiario ?? 0) * 30))} u/mes`, n: `${dec(((d.ritmoDiario ?? 0) * 30 / d.capacidad) * 100)} % de la capacidad` },
                   { k: 'Ociosa', v: `${num(d.ociosa)} u/mes`, n: 'ni comprada ni vendida' },
                 ].map(f => (
                   <div key={f.k} className="flex items-start gap-3 text-[13px]">
@@ -288,8 +302,8 @@ export default function ProduccionPage() {
               </div>
               <Medidor
                 etiqueta="Capacidad usada"
-                valor={`${num(d.pedidos30)} de ${num(d.capacidad)} u`}
-                pct={(d.pedidos30 / d.capacidad) * 100}
+                valor={`${num(Math.round((d.ritmoDiario ?? 0) * 30))} de ${num(d.capacidad)} u`}
+                pct={((d.ritmoDiario ?? 0) * 30 / d.capacidad) * 100}
                 color={DOMINIO.prod.color}
               />
               <p className="text-[13px] leading-relaxed text-[var(--pnl-text-2)]">

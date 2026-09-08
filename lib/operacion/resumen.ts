@@ -21,28 +21,8 @@ import { leerLogistica } from '@/lib/operacion/envios'
 import { leerMl, type VentasMl } from '@/lib/operacion/ml'
 import { leerGa4, type Ga4 } from '@/lib/operacion/ga4'
 import { CATALOGO } from '@/lib/cron-heartbeat'
+import { ventanaPrevia, etiquetaRango, type Rango } from '@/lib/operacion/rango'
 import { retornoSobreCac, margenPonderado, TECHO_CAC } from '@/lib/supuestos'
-
-const DIA = 86_400_000
-
-export type Rango = '24h' | '7d' | '30d'
-
-const DIAS: Record<Rango, number> = { '24h': 1, '7d': 7, '30d': 30 }
-
-const iso = (d: Date) => d.toISOString().slice(0, 10)
-
-/** Ventana del rango y la ventana inmediatamente anterior, del mismo largo, para comparar. */
-function ventanas(rango: Rango) {
-  const n = DIAS[rango]
-  const hoy = new Date()
-  const desde = new Date(hoy.getTime() - (n - 1) * DIA)
-  const previoHasta = new Date(desde.getTime() - DIA)
-  const previoDesde = new Date(previoHasta.getTime() - (n - 1) * DIA)
-  return {
-    since: iso(desde), until: iso(hoy),
-    pSince: iso(previoDesde), pUntil: iso(previoHasta),
-  }
-}
 
 /** Variación porcentual contra el período anterior. Null si no hay base con qué comparar. */
 function variacion(actual: number, previo: number): number | null {
@@ -52,6 +32,8 @@ function variacion(actual: number, previo: number): number | null {
 
 export type Resumen = {
   rango: Rango
+  /** Cómo se nombra el período en pantalla: "últimos 14 días" o el rango literal. */
+  etiqueta: string
   periodo: { since: string; until: string }
   /** Lo que sí se pudo leer. */
   ventasTN: number
@@ -136,8 +118,9 @@ async function faltantes(logisticaFresca: boolean, ml: VentasMl, ga4: Ga4): Prom
   return falta
 }
 
-export async function leerResumen(rango: Rango = '7d'): Promise<Resumen> {
-  const v = ventanas(rango)
+export async function leerResumen(rango: Rango): Promise<Resumen> {
+  const prev = ventanaPrevia(rango)
+  const v = { since: rango.desde, until: rango.hasta, pSince: prev.desde, pUntil: prev.hasta }
 
   // Las cuatro fuentes en paralelo y no en cadena: son independientes entre sí y la más
   // lenta (Meta) marca el tiempo de toda la pantalla igual. Cada una devuelve su propio
@@ -146,6 +129,10 @@ export async function leerResumen(rango: Rango = '7d'): Promise<Resumen> {
     fetchTNOrdersClassified(v.since, v.until),
     fetchTNOrdersClassified(v.pSince, v.pUntil),
     totalesMeta(v.since, v.until),
+    // Logística NO se recorta con el rango, y es a propósito. Los envíos abiertos son los
+    // que están abiertos AHORA: si el filtro estuviera en 7 días, un envío frenado hace 10
+    // desaparecería del KPI justo cuando más hay que reclamarlo. El rango filtra historia,
+    // no la cola de trabajo pendiente. En la pantalla de Logística sí recorta el histórico.
     leerLogistica(21),
     leerMl(new Date(v.since + 'T00:00:00.000Z'), new Date(v.until + 'T23:59:59.999Z')),
     leerGa4(v.since, v.until),
@@ -175,6 +162,7 @@ export async function leerResumen(rango: Rango = '7d'): Promise<Resumen> {
 
   return {
     rango,
+    etiqueta: etiquetaRango(rango),
     periodo: { since: v.since, until: v.until },
     ventasTN,
     // Sumar los dos canales solo tiene sentido si los dos se pudieron leer. Con el push de ML

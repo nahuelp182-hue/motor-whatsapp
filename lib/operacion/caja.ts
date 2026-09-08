@@ -10,6 +10,7 @@
 import { prisma } from '@/lib/prisma'
 import { leerProduccion } from '@/lib/operacion/produccion'
 import { RETENCION_MP_DIAS, PLAZO_PROVEEDORES_DIAS } from '@/lib/supuestos'
+import { rangoDePreset, etiquetaRango, type Rango } from '@/lib/operacion/rango'
 
 export type LineaCaja = { nombre: string; bruto: number; neto: number; liberado: number; pendiente: number }
 
@@ -27,6 +28,17 @@ export type Corte = {
 export type Caja = {
   actual: Corte | null
   previo: Corte | null
+  /**
+   * Todos los cortes que caen en el rango, del más nuevo al más viejo.
+   *
+   * El corte es quincenal porque lo calcula el VPS con los tokens de MercadoPago, que Vercel
+   * no tiene. Así que el filtro no puede recortar a un día cualquiera: elige qué quincenas
+   * se listan. Inventar un corte parcial sería mostrar plata que nadie calculó.
+   */
+  cortes: Corte[]
+  etiqueta: string
+  /** Cortes que existen fuera del rango. Sirve para decir "hay más, ampliá la ventana". */
+  fueraDelRango: number
   /** Variación de cada concepto contra la quincena anterior. Vacío si no hay con qué comparar. */
   comparacion: Array<{ concepto: string; actual: number; previo: number; variacion: number }>
   /**
@@ -51,8 +63,11 @@ export type Caja = {
  * las dos cambie de criterio, y el ciclo de efectivo quedaría discutiendo con la pantalla de
  * al lado.
  */
-async function diasInventario(): Promise<number | null> {
-  const { coberturaDias } = await leerProduccion()
+async function diasInventario(rango: Rango): Promise<number | null> {
+  // Se le pasa el MISMO rango que está mirando la pantalla: si acá se usara la ventana por
+  // defecto, el ciclo de efectivo mostraría un inventario calculado sobre 30 días al lado de
+  // cortes filtrados a otra ventana, y las dos mitades del mismo número no se hablarían.
+  const { coberturaDias } = await leerProduccion(rango)
   return coberturaDias
 }
 
@@ -75,10 +90,24 @@ function aCorte(r: {
 
 const variacion = (a: number, p: number) => (p ? ((a - p) / p) * 100 : 0)
 
-export async function leerCaja(): Promise<Caja> {
-  const cortes = await prisma.corteCaja.findMany({ orderBy: { desde: 'desc' }, take: 2 })
-  const actual = cortes[0] ? aCorte(cortes[0]) : null
-  const previo = cortes[1] ? aCorte(cortes[1]) : null
+export async function leerCaja(rango: Rango = rangoDePreset(30)): Promise<Caja> {
+  // Un corte entra si SE SUPERPONE con el rango, no si está contenido en él: la quincena en
+  // curso siempre arranca antes del filtro, y exigir que entrara entera dejaría la pantalla
+  // vacía justo con el corte que más importa.
+  const desde = new Date(rango.desde + 'T00:00:00.000Z')
+  const hasta = new Date(rango.hasta + 'T23:59:59.999Z')
+
+  const [filas, total] = await Promise.all([
+    prisma.corteCaja.findMany({
+      where: { desde: { lte: hasta }, hasta: { gte: desde } },
+      orderBy: { desde: 'desc' },
+    }),
+    prisma.corteCaja.count(),
+  ])
+
+  const cortes = filas.map(aCorte)
+  const actual = cortes[0] ?? null
+  const previo = cortes[1] ?? null
 
   const comparacion =
     actual && previo
@@ -91,11 +120,14 @@ export async function leerCaja(): Promise<Caja> {
       : []
 
   const comisiones = actual && actual.bruto ? (actual.bruto - actual.neto) / actual.bruto : null
-  const inv = await diasInventario()
+  const inv = await diasInventario(rango)
 
   return {
     actual,
     previo,
+    cortes,
+    etiqueta: etiquetaRango(rango),
+    fueraDelRango: total - cortes.length,
     comparacion,
     comisiones,
     ciclo: {

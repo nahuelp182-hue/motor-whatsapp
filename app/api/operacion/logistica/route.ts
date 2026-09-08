@@ -6,6 +6,7 @@
 // refresco, cada F5 saldría a consultar Andreani envío por envío.
 import { NextRequest, NextResponse } from 'next/server'
 import { leerLogistica } from '@/lib/operacion/envios'
+import { parseRango } from '@/lib/operacion/rango'
 import { log, traceId } from '@/lib/log'
 
 export const runtime = 'nodejs'
@@ -13,9 +14,15 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   const trace = traceId()
-  const dias = Number(req.nextUrl.searchParams.get('dias') ?? 21)
+  // El rango recorta el HISTÓRICO (cumplimiento, demora por provincia, por semana). Los
+  // envíos abiertos no se recortan dentro de leerLogistica: un envío frenado hace 10 días no
+  // puede desaparecer de la cola porque alguien miró los últimos 7.
+  const rango = parseRango(
+    req.nextUrl.searchParams.get('desde'),
+    req.nextUrl.searchParams.get('hasta'),
+  )
   try {
-    const datos = await leerLogistica(Number.isFinite(dias) ? dias : 21)
+    const datos = await leerLogistica(rango.dias)
     return NextResponse.json(datos)
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'error desconocido'

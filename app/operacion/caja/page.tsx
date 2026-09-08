@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Wallet, CircleCheck, Hourglass, TrendingUp, RefreshCw, ArrowLeftRight } from 'lucide-react'
 import { PanelShell } from '@/components/PanelShell'
 import { RailOperacion } from '@/components/operacion/Rail'
+import { FiltroMaestro, useRangoMaestro } from '@/components/operacion/FiltroMaestro'
 import {
   Tarjeta, Kpi, Medidor, Pastilla, Encabezado, Aviso,
   DOMINIO, TONO, ars, dec, type EstadoTarjeta,
@@ -24,6 +25,9 @@ type Corte = {
 type Caja = {
   actual: Corte | null
   previo: Corte | null
+  cortes: Corte[]
+  etiqueta: string
+  fueraDelRango: number
   comparacion: Array<{ concepto: string; actual: number; previo: number; variacion: number }>
   comisiones: number | null
   ciclo: { inventario: number | null; cobro: number; pago: number; total: number | null }
@@ -37,16 +41,19 @@ const fecha = (iso: string) =>
 const COLOR_LINEA = [DOMINIO.web.color, DOMINIO.ml.color, 'var(--pnl-text-3)']
 
 export default function CajaPage() {
+  const { rango, aplicar } = useRangoMaestro()
   const [datos, setDatos] = useState<Caja | null>(null)
   const [cargando, setCargando] = useState(true)
   const [fallo, setFallo] = useState<string | null>(null)
   const [recarga, setRecarga] = useState(0)
 
   useEffect(() => {
+    if (!rango) return
     let vivo = true
+    setCargando(true)
     void (async () => {
       try {
-        const res = await fetch('/api/operacion/caja')
+        const res = await fetch(`/api/operacion/caja?desde=${rango.desde}&hasta=${rango.hasta}`)
         const j = (await res.json()) as Caja
         if (!res.ok) throw new Error(j.error ?? `respuesta ${res.status}`)
         if (vivo) { setDatos(j); setFallo(null) }
@@ -57,7 +64,7 @@ export default function CajaPage() {
       }
     })()
     return () => { vivo = false }
-  }, [recarga])
+  }, [rango, recarga])
 
   const recargar = useCallback(() => { setCargando(true); setRecarga(n => n + 1) }, [])
 
@@ -86,6 +93,12 @@ export default function CajaPage() {
       }
     >
       <RailOperacion />
+
+      <FiltroMaestro
+        rango={rango}
+        onCambio={aplicar}
+        nota="El corte de caja es quincenal: lo calcula el VPS, que tiene los tokens de MercadoPago. El rango elige qué quincenas se listan, no parte una por la mitad — un corte parcial sería plata que nadie calculó."
+      />
 
       {fallo && datos && (
         <Aviso tono="warn" mensaje={`No se pudo actualizar: ${fallo}. Lo de abajo es el último dato bueno.`} />

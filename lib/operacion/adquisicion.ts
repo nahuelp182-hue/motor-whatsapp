@@ -16,6 +16,8 @@ import {
   margenPonderado, ltv, retornoSobreCac,
 } from '@/lib/supuestos'
 
+import { etiquetaRango, type Rango } from '@/lib/operacion/rango'
+
 const DIA = 86_400_000
 const iso = (d: Date) => d.toISOString().slice(0, 10)
 
@@ -31,6 +33,8 @@ export type Escenario = {
 
 export type Adquisicion = {
   periodo: { since: string; until: string; dias: number }
+  /** Cómo se nombra el período en pantalla. */
+  etiqueta: string
   gasto: number
   metaOk: boolean
   pedidos: number
@@ -84,10 +88,14 @@ function escenarios(gastoDiaActual: number, cacActual: number): Escenario[] {
   })
 }
 
-export async function leerAdquisicion(dias = 30): Promise<Adquisicion> {
-  const hoy = new Date()
-  const since = iso(new Date(hoy.getTime() - (dias - 1) * DIA))
-  const until = iso(hoy)
+export async function leerAdquisicion(rango: Rango): Promise<Adquisicion> {
+  const { dias } = rango
+  // El rango llega ya validado del filtro maestro: no se recalcula acá para que Adquisición
+  // y Resumen no puedan discrepar en qué días abarca "el período". `until` sale del rango y
+  // no de hoy: con una ventana manual que termina en el pasado, usar hoy traería órdenes de
+  // fuera del período y las dividiría por los días del rango, inflando el gasto diario.
+  const since = rango.desde
+  const until = rango.hasta
 
   const [ordenes, meta, adsets] = await Promise.all([
     fetchTNOrdersClassified(since, until),
@@ -111,6 +119,7 @@ export async function leerAdquisicion(dias = 30): Promise<Adquisicion> {
 
   return {
     periodo: { since, until, dias },
+    etiqueta: etiquetaRango(rango),
     gasto: meta.spend,
     metaOk: meta.ok,
     pedidos,

@@ -11,6 +11,7 @@
 // bueno con su hora.
 
 import { prisma } from '@/lib/prisma'
+import { PISO_ABIERTOS_DIAS } from '@/lib/operacion/rango'
 import { getEstadoAndreani, pareceTrackingAndreani, ORDEN_ENTREGADO, ORDEN_EN_SUCURSAL } from '@/lib/andreani'
 import { PLAZO_PROMETIDO, UMBRAL_ENVIO } from '@/lib/supuestos'
 
@@ -248,19 +249,23 @@ export function accionDe(estado: string, dias: number | null): FilaEnvio['accion
  * existe. `historicoDesde` deja que la pantalla lo diga con esas palabras en vez de
  * mostrar un promedio calculado sobre dos envíos.
  */
-export async function leerLogistica(dias = 21): Promise<Logistica> {
+export async function leerLogistica(dias = PISO_ABIERTOS_DIAS): Promise<Logistica> {
   const ahora = new Date()
+  // Dos ventanas: el histórico usa la del filtro; los abiertos, la más ancha de las dos.
+  // Acotar los abiertos sigue siendo necesario (un envío que nunca llega a "entregado" se
+  // quedaría en la lista para siempre y al año la pantalla sería una pila de fantasmas),
+  // pero el piso garantiza que achicar el filtro no oculte nada accionable.
   const desde = new Date(ahora.getTime() - dias * DIA)
+  const desdeAbiertos = new Date(ahora.getTime() - Math.max(dias, PISO_ABIERTOS_DIAS) * DIA)
 
   const [todos, primero, apicolaPendiente] = await Promise.all([
     prisma.envioSeguimiento.findMany({
-      // Los abiertos también se acotan a la ventana. Sin esto, un envío por un correo que
-      // no se puede consultar nunca llega a "entregado" y se queda en la lista para
-      // siempre: al año la pantalla sería una pila de fantasmas tapando lo de esta semana.
       where: {
         OR: [
-          { entregado_at: null, despachado_at: { gte: desde } },
-          { entregado_at: null, despachado_at: null, creado_at: { gte: desde } },
+          { entregado_at: null, despachado_at: { gte: desdeAbiertos } },
+          { entregado_at: null, despachado_at: null, creado_at: { gte: desdeAbiertos } },
+          // Los entregados sí usan la ventana del filtro: son historia, y es exactamente lo
+          // que el rango tiene que poder recortar.
           { entregado_at: { gte: desde } },
         ],
       },
@@ -271,7 +276,8 @@ export async function leerLogistica(dias = 21): Promise<Logistica> {
     // MercadoLibre y no tenemos su trazabilidad. Entra lo pendiente, que es accionable,
     // y no se inventa un "en tránsito" que nadie puede verificar.
     prisma.envioApicola.findMany({
-      where: { despachado: false, fecha_compra: { gte: desde } },
+      // Pendientes de despacho: también son cola de trabajo, así que van con el piso.
+      where: { despachado: false, fecha_compra: { gte: desdeAbiertos } },
       orderBy: { fecha_compra: 'asc' },
     }),
   ])

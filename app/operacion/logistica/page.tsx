@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Truck, PackageX, Package, Clock, TriangleAlert, MapPin, ChartNoAxesColumn, Gauge } from 'lucide-react'
 import { PanelShell } from '@/components/PanelShell'
 import { RailOperacion } from '@/components/operacion/Rail'
+import { FiltroMaestro, useRangoMaestro } from '@/components/operacion/FiltroMaestro'
+import { PISO_ABIERTOS_DIAS } from '@/lib/operacion/rango'
 import {
   Tarjeta, Kpi, Medidor, Pastilla, Encabezado, Aviso,
   DOMINIO, TONO, dec, num, type EstadoTarjeta, type Tono,
@@ -71,6 +73,7 @@ const horaCorta = (iso: string) =>
 type Orden = { col: 'dias' | 'destino' | 'referencia' | 'estado'; dir: 'asc' | 'desc' }
 
 export default function LogisticaPage() {
+  const { rango, aplicar } = useRangoMaestro()
   const [datos, setDatos] = useState<Logistica | null>(null)
   const [cargando, setCargando] = useState(true)
   const [fallo, setFallo] = useState<string | null>(null)
@@ -82,10 +85,12 @@ export default function LogisticaPage() {
   const [recarga, setRecarga] = useState(0)
 
   useEffect(() => {
+    if (!rango) return
     let vivo = true
+    setCargando(true)
     void (async () => {
       try {
-        const res = await fetch('/api/operacion/logistica?dias=21')
+        const res = await fetch(`/api/operacion/logistica?desde=${rango.desde}&hasta=${rango.hasta}`)
         const j = (await res.json()) as Logistica
         if (!res.ok) throw new Error(j.error ?? `respuesta ${res.status}`)
         if (vivo) { setDatos(j); setFallo(null) }
@@ -96,7 +101,7 @@ export default function LogisticaPage() {
       }
     })()
     return () => { vivo = false }
-  }, [recarga])
+  }, [rango, recarga])
 
   const cargar = useCallback(() => {
     setCargando(true)
@@ -153,6 +158,12 @@ export default function LogisticaPage() {
       }
     >
       <RailOperacion />
+
+      <FiltroMaestro
+        rango={rango}
+        onCambio={aplicar}
+        nota={`El rango recorta el histórico (cumplimiento, demora por provincia y por semana). Los envíos abiertos se muestran siempre desde los últimos ${PISO_ABIERTOS_DIAS} días como mínimo: achicar el filtro no puede esconder un envío frenado.`}
+      />
 
       {fallo && datos && (
         <Aviso tono="warn" mensaje={`No se pudo actualizar: ${fallo}. Lo de abajo es el último dato bueno.`} />

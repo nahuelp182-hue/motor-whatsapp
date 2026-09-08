@@ -9,6 +9,7 @@ import {
   DOMINIO, TONO, ars, dec, num, type EstadoTarjeta, type Tono,
 } from '@/components/operacion/ui'
 import { EYEBROW } from '@/components/widgets/ui'
+import { FiltroMaestro, useRangoMaestro } from '@/components/operacion/FiltroMaestro'
 
 // Adquisición.
 //
@@ -23,6 +24,7 @@ type Escenario = { gastoDia: number; cac: number; ventasMes: number; margenMes: 
 
 type Adquisicion = {
   periodo: { since: string; until: string; dias: number }
+  etiqueta: string
   gasto: number
   metaOk: boolean
   pedidos: number
@@ -41,28 +43,24 @@ type Adquisicion = {
   error?: string
 }
 
-const RANGOS = [
-  [7, '7 días'],
-  [30, '30 días'],
-  [45, '45 días'],
-] as const
-
 const TONO_ESTADO: Record<string, Tono> = {
   actual: 'neutro', 'en curso': 'ok', 'el techo': 'warn', fuera: 'crit',
 }
 
 export default function AdquisicionPage() {
-  const [dias, setDias] = useState<number>(30)
+  const { rango, aplicar } = useRangoMaestro()
   const [datos, setDatos] = useState<Adquisicion | null>(null)
   const [cargando, setCargando] = useState(true)
   const [fallo, setFallo] = useState<string | null>(null)
   const [recarga, setRecarga] = useState(0)
 
   useEffect(() => {
+    if (!rango) return
     let vivo = true
+    setCargando(true)
     void (async () => {
       try {
-        const res = await fetch(`/api/operacion/adquisicion?dias=${dias}`)
+        const res = await fetch(`/api/operacion/adquisicion?desde=${rango.desde}&hasta=${rango.hasta}`)
         const j = (await res.json()) as Adquisicion
         if (!res.ok) throw new Error(j.error ?? `respuesta ${res.status}`)
         if (vivo) { setDatos(j); setFallo(null) }
@@ -73,10 +71,9 @@ export default function AdquisicionPage() {
       }
     })()
     return () => { vivo = false }
-  }, [dias, recarga])
+  }, [rango, recarga])
 
   const recargar = useCallback(() => { setCargando(true); setRecarga(n => n + 1) }, [])
-  const cambiar = useCallback((d: number) => { setCargando(true); setDias(d) }, [])
 
   // Un fallo SOLO vacía la pantalla cuando no hay nada previo que mostrar. Si ya había
   // datos, se conservan y el fallo se avisa arriba: el último dato bueno con su hora es más
@@ -105,20 +102,12 @@ export default function AdquisicionPage() {
         <Aviso tono="warn" mensaje={`No se pudo actualizar: ${fallo}. Lo de abajo es el último dato bueno.`} />
       )}
 
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Rango">
-        {RANGOS.map(([k, l]) => (
-          <button
-            key={k} type="button" onClick={() => cambiar(k)} aria-pressed={dias === k}
-            className={`h-10 rounded-full border px-4 text-[13px] font-medium ${
-              dias === k
-                ? 'border-[var(--pnl-track)] bg-[var(--pnl-panel-2)] text-[var(--pnl-text)]'
-                : 'border-[var(--pnl-hair)] text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)]'
-            }`}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
+      <FiltroMaestro
+        rango={rango}
+        onCambio={aplicar}
+        nota="El gasto diario y la elasticidad se calculan sobre los días del rango. Con ventanas cortas el promedio diario es más ruidoso: un solo día flojo lo mueve mucho."
+      />
+
 
       {d && !d.metaOk && (
         <Aviso tono="warn" mensaje="No se pudo leer Meta Ads. Lo que depende del gasto queda sin calcular; los pedidos y la atribución de Tiendanube siguen siendo reales." />
@@ -132,7 +121,7 @@ export default function AdquisicionPage() {
 
       <Encabezado
         titulo="¿La plata que entra, vuelve?"
-        nota={`${dias} días`}
+        nota={d?.etiqueta}
         bajada="Lo que se muestra es lo que se puede sostener con datos: gasto real de Meta, pedidos reales de Tiendanube y frecuencia por conjunto. El CAC incremental —el único que decide si escalar o cortar— necesita días de holdout y todavía no está."
       />
 
@@ -140,8 +129,8 @@ export default function AdquisicionPage() {
         <Kpi
           dominio="crm" icono={<Megaphone className="size-4" />}
           valor={d && d.metaOk ? ars(d.gasto) : '—'}
-          etiqueta={`Gasto en Meta · ${dias} días`}
-          pie={d && d.metaOk ? `${ars(d.gasto / dias)} por día` : 'no se pudo leer'}
+          etiqueta={d ? `Gasto en Meta · ${d.etiqueta}` : 'Gasto en Meta'}
+          pie={d && d.metaOk ? `${ars(d.gasto / d.periodo.dias)} por día` : 'no se pudo leer'}
         />
         <Kpi
           dominio="crm" icono={<Target className="size-4" />}

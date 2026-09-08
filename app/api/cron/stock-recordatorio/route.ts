@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       ? [
           `El último conteo de stock es del ${ultimo.fecha.toLocaleDateString('es-AR')} (hace ${dias} días): ${ultimo.unidades} unidades.`,
           cobertura !== null
-            ? `Al ritmo de los últimos 30 días (${prod.pedidos30} pedidos), ese stock daba para ${Math.round(cobertura)} días.`
+            ? `Al ritmo de los últimos ${prod.ventanaDias} días (${prod.pedidos} pedidos), ese stock daba para ${Math.round(cobertura)} días.`
             : 'No hubo pedidos en los últimos 30 días, así que no hay ritmo con qué calcular la cobertura.',
           '',
           'Con un conteo viejo, la cobertura y el punto de reposición se calculan sobre una foto que ya no es. Contá el estante y cargá el número:',

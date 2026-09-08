@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Truck, LayoutGrid, Megaphone, Factory, Wallet } from 'lucide-react'
 import { DOMINIO } from '@/components/operacion/ui'
@@ -25,6 +26,24 @@ const SECCIONES = [
 
 export function RailOperacion() {
   const path = usePathname()
+
+  // El rango del filtro maestro viaja con el link. Sin esto, moverse de Resumen a Logística
+  // reseteaba la ventana al default y el filtro dejaba de ser maestro apenas cambiabas de
+  // pantalla — que es justo cuando más importa que no cambie.
+  //
+  // Se lee en un efecto y no en el render: en el servidor no existe `location`, y usar
+  // `useSearchParams` obligaría a envolver cada página en <Suspense>.
+  const [query, setQuery] = useState('')
+  useEffect(() => {
+    const leer = () => {
+      const p = new URLSearchParams(window.location.search)
+      const desde = p.get('desde'); const hasta = p.get('hasta')
+      setQuery(desde && hasta ? `?desde=${desde}&hasta=${hasta}` : '')
+    }
+    leer()
+    window.addEventListener('popstate', leer)
+    return () => window.removeEventListener('popstate', leer)
+  }, [path])
   return (
     <nav className="flex flex-wrap items-center gap-2" aria-label="Secciones de Operación">
       {SECCIONES.map(({ href, label, icon: Icono, dominio }) => {
@@ -32,7 +51,7 @@ export function RailOperacion() {
         return (
           <Link
             key={href}
-            href={href}
+            href={`${href}${query}`}
             aria-current={activo ? 'page' : undefined}
             className={`flex h-10 items-center gap-2 rounded-full border px-4 text-[13px] font-medium transition-colors ${
               activo

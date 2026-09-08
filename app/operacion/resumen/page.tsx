@@ -9,6 +9,8 @@ import {
   DOMINIO, TONO, ars, dec, num, type EstadoTarjeta,
 } from '@/components/operacion/ui'
 import { EYEBROW } from '@/components/widgets/ui'
+import { FiltroMaestro, useRangoMaestro } from '@/components/operacion/FiltroMaestro'
+import { type Rango } from '@/lib/operacion/rango'
 
 // Resumen: qué está pasando ahora.
 //
@@ -21,7 +23,8 @@ import { EYEBROW } from '@/components/widgets/ui'
 // saber qué falta y por qué que ver una tarjeta con un número inventado.
 
 type Resumen = {
-  rango: '24h' | '7d' | '30d'
+  rango: Rango
+  etiqueta: string
   periodo: { since: string; until: string }
   ventasTN: number
   ventasTotales: number | null
@@ -54,11 +57,6 @@ type Resumen = {
   error?: string
 }
 
-const RANGOS = [
-  ['24h', '24 h'],
-  ['7d', '7 días'],
-  ['30d', '30 días'],
-] as const
 
 /** Una variación se muestra con su signo y su color; si no hay base con qué comparar, no se muestra. */
 function delta(v: number | null, invertir = false) {
@@ -71,17 +69,22 @@ function delta(v: number | null, invertir = false) {
 }
 
 export default function ResumenPage() {
-  const [rango, setRango] = useState<'24h' | '7d' | '30d'>('7d')
+  const { rango, aplicar } = useRangoMaestro()
   const [datos, setDatos] = useState<Resumen | null>(null)
   const [cargando, setCargando] = useState(true)
   const [fallo, setFallo] = useState<string | null>(null)
   const [recarga, setRecarga] = useState(0)
 
   useEffect(() => {
+    // Se espera a tener rango: el hook devuelve null en el primer render (en el servidor no
+    // hay URL que leer), y pedir con el default para después repetir con el real sería
+    // hacer dos veces una consulta que sale a Tiendanube, Meta y GA4.
+    if (!rango) return
     let vivo = true
+    setCargando(true)
     void (async () => {
       try {
-        const res = await fetch(`/api/operacion/resumen?rango=${rango}`)
+        const res = await fetch(`/api/operacion/resumen?desde=${rango.desde}&hasta=${rango.hasta}`)
         const j = (await res.json()) as Resumen
         if (!res.ok) throw new Error(j.error ?? `respuesta ${res.status}`)
         if (vivo) { setDatos(j); setFallo(null) }
@@ -93,11 +96,6 @@ export default function ResumenPage() {
     })()
     return () => { vivo = false }
   }, [rango, recarga])
-
-  const cambiarRango = useCallback((r: '24h' | '7d' | '30d') => {
-    setCargando(true)
-    setRango(r)
-  }, [])
 
   const recargar = useCallback(() => {
     setCargando(true)
@@ -111,6 +109,11 @@ export default function ResumenPage() {
   const d = datos
   const vVentas = delta(d?.varVentas ?? null)
   const vPedidos = delta(d?.varPedidos ?? null)
+  // Los links internos llevan el rango, igual que los del Rail: pasar de una pantalla a otra
+  // por un botón de la propia pantalla no puede resetear el filtro.
+  const hrefLogistica = rango
+    ? `/operacion/logistica?desde=${rango.desde}&hasta=${rango.hasta}`
+    : '/operacion/logistica'
   const vMl = delta(
     d && d.ml.fresco && d.ml.ventasPrev ? ((d.ml.ventas - d.ml.ventasPrev) / d.ml.ventasPrev) * 100 : null,
   )
@@ -118,7 +121,7 @@ export default function ResumenPage() {
   return (
     <PanelShell
       titulo="Operación · Resumen"
-      sub={d ? `${d.periodo.since} al ${d.periodo.until}` : 'Cargando período'}
+      sub={d ? d.etiqueta : 'Cargando período'}
       accion={
         <button
           type="button"
@@ -136,30 +139,15 @@ export default function ResumenPage() {
         <Aviso tono="warn" mensaje={`No se pudo actualizar: ${fallo}. Lo de abajo es el último dato bueno.`} />
       )}
 
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Rango">
-        {RANGOS.map(([k, l]) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => cambiarRango(k)}
-            aria-pressed={rango === k}
-            className={`h-10 rounded-full border px-4 text-[13px] font-medium ${
-              rango === k
-                ? 'border-[var(--pnl-track)] bg-[var(--pnl-panel-2)] text-[var(--pnl-text)]'
-                : 'border-[var(--pnl-hair)] text-[var(--pnl-text-3)] hover:text-[var(--pnl-text-2)]'
-            }`}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
+      <FiltroMaestro rango={rango} onCambio={aplicar} />
+
 
       {d && d.envios.fresco && d.envios.frenados > 0 && (
         <Aviso
           tono="crit"
           mensaje={`${d.envios.frenados} ${d.envios.frenados === 1 ? 'envío lleva' : 'envíos llevan'} 8 días o más sin entregar`}
           accion={
-            <a href="/operacion/logistica" className="text-[13px] underline underline-offset-4">
+            <a href={hrefLogistica} className="text-[13px] underline underline-offset-4">
               Ver logística
             </a>
           }
@@ -183,7 +171,7 @@ export default function ResumenPage() {
 
       <Encabezado
         titulo="Qué está pasando ahora"
-        nota={RANGOS.find(r => r[0] === rango)?.[1]}
+        nota={d?.etiqueta}
         bajada="Cada tarjeta lleva a su pantalla, donde el mismo dato aparece con su derivación completa. Lo que todavía no tiene fuente se lista al final con el motivo, en vez de aparecer como un número."
       />
 
@@ -303,7 +291,7 @@ export default function ResumenPage() {
                 ))}
               </div>
               <a
-                href="/operacion/logistica"
+                href={hrefLogistica}
                 className="flex h-11 items-center justify-center rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] text-[13px] font-semibold text-[var(--pnl-text-2)] hover:text-[var(--pnl-text)]"
               >
                 Ver logística
