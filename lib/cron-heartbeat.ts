@@ -142,6 +142,10 @@ export const CATALOGO: Record<string, EntradaCatalogo> = {
     origen: 'vps', maxHoras: 3,
     que: 'Empuja las ventas y la reputación de MercadoLibre al panel; el token de ML solo vive en el VPS',
   },
+  'stock-recordatorio': {
+    origen: 'vps', maxHoras: 30,
+    que: 'Avisa cuando el conteo de stock quedó viejo; es el único dato del panel que se carga a mano',
+  },
   'seguimiento-ctwa': {
     origen: 'vps', maxHoras: 4,
     que: 'Reimpacta gratis a los leads de anuncios click-to-WhatsApp dentro de su ventana de 72 h',
