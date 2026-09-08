@@ -19,8 +19,12 @@ const Venta = z.object({
   fecha: z.iso.datetime(),
   total: z.number().min(0),
   unidades: z.number().int().min(0).max(500).default(1),
-  titulo: z.string().max(200).optional(),
-  sku: z.string().max(60).optional(),
+  // nullish y no optional: un ítem sin SKU cargado llega como `null` explícito desde la API
+  // de ML, no como campo ausente. Con `.optional()` el push entero se rechazaba por una sola
+  // venta de guantes sin SKU, y el 400 no distinguía entre "el VPS manda basura" y "esta
+  // publicación no tiene SKU", que es un dato normal.
+  titulo: z.string().max(200).nullish(),
+  sku: z.string().max(60).nullish(),
   canal: z.enum(['apicola', 'incubadora', 'otros']),
   estado: z.string().min(1).max(30),
 })
