@@ -130,6 +130,14 @@ export const CATALOGO: Record<string, EntradaCatalogo> = {
     origen: 'vps', maxHoras: 2,
     que: 'Drena la cola de mensajes salientes del recupero de carrito',
   },
+  'operacion-envios': {
+    origen: 'vps', maxHoras: 4,
+    que: 'Guarda el estado de cada envío para el panel de Operación; Andreani no informa el pasado',
+  },
+  'operacion-caja': {
+    origen: 'vps', maxHoras: 30,
+    que: 'Empuja el corte de caja quincenal (MercadoPago) al panel de Operación',
+  },
   'seguimiento-ctwa': {
     origen: 'vps', maxHoras: 4,
     que: 'Reimpacta gratis a los leads de anuncios click-to-WhatsApp dentro de su ventana de 72 h',

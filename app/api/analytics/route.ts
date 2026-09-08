@@ -2,35 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { log, traceId } from '@/lib/log'
 import { fetchTNOrdersClassified, aggregateByChannel, CHANNEL_LABEL, CHANNEL_COLOR, type TNClass } from '@/lib/attribution'
+// Las lecturas de Meta viven en lib/meta-insights.ts desde que el panel de Operación
+// necesitó el mismo gasto: una sola función, un solo resultado.
+import { totalesMeta, porDiaMeta, type MetaInsightDay } from '@/lib/meta-insights'
 
 export const dynamic = 'force-dynamic'
-
-const META_ACCOUNT = 'act_1063192135217249'
-
-interface MetaInsightDay {
-  date_start: string
-  spend: string
-  clicks: string
-  impressions: string
-  reach: string
-  actions?: { action_type: string; value: string }[]
-}
-
-async function fetchMetaByDay(since: string, until: string) {
-  const token = process.env.META_ADS_TOKEN
-  if (!token) return []
-  try {
-    const url = `https://graph.facebook.com/v21.0/${META_ACCOUNT}/insights` +
-      `?fields=spend,clicks,impressions,reach,actions` +
-      `&time_increment=1` +
-      `&time_range={"since":"${since}","until":"${until}"}` +
-      `&limit=90` +
-      `&access_token=${token}`
-    const res  = await fetch(url)
-    const data = await res.json() as { data?: MetaInsightDay[] }
-    return data.data ?? []
-  } catch { return [] }
-}
 
 // ── Google Ads: gasto del período desde gads_cache (poblada por ~/.claude/gads.py) ──
 async function fetchGoogleSpend(since: string, until: string): Promise<number> {
@@ -43,27 +19,6 @@ async function fetchGoogleSpend(since: string, until: string): Promise<number> {
   } catch {
     return 0
   }
-}
-
-async function fetchMetaTotals(since: string, until: string) {
-  const token = process.env.META_ADS_TOKEN
-  if (!token) return { spend: 0, clicks: 0, impressions: 0, reach: 0 }
-  try {
-    const url = `https://graph.facebook.com/v21.0/${META_ACCOUNT}/insights` +
-      `?fields=spend,clicks,impressions,reach` +
-      `&time_range={"since":"${since}","until":"${until}"}` +
-      `&access_token=${token}`
-    const res  = await fetch(url)
-    const data = await res.json() as { data?: { spend: string; clicks: string; impressions: string; reach: string }[] }
-    const d = data.data?.[0]
-    if (!d) return { spend: 0, clicks: 0, impressions: 0, reach: 0 }
-    return {
-      spend:       parseFloat(d.spend       ?? '0'),
-      clicks:      parseInt(d.clicks        ?? '0'),
-      impressions: parseInt(d.impressions   ?? '0'),
-      reach:       parseInt(d.reach         ?? '0'),
-    }
-  } catch { return { spend: 0, clicks: 0, impressions: 0, reach: 0 } }
 }
 
 export async function GET(req: NextRequest) {
@@ -113,8 +68,8 @@ export async function GET(req: NextRequest) {
 
     // ── Meta Ads por día + gasto Google (para el ROAS Global) ─────
     const [metaDays, metaTotals, googleSpend] = await Promise.all([
-      fetchMetaByDay(since, until),
-      fetchMetaTotals(since, until),
+      porDiaMeta(since, until),
+      totalesMeta(since, until),
       fetchGoogleSpend(since, until),
     ])
 

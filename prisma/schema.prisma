@@ -497,3 +497,83 @@ model AuditoriaCheck {
   @@index([run_id])
   @@index([clave, id])
 }
+
+/// Histórico de envíos para el panel de Operación.
+///
+/// Existe por una razón concreta: Andreani no devuelve el pasado. Su API dice en qué
+/// estado está un envío HOY; no dice cuándo cambió de estado ni qué pasó con los que ya
+/// se entregaron. Así que "días a destino por provincia" y "cumplimiento del plazo
+/// prometido" no se pueden reconstruir hacia atrás — solo existen desde el día que esta
+/// tabla empieza a llenarse. Cada corrida del cron es un día de historia que no se
+/// recupera si no se guardó.
+///
+/// Guarda solo los envíos con tracking propio (Tiendanube/Andreani). Los apícolas NO entran
+/// acá: `EnvioApicola` registra si el aviso de WhatsApp le llegó al fabricante, no en qué
+/// estado está el paquete — el envío lo maneja MercadoLibre y esa trazabilidad no la
+/// tenemos. Logística los muestra juntos igual, pero solo por lo que cada fuente sabe de
+/// verdad: del apícola, si se despachó; del propio, dónde está.
+model EnvioSeguimiento {
+  tracking      String    @id // nº de seguimiento del correo: es la clave natural y la de idempotencia
+  origen        String // tn | ml
+  referencia    String // nº de pedido de Tiendanube, o el interno del envío apícola
+  cliente       String?
+  producto      String?
+  provincia     String? // del domicilio de entrega: es el eje de "demora por provincia"
+  despachado_at DateTime? // cuándo salió. Null = pagado y todavía sin despachar
+  entregado_at  DateTime? // se sella la primera vez que Andreani lo da por entregado y no se vuelve a tocar
+  estado        String // sin_despachar | en_transito | en_sucursal | entregado | sin_dato
+  orden         Int? // posición en el timeline de Andreani (1 a 5), null si no se pudo leer
+  error         String? // por qué falló la última consulta: el panel lo muestra en vez de un cero falso
+  visto_at      DateTime // última vez que se consultó el estado, exitosa o no
+  creado_at     DateTime  @default(now())
+  actualizado   DateTime  @updatedAt
+
+  @@index([estado, despachado_at])
+  @@index([entregado_at])
+  @@index([provincia, entregado_at])
+}
+
+/// Conteo manual de stock de incubadoras terminadas.
+///
+/// Es el ÚNICO dato del panel que se carga a mano, porque es el único que no existe en
+/// ningún sistema: las unidades armadas se cuentan mirando el estante. Todo lo demás de
+/// Producción (cobertura, punto de reposición, ritmo) se deriva de este número, así que la
+/// pantalla muestra la fecha del conteo al lado del valor: un stock de hace tres semanas
+/// presentado como si fuera de hoy es peor que no mostrar nada.
+///
+/// Se guarda cada conteo y no se pisa el anterior: la serie es lo que permite ver el ritmo
+/// real de consumo sin depender de que los pedidos estén bien cargados.
+model ConteoStock {
+  id        String   @id @default(cuid())
+  fecha     DateTime // cuándo se contó (puede ser anterior a la carga)
+  unidades  Int // total de incubadoras terminadas, sin abrir por modelo
+  nota      String? // "faltan 2 cúpulas", "incluye las 3 de garantía"…
+  creado_at DateTime @default(now())
+
+  @@index([fecha])
+}
+
+/// Corte de caja quincenal, empujado por el VPS.
+///
+/// El cálculo (separar apícola de incubadora, restar comisiones, ver qué liberó
+/// MercadoPago) ya lo hace un script fuera de esta app y tiene los tokens que Vercel no
+/// tiene. Acá solo se guarda el resultado, igual que con `EnvioApicola`: el VPS empuja, el
+/// panel lee.
+///
+/// `liberado` + `pendiente` = `neto`. Cobrado no es lo mismo que disponible: MercadoPago
+/// retiene una parte, y confundirlos es lo que hace creer que hay plata que todavía no está.
+model CorteCaja {
+  id          String   @id // "2026-08-2" = segunda quincena de agosto: idempotente por diseño
+  desde       DateTime
+  hasta       DateTime
+  bruto       Float
+  neto        Float
+  liberado    Float
+  pendiente   Float
+  /// Detalle por línea de negocio: [{ nombre, bruto, neto, liberado, pendiente }]
+  lineas      Json
+  actualizado DateTime @updatedAt
+  creado_at   DateTime @default(now())
+
+  @@index([desde])
+}

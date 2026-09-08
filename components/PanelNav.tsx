@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Activity,
+  Truck,
 } from 'lucide-react'
 import { MARCA, seccionHabilitada } from '@/lib/marca'
 
@@ -29,6 +30,7 @@ import { MARCA, seccionHabilitada } from '@/lib/marca'
 
 const ITEMS = [
   { href: '/dashboard', label: 'Métricas', icon: LayoutDashboard },
+  { href: '/operacion', label: 'Operación', icon: Truck },
   { href: '/conversaciones', label: 'Conversaciones', icon: MessagesSquare },
   { href: '/marketing-automatico', label: 'Marketing', icon: Megaphone },
   { href: '/calendario', label: 'Calendario', icon: CalendarDays },
