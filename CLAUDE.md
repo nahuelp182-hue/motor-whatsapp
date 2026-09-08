@@ -12,6 +12,14 @@ atiende una sola tienda; lo que se comparte es el código. Además de Micelium e
 **Osamayor** (motor de widgets para una segunda tienda de Tiendanube): ver `OSAMAYOR.md`
 para la configuración completa y `OSAMAYOR_AGENDA.md` para el estado del trabajo.
 Consecuencia práctica: **un arreglo del motor de widgets hay que desplegarlo en las dos**.
+Un solo `git push` a `master` dispara el deploy automático en ambas (mismo repo, misma
+rama), pero **verificado 31/08/26: el plan Hobby de Vercel corre un build a la vez**. Los
+dos proyectos (`mw-micelium` y `osamayor`) compiten por el mismo slot: el segundo queda en
+`Queued` con el build en `0ms` hasta que el primero libera. Un push que agrega ~1 minuto de
+build real tardó ~7 minutos en reflejarse en OSA MAYOR — muy por encima del "en menos de un
+minuto" que dice el propio panel. Antes de reportar "no veo el cambio", chequear con
+`vercel inspect <url>` (o `vercel ls osamayor`) si el deploy sigue en cola, en vez de asumir
+que ya terminó o que el fix no sirvió.
 
 Conviven ~7 productos: bot de WhatsApp, portal de guías (`guias.infomicelium.com.ar`),
 motor de widgets, tracking de curiosos, radar, calendario y atribución de ads.
@@ -64,7 +72,8 @@ Dónde vive cada cosa ahora, y la regla para decidirlo:
   `resumen-bot.yml`. Un vigilante no puede vivir en la infraestructura que vigila. GH es
   una tercera infra, independiente de Hetzner y de Vercel.
 - **Cron del VPS** (`curl` con `CRON_SECRET`) → el trabajo de negocio: `carrito-abandonado`,
-  `resena-post-entrega`, `send-pending`, `radar`, `sync-calendario`, `ciclo-cultivo`.
+  `resena-post-entrega`, `send-pending`, `radar`, `sync-calendario`, `ciclo-cultivo`,
+  `operacion-envios`, `operacion-caja`.
 - **Vercel** → nada. Si alguien vuelve a agregar un cron acá, con el plan Hobby entra en la
   ruleta de cuáles dos sobreviven.
 
@@ -103,6 +112,28 @@ toque la base hasta que esto se separe (bloque B).**
   séptimo lugar sin el filtro no rompe el build ni los tests.
 
 ---
+
+**El histórico de envíos solo existe hacia adelante.** `EnvioSeguimiento` (panel de
+Operación) la llena el cron `operacion-envios`. Andreani informa el ESTADO ACTUAL de un
+envío: no dice cuándo cambió ni qué pasó con los ya entregados. O sea que "días a destino",
+"cumplimiento del plazo" y "demora por provincia" no se pueden reconstruir hacia atrás —
+cada día que el cron no corre es un día de historia perdido para siempre, y la pantalla no
+se rompe cuando eso pasa (muestra "sin fuente"), así que no se nota. Por eso está en el
+catálogo de heartbeats con tolerancia de 4 h: es la única forma de enterarse.
+
+**El panel de Operación (`/operacion`) es de LECTURA, con dos excepciones.** Cinco
+secciones (Resumen, Adquisición, Producción, Logística, Caja) sobre `lib/operacion/` y
+`components/operacion/`. Las dos escrituras son el conteo de stock (`POST
+/api/operacion/produccion`, con sesión) y el corte de caja que empuja el VPS (`POST
+/api/operacion/caja`, con `CRON_SECRET`). Todos los supuestos de negocio —márgenes, techo
+de CAC, capacidad, plazos— viven en `lib/supuestos.ts` con su fecha de medición: no
+hardcodear ninguno en una pantalla.
+
+**Regla del panel: un dato que falta NO se muestra como cero.** Las tarjetas tienen cinco
+estados (`components/operacion/ui.tsx`), y el quinto es `sin_fuente`: dice qué falta para
+llenarlas. Un cero en "ventas de MercadoLibre" se lee como "no vendimos", que es una
+afirmación falsa sobre el negocio. Al agregar una tarjeta, decidir su estado vacío y su
+estado sin-fuente antes que su estado normal.
 
 ## Cómo se trabaja acá
 
