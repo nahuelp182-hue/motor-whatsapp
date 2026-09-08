@@ -5,13 +5,22 @@
 // completa. Si un dato no vive en ninguna sección, no entra — un indicador sin pantalla
 // donde discutirlo es un número que nadie puede auditar.
 //
-// Lo que todavía no tiene fuente (MercadoLibre, stock, MercadoPago, conversión web) NO se
-// devuelve con ceros: se devuelve `null` y la pantalla lo dice. Un cero en "ventas de
-// MercadoLibre" se lee como "no vendimos", que es una afirmación falsa sobre el negocio.
+// Lo que todavía no tiene fuente NO se devuelve con ceros: se devuelve `null` y la pantalla
+// lo dice. Un cero en "ventas de MercadoLibre" se lee como "no vendimos", que es una
+// afirmación falsa sobre el negocio.
+//
+// Ese mismo criterio vale para las fuentes que SÍ existen pero dependen de un cron: si el
+// que llena la tabla deja de correr, la consulta sigue devolviendo ceros bien formados y
+// nadie se entera. Por eso Logística viaja con su fecha de corte, y `sinFuente` se deriva
+// del estado real en vez de estar escrita a mano.
 
+import { prisma } from '@/lib/prisma'
 import { fetchTNOrdersClassified } from '@/lib/attribution'
 import { totalesMeta } from '@/lib/meta-insights'
 import { leerLogistica } from '@/lib/operacion/envios'
+import { leerMl, type VentasMl } from '@/lib/operacion/ml'
+import { leerGa4, type Ga4 } from '@/lib/operacion/ga4'
+import { CATALOGO } from '@/lib/cron-heartbeat'
 import { retornoSobreCac, margenPonderado, TECHO_CAC } from '@/lib/supuestos'
 
 const DIA = 86_400_000
@@ -46,6 +55,17 @@ export type Resumen = {
   periodo: { since: string; until: string }
   /** Lo que sí se pudo leer. */
   ventasTN: number
+  /** Tiendanube + MercadoLibre. Es la facturación del negocio, no la de un canal. */
+  ventasTotales: number | null
+  ml: VentasMl
+  web: {
+    ga4: Ga4
+    /**
+     * Pedidos de Tiendanube sobre sesiones de GA4. El numerador es de TN a propósito:
+     * ver el encabezado de lib/operacion/ga4.
+     */
+    conversion: number | null
+  }
   pedidos: number
   ticket: number | null
   varVentas: number | null
@@ -57,19 +77,78 @@ export type Resumen = {
   retorno: number | null
   margenPorPedido: number
   techoCac: number
-  envios: { frenados: number; enTransito: number; sinDespachar: number; promedioDias: number | null }
+  /**
+   * Logística. `fresco` es la diferencia entre "no hay envíos abiertos" y "nadie los miró":
+   * la tabla la llena un cron del VPS, y si ese cron se cae `leerLogistica` sigue devolviendo
+   * ceros perfectamente formados. Un cero sin fecha de corte es el mismo cero mentiroso que
+   * este archivo se niega a devolver para MercadoLibre, así que acá también viaja el motivo.
+   */
+  envios: {
+    frenados: number; enTransito: number; sinDespachar: number; promedioDias: number | null
+    corte: string | null; fresco: boolean; horasDesdeCorte: number | null
+  }
   /** Lo que todavía no tiene fuente, con el motivo. La pantalla lo muestra tal cual. */
   sinFuente: Record<string, string>
+}
+
+/**
+ * Qué falta y por qué, derivado del estado real y no escrito a mano.
+ *
+ * La versión anterior era un objeto literal: la tarjeta prometía que "la lista se achica
+ * sola a medida que cada fuente entra" y en realidad había que editar este archivo y
+ * desplegar. Dos de los cinco motivos ya eran falsos cuando se leyeron (el stock SÍ tenía
+ * dónde cargarse, la pantalla de Caja YA existía) y nadie se enteró, porque un texto fijo
+ * no puede quedar en evidencia. Ahora cada ítem entra solo si su fuente sigue vacía.
+ */
+async function faltantes(logisticaFresca: boolean, ml: VentasMl, ga4: Ga4): Promise<Record<string, string>> {
+  const [conteos, cortes] = await Promise.all([
+    prisma.conteoStock.count(),
+    prisma.corteCaja.count(),
+  ])
+  const falta: Record<string, string> = {}
+
+  if (!conteos) {
+    falta['Stock de INC101'] =
+      'El conteo se hace a mano y todavía no se cargó ninguno. Se carga en Producción y desaparece de esta lista solo.'
+  }
+  if (!cortes) {
+    falta['Disponible en MercadoPago'] =
+      'El corte quincenal lo calcula mp_ventas_split.py en el VPS los días 1 y 15. Falta que lo empuje a /api/operacion/caja: la pantalla y el endpoint ya están.'
+  }
+  if (!logisticaFresca) {
+    falta['Estado de los envíos'] =
+      'El cron operacion-envios no dejó un corte reciente. Los envíos abiertos que se muestren pueden estar viejos: Andreani solo informa el presente y lo que no se consultó no se recupera.'
+  }
+
+  if (!ml.fresco) {
+    falta['Ventas de MercadoLibre'] = ml.corte
+      ? `El VPS no empuja las ventas de ML desde ${new Date(ml.corte).toLocaleString('es-AR')}. Lo que se muestre de ML es de esa hora.`
+      : 'El token de ML lo rota el VPS, que es su dueño único: Vercel no puede consultarlo sin invalidarlo. Falta que el cron del VPS empuje a /api/operacion/ml — el endpoint ya está.'
+  }
+  if (!ml.reputacion) {
+    falta['Reputación de MercadoLibre'] =
+      'Entra por el mismo push que las ventas de ML, en el campo `reputacion` del payload.'
+  }
+  if (!ga4.ok) {
+    falta['Conversión web'] = `${ga4.motivo ?? 'GA4 no respondió.'} La tasa se calcula con sesiones de GA4 y pedidos de Tiendanube: el checkout lo ejecuta el servidor de TN, así que el purchase del navegador se pierde en los pagos por transferencia.`
+  }
+
+  return falta
 }
 
 export async function leerResumen(rango: Rango = '7d'): Promise<Resumen> {
   const v = ventanas(rango)
 
-  const [ordenes, previas, meta, logistica] = await Promise.all([
+  // Las cuatro fuentes en paralelo y no en cadena: son independientes entre sí y la más
+  // lenta (Meta) marca el tiempo de toda la pantalla igual. Cada una devuelve su propio
+  // estado, así que una que falle no arrastra a las otras.
+  const [ordenes, previas, meta, logistica, ml, ga4] = await Promise.all([
     fetchTNOrdersClassified(v.since, v.until),
     fetchTNOrdersClassified(v.pSince, v.pUntil),
     totalesMeta(v.since, v.until),
     leerLogistica(21),
+    leerMl(new Date(v.since + 'T00:00:00.000Z'), new Date(v.until + 'T23:59:59.999Z')),
+    leerGa4(v.since, v.until),
   ])
 
   const ventasTN = ordenes.reduce((s, o) => s + o.total, 0)
@@ -81,10 +160,29 @@ export async function leerResumen(rango: Rango = '7d'): Promise<Resumen> {
   // piso más honesto que se puede calcular sin holdout, y se rotula así en la pantalla.
   const cacBruto = pedidos > 0 && meta.spend > 0 ? meta.spend / pedidos : null
 
+  // La tolerancia sale del catálogo de crons y no de un número escrito acá: el día que
+  // cambie la cadencia de `operacion-envios`, cambia en un solo lugar. Dos umbrales para lo
+  // mismo terminan discutiendo entre sí en cuanto alguien toca uno solo.
+  const horas = logistica.corte
+    ? (Date.now() - new Date(logistica.corte).getTime()) / 3_600_000
+    : null
+  const fresco = horas !== null && horas <= (CATALOGO['operacion-envios']?.maxHoras ?? 4)
+  // La conversión solo existe si GA4 trajo sesiones: dividir por cero da Infinity, y una
+  // tasa de conversión infinita se pinta igual de convincente que una buena.
+  const conversion = ga4.ok && ga4.sesiones > 0 ? (pedidos / ga4.sesiones) * 100 : null
+
+  const sinFuente = await faltantes(fresco, ml, ga4)
+
   return {
     rango,
     periodo: { since: v.since, until: v.until },
     ventasTN,
+    // Sumar los dos canales solo tiene sentido si los dos se pudieron leer. Con el push de ML
+    // caído, `ventasTN + 0` se mostraría como la facturación total y estaría por debajo de la
+    // real sin que nada lo indique — el error más caro de todos, porque parece un dato.
+    ventasTotales: ml.fresco ? ventasTN + ml.ventas : null,
+    ml,
+    web: { ga4, conversion },
     pedidos,
     ticket: pedidos ? ventasTN / pedidos : null,
     varVentas: variacion(ventasTN, ventasPrev),
@@ -100,18 +198,10 @@ export async function leerResumen(rango: Rango = '7d'): Promise<Resumen> {
       enTransito: logistica.kpis.enTransito,
       sinDespachar: logistica.kpis.sinDespachar,
       promedioDias: logistica.kpis.promedioDias,
+      corte: logistica.corte,
+      fresco,
+      horasDesdeCorte: horas,
     },
-    sinFuente: {
-      'Ventas de MercadoLibre':
-        'El token de ML lo rota el VPS, que es su dueño único: Vercel no puede consultarlo sin invalidarlo. Entra cuando el VPS empuje sus ventas a un endpoint propio.',
-      'Reputación de MercadoLibre':
-        'Misma razón que las ventas de ML: se resuelve con el mismo push del VPS.',
-      'Stock de INC101':
-        'El stock se cuenta a mano y todavía no hay dónde cargarlo. Lo habilita la pantalla de Producción.',
-      'Disponible en MercadoPago':
-        'El corte quincenal lo calcula un script fuera de esta app. Entra cuando el VPS lo empuje, junto con la pantalla de Caja.',
-      'Conversión web':
-        'El tracking propio no ve el checkout de Tiendanube (lo ejecuta su servidor, no el navegador), así que la tasa que saldría de acá estaría mal. La fuente buena es GA4 y todavía no está conectada.',
-    },
+    sinFuente,
   }
 }

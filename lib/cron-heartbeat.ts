@@ -138,6 +138,10 @@ export const CATALOGO: Record<string, EntradaCatalogo> = {
     origen: 'vps', maxHoras: 30,
     que: 'Empuja el corte de caja quincenal (MercadoPago) al panel de Operación',
   },
+  'operacion-ml': {
+    origen: 'vps', maxHoras: 3,
+    que: 'Empuja las ventas y la reputación de MercadoLibre al panel; el token de ML solo vive en el VPS',
+  },
   'seguimiento-ctwa': {
     origen: 'vps', maxHoras: 4,
     que: 'Reimpacta gratis a los leads de anuncios click-to-WhatsApp dentro de su ventana de 72 h',

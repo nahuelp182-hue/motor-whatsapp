@@ -377,14 +377,14 @@ model Heartbeat {
 /// de vivir ahí sin pisar el tracking del envío principal — motor-whatsapp lo guarda acá y
 /// mensajeSeguimiento() lo suma como línea aparte cuando el cliente pregunta por su pedido.
 model EnvioExtra {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   orden_numero  Int // número de orden de Tiendanube (Pedido.numero), no el ID interno
   motivo        String // qué es: "booster faltante", "cambio de cúpula por garantía", ...
   tracking      String // nº de seguimiento (Andreani u otro correo)
-  esAndreani    Boolean   @default(true)
-  despachado_at DateTime  @default(now())
-  entregado     Boolean   @default(false)
-  createdAt     DateTime  @default(now())
+  esAndreani    Boolean  @default(true)
+  despachado_at DateTime @default(now())
+  entregado     Boolean  @default(false)
+  createdAt     DateTime @default(now())
 
   @@index([orden_numero])
 }
@@ -576,4 +576,44 @@ model CorteCaja {
   creado_at   DateTime @default(now())
 
   @@index([desde])
+}
+
+/// Venta de MercadoLibre (MICELIUMSTORE), empujada por el VPS.
+///
+/// Mismo motivo que EnvioApicola y CorteCaja: el refresh_token de ML lo rota el VPS en cada
+/// uso y es su dueño único, así que Vercel no puede consultar la API sin invalidarlo. El VPS
+/// consulta y empuja; el panel solo lee.
+///
+/// Se guarda la ORDEN y no un agregado por período a propósito. El Resumen compara rangos
+/// móviles (24 h / 7 d / 30 d) contra su período previo, y eso no se puede reconstruir desde
+/// totales ya sumados: haría falta un agregado por cada ventana que a alguien se le ocurra
+/// mirar. Con la orden, cualquier ventana sale de la misma tabla, igual que con Tiendanube.
+model VentaMl {
+  order_id  String   @id // id de la orden en ML: clave natural y de idempotencia del push
+  fecha     DateTime // date_created de la orden
+  total     Float // total_amount: lo que pagó el comprador, antes de comisiones
+  unidades  Int      @default(1)
+  titulo    String? // primer ítem de la orden, para reconocerla de un vistazo
+  sku       String?
+  /// apicola | incubadora | otros. Lo clasifica el VPS, que es quien tiene el SKU real.
+  canal     String
+  estado    String // paid | cancelled | ...
+  creado_at DateTime @default(now())
+
+  @@index([fecha])
+  @@index([canal, fecha])
+}
+
+/// Reputación de MICELIUMSTORE. Una fila por lectura: la serie muestra si el color se está
+/// moviendo, que es lo único accionable — el valor puntual solo dice dónde estamos parados.
+model ReputacionMl {
+  id          String   @id @default(cuid())
+  nivel       String // 3_yellow, 5_green, ...
+  completadas Int
+  canceladas  Int
+  reclamos    Float? // ratio de reclamos sobre ventas, si la API lo informa
+  demoras     Float? // ratio de demoras en el despacho
+  leido_at    DateTime @default(now())
+
+  @@index([leido_at])
 }

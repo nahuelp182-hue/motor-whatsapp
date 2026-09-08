@@ -37,6 +37,19 @@ const PUBLICOS = new Set([
 // para no abrir también el GET de lectura del panel, que sí debe pedir sesión.
 const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/cron', '/api/webhooks', '/api/asistente', '/api/acceso', '/api/contacto', '/api/widgets/config', '/api/widgets/evento', '/api/widgets/resena', '/api/presencia', '/api/despacho', '/api/jobs/ingest', '/api/auditoria/ingest', '/api/ia/uso', '/api/ml-preguntas/sync']
 
+// Rutas donde solo el POST entra sin sesión del panel, porque la ruta valida su propio
+// CRON_SECRET. El GET de esas mismas rutas sigue exigiendo sesión.
+//
+// No pueden ir en API_ABIERTAS: eso abriría también el GET, y el de /api/operacion/caja
+// devuelve la facturación completa de la quincena. Sin esta excepción el POST era
+// directamente inalcanzable — el middleware cortaba con 401 antes de que la ruta llegara a
+// mirar el secreto — así que el corte que el VPS calcula desde agosto no tenía por dónde
+// entrar, y la pantalla de Caja quedaba vacía sin que nada lo explicara.
+//
+// Coincidencia exacta y no prefijo: un prefijo abriría el POST de toda ruta futura que
+// cuelgue debajo, y la escritura es justo lo que no puede nacer expuesta.
+const API_POST_ABIERTO = ['/api/operacion/caja', '/api/operacion/ml']
+
 // Capa pública de contenido: indexable y sin login a propósito. El conocimiento general es
 // lo que construye confianza antes de la compra; lo privado (manuales del equipo, pedidos)
 // va en rutas aparte que sí piden sesión.
@@ -111,6 +124,7 @@ export async function middleware(request: NextRequest) {
   }
   if (pathname === '/login') return NextResponse.next()
   if (API_ABIERTAS.some(p => pathname.startsWith(p))) return NextResponse.next()
+  if (request.method === 'POST' && API_POST_ABIERTO.includes(pathname)) return NextResponse.next()
 
   // Área privada del CLIENTE: identidad y cookie propias, separadas del dashboard interno.
   // Sin sesión de cliente → a /acceso (no al login del panel). El secreto de firma es el

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ShoppingCart, Megaphone, Truck, Calculator, Target, TriangleAlert } from 'lucide-react'
+import { ShoppingCart, Megaphone, Truck, Calculator, Target, TriangleAlert, Store, MousePointerClick } from 'lucide-react'
 import { PanelShell } from '@/components/PanelShell'
 import { RailOperacion } from '@/components/operacion/Rail'
 import {
@@ -24,6 +24,18 @@ type Resumen = {
   rango: '24h' | '7d' | '30d'
   periodo: { since: string; until: string }
   ventasTN: number
+  ventasTotales: number | null
+  ml: {
+    ventas: number; pedidos: number; ticket: number | null
+    ventasPrev: number; pedidosPrev: number
+    porCanal: Array<{ canal: string; ventas: number; pedidos: number }>
+    reputacion: { nivel: string; completadas: number; canceladas: number; reclamos: number | null; demoras: number | null; leido: string } | null
+    corte: string | null; fresco: boolean
+  }
+  web: {
+    ga4: { ok: boolean; sesiones: number; usuarios: number; comprasGa4: number; motivo: string | null }
+    conversion: number | null
+  }
   pedidos: number
   ticket: number | null
   varVentas: number | null
@@ -34,7 +46,10 @@ type Resumen = {
   retorno: number | null
   margenPorPedido: number
   techoCac: number
-  envios: { frenados: number; enTransito: number; sinDespachar: number; promedioDias: number | null }
+  envios: {
+    frenados: number; enTransito: number; sinDespachar: number; promedioDias: number | null
+    corte: string | null; fresco: boolean; horasDesdeCorte: number | null
+  }
   sinFuente: Record<string, string>
   error?: string
 }
@@ -96,6 +111,9 @@ export default function ResumenPage() {
   const d = datos
   const vVentas = delta(d?.varVentas ?? null)
   const vPedidos = delta(d?.varPedidos ?? null)
+  const vMl = delta(
+    d && d.ml.fresco && d.ml.ventasPrev ? ((d.ml.ventas - d.ml.ventasPrev) / d.ml.ventasPrev) * 100 : null,
+  )
 
   return (
     <PanelShell
@@ -136,7 +154,7 @@ export default function ResumenPage() {
         ))}
       </div>
 
-      {d && d.envios.frenados > 0 && (
+      {d && d.envios.fresco && d.envios.frenados > 0 && (
         <Aviso
           tono="crit"
           mensaje={`${d.envios.frenados} ${d.envios.frenados === 1 ? 'envío lleva' : 'envíos llevan'} 8 días o más sin entregar`}
@@ -144,6 +162,17 @@ export default function ResumenPage() {
             <a href="/operacion/logistica" className="text-[13px] underline underline-offset-4">
               Ver logística
             </a>
+          }
+        />
+      )}
+
+      {d && !d.envios.fresco && (
+        <Aviso
+          tono="warn"
+          mensaje={
+            d.envios.corte
+              ? `Los envíos no se actualizan desde hace ${dec(d.envios.horasDesdeCorte ?? 0)} h. Los números de logística son de esa hora, no de ahora.`
+              : 'Nunca se guardó el estado de los envíos. Logística no muestra ceros: no tiene con qué contar.'
           }
         />
       )}
@@ -158,13 +187,31 @@ export default function ResumenPage() {
         bajada="Cada tarjeta lleva a su pantalla, donde el mismo dato aparece con su derivación completa. Lo que todavía no tiene fuente se lista al final con el motivo, en vez de aparecer como un número."
       />
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Indicadores">
         <Kpi
           dominio="web" icono={<ShoppingCart className="size-4" />}
-          valor={d ? ars(d.ventasTN) : '—'}
-          etiqueta="Ventas en Tiendanube"
-          pie={d ? `${num(d.pedidos)} pedidos pagos` : undefined}
+          // Con el push de ML caído se muestra Tiendanube y se dice que es solo Tiendanube.
+          // Presentar TN como si fuera el total sería el mismo cero mentiroso de siempre,
+          // disfrazado de suma.
+          valor={d ? ars(d.ventasTotales ?? d.ventasTN) : '—'}
+          etiqueta={d && d.ventasTotales === null ? 'Ventas en Tiendanube (falta ML)' : 'Ventas totales'}
+          pie={d ? (d.ventasTotales !== null ? `TN ${ars(d.ventasTN)} · ML ${ars(d.ml.ventas)}` : `${num(d.pedidos)} pedidos pagos`) : undefined}
           delta={vVentas.texto} deltaTono={vVentas.tono}
+        />
+        <Kpi
+          dominio="crm" icono={<Store className="size-4" />}
+          valor={d && d.ml.fresco ? ars(d.ml.ventas) : '—'}
+          etiqueta="Ventas en MercadoLibre"
+          pie={d ? (d.ml.fresco ? `${num(d.ml.pedidos)} pedidos · ${d.ml.reputacion?.nivel ?? 'reputación sin leer'}` : 'el VPS no empujó datos') : undefined}
+          delta={vMl.texto} deltaTono={vMl.tono}
+        />
+        <Kpi
+          dominio="web" icono={<MousePointerClick className="size-4" />}
+          valor={d?.web.conversion != null ? `${dec(d.web.conversion)} %` : '—'}
+          etiqueta="Conversión web"
+          // Se rotula de dónde sale cada mitad: es una tasa que mezcla dos fuentes a
+          // propósito, y sin el rótulo alguien la va a comparar contra la de GA4 y no va a dar.
+          pie={d ? (d.web.conversion != null ? `${num(d.web.ga4.sesiones)} sesiones GA4 · ${num(d.pedidos)} pedidos TN` : 'sin sesiones de GA4') : undefined}
         />
         <Kpi
           dominio="web" icono={<Calculator className="size-4" />}
@@ -181,10 +228,13 @@ export default function ResumenPage() {
         />
         <Kpi
           dominio="log" icono={<Truck className="size-4" />}
-          valor={d ? num(d.envios.enTransito + d.envios.sinDespachar) : '—'} unidad="envíos"
+          valor={d && d.envios.fresco ? num(d.envios.enTransito + d.envios.sinDespachar) : '—'}
+          unidad={d && d.envios.fresco ? 'envíos' : undefined}
           etiqueta="Abiertos: en tránsito o sin despachar"
-          pie={d ? `${num(d.envios.frenados)} frenados` : undefined}
-          delta={d?.envios.frenados ? 'atender hoy' : undefined} deltaTono="crit"
+          // Sin corte fresco el cero no significa "no hay envíos abiertos", significa que
+          // nadie los contó. Mostrarlo como 0 es afirmar que la operación está limpia.
+          pie={d ? (d.envios.fresco ? `${num(d.envios.frenados)} frenados` : 'sin dato fresco') : undefined}
+          delta={d?.envios.fresco && d.envios.frenados ? 'atender hoy' : undefined} deltaTono="crit"
         />
       </section>
 
@@ -232,11 +282,12 @@ export default function ResumenPage() {
           dominio="log" icono={<Truck className="size-3.5" />}
           titulo="Logística de un vistazo"
           sub="El detalle, los umbrales y el histórico están en su pantalla."
-          estado={estadoBase}
+          estado={estadoBase === 'normal' && d && !d.envios.fresco ? 'sin_fuente' : estadoBase}
+          falta="El cron que guarda el estado de cada envío no dejó un corte reciente. Los conteos existen pero serían de otro momento, y no hay forma de distinguirlos de la operación de hoy."
           error={fallo}
           onReintentar={recargar}
         >
-          {d && (
+          {d && d.envios.fresco && (
             <>
               <div className="flex flex-col gap-2">
                 {[
@@ -261,6 +312,46 @@ export default function ResumenPage() {
           )}
         </Tarjeta>
       </div>
+
+      <Tarjeta
+        dominio="crm" icono={<Store className="size-3.5" />}
+        titulo="MercadoLibre"
+        sub="MICELIUMSTORE. Lo empuja el VPS, que es el dueño único del token: Vercel no puede consultar la API sin invalidarlo."
+        estado={estadoBase === 'normal' && d && !d.ml.fresco ? 'sin_fuente' : estadoBase}
+        falta="El cron del VPS no empujó ventas ni reputación. Sin eso no se sabe si no hubo ventas o si nadie preguntó, y la apicultura es estacional: en temporada baja las dos cosas se ven igual."
+        error={fallo}
+        onReintentar={recargar}
+      >
+        {d && d.ml.fresco && (
+          <>
+            <div className="flex flex-col gap-2">
+              {d.ml.porCanal.map(c => (
+                <div key={c.canal} className="flex items-center gap-3 text-[13px]">
+                  <span className="capitalize text-[var(--pnl-text-2)]">{c.canal}</span>
+                  <span className="text-[11px] text-[var(--pnl-text-3)]">{num(c.pedidos)} ped.</span>
+                  <span className="num ml-auto font-semibold text-[var(--pnl-text)]">{ars(c.ventas)}</span>
+                </div>
+              ))}
+              {d.ml.porCanal.length === 0 && (
+                <p className="text-[13px] text-[var(--pnl-text-3)]">
+                  Sin ventas en el período. El dato es fresco: se consultó y no hubo. La apicultura
+                  factura de octubre a enero, así que fuera de esa ventana esto es lo esperado.
+                </p>
+              )}
+            </div>
+            {d.ml.reputacion && (
+              <div className="flex flex-col gap-1 rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] p-3">
+                <span className="num text-lg font-bold" style={{ color: d.ml.reputacion.nivel.includes('green') ? TONO.ok : TONO.warn }}>
+                  {d.ml.reputacion.nivel}
+                </span>
+                <span className="text-[11px] leading-snug text-[var(--pnl-text-3)]">
+                  {num(d.ml.reputacion.completadas)} completadas · {num(d.ml.reputacion.canceladas)} canceladas
+                </span>
+              </div>
+            )}
+          </>
+        )}
+      </Tarjeta>
 
       <Tarjeta
         dominio="prod" icono={<TriangleAlert className="size-3.5" />}

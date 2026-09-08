@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { tokenGoogle } from '@/lib/google-token'
 
 export const dynamic = 'force-dynamic'
 
@@ -6,25 +7,9 @@ const GADS_CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID ?? '5307718423'
 const CLARITY_PROJECT  = process.env.CLARITY_PROJECT_ID ?? 'uhup54dj4f'
 const GA4_PROPERTY_ID  = process.env.GA4_PROPERTY_ID ?? ''
 
-// ── OAuth helper ────────────────────────────────────────────────────────────
-async function getGoogleAccessToken(): Promise<string | null> {
-  const clientId     = process.env.GOOGLE_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN
-  if (!clientId || !clientSecret || !refreshToken) return null
-  try {
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId, client_secret: clientSecret,
-        refresh_token: refreshToken, grant_type: 'refresh_token',
-      }),
-    })
-    const data = await res.json() as { access_token?: string }
-    return data.access_token ?? null
-  } catch { return null }
-}
+// El helper de OAuth vive en lib/google-token: Operación también lo necesita para GA4 y
+// dos copias de la misma función divergen en cuanto una sola aprende algo.
+const getGoogleAccessToken = tokenGoogle
 
 // ── Google Ads — reads from cache table (populated by Python cron) ──────────
 async function fetchGoogleAdsCache(since: string, until: string) {
