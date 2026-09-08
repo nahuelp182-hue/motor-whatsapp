@@ -76,8 +76,14 @@ export default function CajaPage() {
   const a = d?.actual
   const sinCorte = estadoBase === 'normal' && !a
 
+  // Dos motivos distintos para la misma pantalla vacía, y confundirlos manda a buscar el
+  // problema al lugar equivocado: "no hay cortes" es un cron que no corre; "no hay cortes EN
+  // ESTE RANGO" es un filtro demasiado angosto. Con el preset de 7 días lo segundo es lo
+  // normal — las quincenas cierran los días 1 y 15, así que casi ninguna semana contiene una.
   const FALTA_CORTE =
-    'Todavía no llegó ningún corte. Lo calcula el script del VPS (tiene los tokens de MercadoPago que Vercel no tiene) y lo empuja a POST /api/operacion/caja con el CRON_SECRET. Hasta que ese cron corra, esta pantalla no tiene nada real que mostrar — y un corte inventado sería exactamente el número que después se usa para decidir si alcanza la plata.'
+    d && d.fueraDelRango > 0
+      ? `No hay cortes en el período elegido, pero existen ${d.fueraDelRango} fuera de él. Los cortes son quincenales (cierran los días 1 y 15), así que una ventana corta puede no contener ninguno: ampliá el rango para verlos.`
+      : 'Todavía no llegó ningún corte. Lo calcula el script del VPS (tiene los tokens de MercadoPago que Vercel no tiene) y lo empuja a POST /api/operacion/caja con el CRON_SECRET. Hasta que ese cron corra, esta pantalla no tiene nada real que mostrar — y un corte inventado sería exactamente el número que después se usa para decidir si alcanza la plata.'
 
   return (
     <PanelShell
