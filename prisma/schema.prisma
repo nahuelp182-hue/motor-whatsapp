@@ -520,7 +520,18 @@ model EnvioSeguimiento {
   producto      String?
   provincia     String? // del domicilio de entrega: es el eje de "demora por provincia"
   despachado_at DateTime? // cuándo salió. Null = pagado y todavía sin despachar
-  entregado_at  DateTime? // se sella la primera vez que Andreani lo da por entregado y no se vuelve a tocar
+  /// Cuándo el paquete ENTRÓ al circuito de Andreani (primer evento del timeline).
+  ///
+  /// Parte el tiempo total en dos mitades que se arreglan de forma distinta: de la compra al
+  /// ingreso manda Micelium (armado y despacho); del ingreso a la entrega manda el correo.
+  /// Sin este corte, un promedio alto no dice a quién reclamarle.
+  ingresado_at  DateTime?
+  /// Fecha REAL de entrega, del último evento que informa Andreani.
+  ///
+  /// Antes se sellaba con la hora de la consulta. Con el cron corriendo seguido el error es
+  /// de horas, pero el primer backfill selló los 28 envíos ya entregados con el mismo
+  /// instante, y el promedio pasó a medir "hace cuánto se despachó" en vez de "cuánto tardó".
+  entregado_at  DateTime?
   estado        String // sin_despachar | en_transito | en_sucursal | entregado | sin_dato
   orden         Int? // posición en el timeline de Andreani (1 a 5), null si no se pudo leer
   error         String? // por qué falló la última consulta: el panel lo muestra en vez de un cero falso

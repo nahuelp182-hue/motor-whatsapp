@@ -22,6 +22,17 @@ const TN_UA = 'Micelium/1.0 (nahuelp182@gmail.com)'
 const DIA = 86_400_000
 
 /** Días completos entre dos fechas. Null si falta alguna: un cero acá se leería como "llegó el mismo día". */
+/**
+ * Fecha de Andreani a Date. Vienen sin zona ("2026-08-06T16:03:33") y son hora argentina:
+ * interpretarlas como UTC correría todo tres horas, que en un promedio de días no se nota
+ * pero sí puede mover un envío de un día al anterior.
+ */
+export function fechaAndreani(s: string | null | undefined): Date | null {
+  if (!s) return null
+  const d = new Date(/[Zz]|[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s}-03:00`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
 export function diasEntre(desde: Date | null, hasta: Date | null): number | null {
   if (!desde || !hasta) return null
   return Math.max(0, Math.round((hasta.getTime() - desde.getTime()) / DIA))
@@ -177,6 +188,19 @@ export async function refrescarEnvios(dias = 45): Promise<ResultadoRefresco> {
       continue
     }
     const entregado = est.orden !== null && est.orden >= ORDEN_ENTREGADO
+
+    // Las fechas salen del timeline de Andreani, no del reloj de esta corrida.
+    //
+    // `ahora` como fecha de entrega solo es válido si el cron viene corriendo desde antes de
+    // que el paquete llegara. En un backfill es directamente falso: el 08/09/2026 los 28
+    // envíos ya entregados quedaron sellados con el mismo milisegundo, y el promedio a
+    // destino saltó a 26,8 días midiendo "hace cuánto se despachó". Andreani informa la
+    // fecha real; solo había que leerla.
+    //
+    // Se cae a `ahora` únicamente si Andreani no la trae: ahí sigue siendo la mejor
+    // aproximación disponible, con la precisión de la cadencia del cron.
+    const fechaEntrega = entregado ? (fechaAndreani(est.fechaUltimoEvento) ?? ahora) : null
+    const fechaIngreso = fechaAndreani(est.fechaIngreso)
     await prisma.envioSeguimiento.update({
       where: { tracking },
       data: {
@@ -185,7 +209,9 @@ export async function refrescarEnvios(dias = 45): Promise<ResultadoRefresco> {
         error: null,
         // Se sella una sola vez, el día que se lo ve entregado. Es una aproximación de la
         // fecha real de entrega con la precisión de la cadencia del cron, y está declarada.
-        entregado_at: entregado ? ahora : null,
+        entregado_at: fechaEntrega,
+        // Solo se escribe si Andreani la trajo: un null pisaría una fecha buena leída antes.
+        ...(fechaIngreso ? { ingresado_at: fechaIngreso } : {}),
         visto_at: ahora,
       },
     })
@@ -216,7 +242,16 @@ export type Logistica = {
     frenados: number
     enTransito: number
     sinDespachar: number
+    /** Compra a entrega, punta a punta. Es lo que vive el cliente. */
     promedioDias: number | null
+    /**
+     * Las dos mitades del total, que se arreglan de forma distinta y por eso van separadas:
+     * `promedioDespacho` es de la compra al ingreso a Andreani (armado y despacho, manda
+     * Micelium) y `promedioCorreo` del ingreso a la entrega (manda el correo). Un promedio
+     * total alto sin este corte no dice a quién reclamarle.
+     */
+    promedioDespacho: number | null
+    promedioCorreo: number | null
     entregadosMedidos: number
   }
   abiertos: FilaEnvio[]
@@ -365,6 +400,12 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS): Promise<Logistic
       // pagados y sin despachar, y son la mitad del problema que este número tiene que mostrar.
       sinDespachar: abiertos.filter(e => e.estado === 'sin_despachar').length,
       promedioDias: promedio(duraciones),
+      promedioDespacho: promedio(
+        entregados.map(e => diasEntre(e.despachado_at, e.ingresado_at)).filter((d): d is number => d !== null),
+      ),
+      promedioCorreo: promedio(
+        entregados.map(e => diasEntre(e.ingresado_at, e.entregado_at)).filter((d): d is number => d !== null),
+      ),
       entregadosMedidos: duraciones.length,
     },
     abiertos,

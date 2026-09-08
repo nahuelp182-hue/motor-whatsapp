@@ -23,7 +23,18 @@ export type EstadoAndreani = {
   titulo: string | null
   enSucursal: boolean
   entregado: boolean
-  timeline: Array<{ orden: number; titulo: string; hecho: boolean }>
+  timeline: Array<{ orden: number; titulo: string; hecho: boolean; fecha: string | null }>
+  /**
+   * Fecha del último evento registrado (ISO, hora local argentina, sin zona).
+   *
+   * Cuando el envío está entregado, ES la fecha real de entrega. Es la diferencia entre
+   * medir cuándo llegó el paquete y medir cuándo alguien se acordó de preguntar: sellar la
+   * entrega con la hora de la consulta funciona mientras el cron corra seguido, pero
+   * convierte cualquier backfill en un promedio inventado.
+   */
+  fechaUltimoEvento: string | null
+  /** Fecha del primer evento: cuándo el paquete entró al circuito de Andreani. */
+  fechaIngreso: string | null
   error: string | null
 }
 
@@ -42,6 +53,7 @@ export async function getEstadoAndreani(numero: string, timeoutMs = 15000): Prom
   const res: EstadoAndreani = {
     numero: String(numero), ok: false, orden: null, ordenMaxima: null,
     titulo: null, enSucursal: false, entregado: false, timeline: [], error: null,
+    fechaUltimoEvento: null, fechaIngreso: null,
   }
   try {
     const payload = encodeURIComponent(buildPayload(numero))
@@ -66,9 +78,23 @@ export async function getEstadoAndreani(numero: string, timeoutMs = 15000): Prom
     res.titulo = proc.titulo ?? null
     const tl = Array.isArray(data.timelines) ? data.timelines : []
     res.ordenMaxima = tl.length || data.ordenMaxima || null
-    res.timeline = tl.map((s: { orden: number; titulo: string }) => ({
+    type Paso = {
+      orden: number; titulo: string; fechaUltimoEvento?: string | null
+      traducciones?: Array<{ fechaEvento?: string | null }>
+    }
+    // `fechaUltimoEvento` del paso, y si no está, la del primer evento traducido: Andreani
+    // no siempre completa las dos y quedarse con una sola perdía fechas que sí venían.
+    const fechaDe = (s: Paso) => s.fechaUltimoEvento ?? s.traducciones?.[0]?.fechaEvento ?? null
+
+    res.timeline = (tl as Paso[]).map(s => ({
       orden: s.orden, titulo: s.titulo, hecho: (s.orden ?? 99) <= (orden ?? 0),
+      fecha: fechaDe(s),
     }))
+    res.fechaUltimoEvento = proc.fechaUltimoEvento ?? null
+    // El ingreso al circuito: el primer paso CUMPLIDO que tenga fecha. No se fija el orden a
+    // mano porque el timeline no siempre arranca en 1 (los envíos de "corta traza" saltan
+    // pasos), y pedir un orden que no existe devolvería null para envíos perfectamente sanos.
+    res.fechaIngreso = res.timeline.find(t => t.hecho && t.fecha)?.fecha ?? null
     if (orden !== null) {
       res.enSucursal = orden >= ORDEN_EN_SUCURSAL
       res.entregado = orden >= ORDEN_ENTREGADO

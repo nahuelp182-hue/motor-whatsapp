@@ -39,7 +39,11 @@ type FilaEnvio = {
 type Logistica = {
   corte: string | null
   historicoDesde: string | null
-  kpis: { frenados: number; enTransito: number; sinDespachar: number; promedioDias: number | null; entregadosMedidos: number }
+  kpis: {
+    frenados: number; enTransito: number; sinDespachar: number
+    promedioDias: number | null; promedioDespacho: number | null; promedioCorreo: number | null
+    entregadosMedidos: number
+  }
   abiertos: FilaEnvio[]
   cumplimiento: { dentro: number; total: number; pct: number | null }
   porProvincia: Array<{ provincia: string; dias: number; entregas: number }>
@@ -200,7 +204,7 @@ export default function LogisticaPage() {
         <Kpi
           dominio="log" icono={<Clock className="size-4" />}
           valor={k?.promedioDias != null ? dec(k.promedioDias) : '—'} unidad="días"
-          etiqueta="Promedio a destino"
+          etiqueta="Compra a entrega"
           pie={
             k?.promedioDias != null
               ? `sobre ${num(k.entregadosMedidos)} entregas medidas · plazo prometido 2 a 5`
@@ -208,6 +212,41 @@ export default function LogisticaPage() {
           }
         />
       </section>
+
+      <Tarjeta
+        dominio="log" icono={<Clock className="size-3.5" />}
+        titulo="¿Dónde se van los días?"
+        sub="El total partido en sus dos mitades, porque se arreglan de forma distinta: una se resuelve armando y despachando antes, la otra hay que reclamársela al correo."
+        estado={estadoBase === 'normal' && k?.promedioDespacho == null ? 'sin_fuente' : estadoBase}
+        falta="Hacen falta entregas con fecha de ingreso a Andreani. Se completa sola a medida que el cron registra envíos nuevos."
+        error={fallo}
+        onReintentar={cargar}
+      >
+        {k?.promedioDespacho != null && (
+          <>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {[
+                { n: dec(k.promedioDespacho), l: 'De la compra al ingreso en Andreani', s: 'lo maneja Micelium: armado y despacho' },
+                { n: k.promedioCorreo != null ? dec(k.promedioCorreo) : '—', l: 'Del ingreso a la entrega', s: 'lo maneja el correo' },
+                { n: k.promedioDias != null ? dec(k.promedioDias) : '—', l: 'Total, punta a punta', s: 'es lo que vive el cliente' },
+              ].map(b => (
+                <div key={b.l} className="flex flex-col gap-1 rounded-md border border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] p-3">
+                  <span className="num text-xl font-bold leading-tight text-[var(--pnl-text)]">{b.n} <span className="text-[12px] font-medium text-[var(--pnl-text-3)]">días</span></span>
+                  <span className="text-[11px] leading-snug text-[var(--pnl-text-2)]">{b.l}</span>
+                  <span className="text-[11px] leading-snug text-[var(--pnl-text-3)]">{b.s}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs leading-relaxed text-[var(--pnl-text-3)]">
+              La fecha de entrega es la que informa Andreani en su timeline, no la hora en que el
+              cron la consultó. La distinción importa: sellar la entrega con el momento de la
+              lectura funciona mientras el cron corra seguido, pero convierte cualquier carga
+              histórica en un promedio inventado. Del lado de la compra, Tiendanube no expone la
+              fecha de despacho y se usa la de la orden, así que esa mitad es conservadora.
+            </p>
+          </>
+        )}
+      </Tarjeta>
 
       <Tarjeta
         dominio="log" icono={<Truck className="size-3.5" />}
