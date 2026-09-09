@@ -48,7 +48,7 @@ const API_ABIERTAS = ['/api/track', '/api/lead', '/api/cnc', '/api/auth', '/api/
 //
 // Coincidencia exacta y no prefijo: un prefijo abriría el POST de toda ruta futura que
 // cuelgue debajo, y la escritura es justo lo que no puede nacer expuesta.
-const API_POST_ABIERTO = ['/api/operacion/caja', '/api/operacion/ml']
+const API_POST_ABIERTO = ['/api/operacion/caja', '/api/operacion/ml', '/api/operacion/manuales']
 
 // Capa pública de contenido: indexable y sin login a propósito. El conocimiento general es
 // lo que construye confianza antes de la compra; lo privado (manuales del equipo, pedidos)

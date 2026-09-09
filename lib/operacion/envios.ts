@@ -13,7 +13,7 @@
 import { prisma } from '@/lib/prisma'
 import { PISO_ABIERTOS_DIAS } from '@/lib/operacion/rango'
 import { getEstadoAndreani, pareceTrackingAndreani, ORDEN_ENTREGADO, ORDEN_EN_SUCURSAL } from '@/lib/andreani'
-import { PLAZO_PROMETIDO, UMBRAL_ENVIO } from '@/lib/supuestos'
+import { PLAZO_PROMETIDO, UMBRAL_ENVIO, PLAZO_MANUAL_DIAS } from '@/lib/supuestos'
 
 const TN_TOKEN = process.env.TN_ACCESS_TOKEN
 const TN_STORE = process.env.TN_STORE_ID ?? '1957278'
@@ -233,7 +233,35 @@ export type FilaEnvio = {
   dias: number | null
   accion: 'Reclamar' | 'Avisar' | 'Despachar' | null
   error: string | null
+  /**
+   * Si al comprador le llegó el material post-venta, y desde cuándo.
+   *
+   *   ok         — hay acuse de envío del manual (`enviado_at`)
+   *   pendiente  — todavía no, pero es temprano: el manual sale con el despacho + 24 h
+   *   faltante   — pasó el plazo y sigue sin acuse. Este es el que hay que mirar.
+   *   sin_material — el producto no tiene manual escrito (HALO). No es una falla del envío:
+   *                  es contenido que falta producir, y se marca aparte para que no se
+   *                  cuente como incumplimiento ni desaparezca en un "ok".
+   *   na         — el envío es apícola (MercadoLibre): no lleva material propio.
+   */
+  manual: EstadoManual
+  /** Cuándo se mandó el manual. Null si todavía no. */
+  manualAt: string | null
 }
+
+export type EstadoManual = 'ok' | 'pendiente' | 'faltante' | 'sin_material' | 'na'
+
+/**
+ * SKUs de hardware que todavía no tienen material escrito. Espejo de `SKU_SIN_MATERIAL` en
+ * `envio_manuales_sku.py` (VPS): están declarados en los dos lados a propósito, porque si el
+ * panel no los conociera los mostraría como "faltante" para siempre y el indicador se
+ * volvería ruido que se aprende a ignorar.
+ *
+ * Se matchea por nombre de producto de Tiendanube, que es lo único que guarda
+ * `EnvioSeguimiento`. Sacar de acá lo que ya tenga manual producido.
+ */
+const PRODUCTOS_SIN_MATERIAL = [/halo/i]
+
 
 export type Logistica = {
   corte: string | null
@@ -253,8 +281,27 @@ export type Logistica = {
     promedioDespacho: number | null
     promedioCorreo: number | null
     entregadosMedidos: number
+    /**
+     * Compradores despachados hace más de `PLAZO_MANUAL_DIAS` y sin acuse de manual.
+     *
+     * Es el control de que nadie se quede sin material: mientras sea 0, todo comprador con
+     * manual disponible lo recibió. No incluye los `sin_material` (HALO), que se cuentan
+     * aparte porque se arreglan produciendo contenido, no reenviando un mail.
+     */
+    sinManual: number
+    /** Despachados cuyo producto todavía no tiene manual escrito. */
+    sinMaterial: number
   }
   abiertos: FilaEnvio[]
+  /**
+   * Los compradores sin manual, incluidos los YA ENTREGADOS.
+   *
+   * Va aparte de `abiertos` a propósito: un envío entregado sale de la cola de logística,
+   * pero si nunca recibió el manual el problema sigue vivo — es justamente el caso que se
+   * escapó (el paquete llegó, el material no). Si esta lista viviera dentro de `abiertos`,
+   * cerrarse el envío borraría la evidencia.
+   */
+  sinManual: FilaEnvio[]
   cumplimiento: { dentro: number; total: number; pct: number | null }
   porProvincia: Array<{ provincia: string; dias: number; entregas: number }>
   porSemana: Array<{ semana: string; dias: number; entregas: number }>
@@ -274,6 +321,33 @@ export function accionDe(estado: string, dias: number | null): FilaEnvio['accion
   if (dias >= UMBRAL_ENVIO.reclamo) return 'Reclamar'
   if (dias >= UMBRAL_ENVIO.alerta) return 'Avisar'
   return null
+}
+
+/**
+ * En qué estado está el material post-venta de un envío.
+ *
+ * Se deriva del acuse real y del reloj: no hay ninguna lista de pendientes que alguien tenga
+ * que mantener, porque una lista así se desactualiza en silencio y vuelve a dejar
+ * compradores afuera — que es exactamente el problema que este indicador existe para evitar.
+ */
+export function estadoManual(
+  origen: string,
+  producto: string | null,
+  despachadoAt: Date | null,
+  enviadoAt: Date | null,
+  ahora: Date,
+): EstadoManual {
+  // Los apícolas los despacha el fabricante y no llevan material propio: marcarlos
+  // "faltante" sería inventar una deuda que no existe y tapar los casos reales.
+  if (origen !== 'tn') return 'na'
+  if (enviadoAt) return 'ok'
+  if (producto && PRODUCTOS_SIN_MATERIAL.some(re => re.test(producto))) return 'sin_material'
+  // Sin despacho todavía no corresponde: el manual sale con el envío. El caso de retiro en
+  // punto (que nunca marca despacho) lo rescata el script del VPS a los 3 días del pago;
+  // acá se ve igual, porque al llegar el acuse pasa a `ok` sin haber pasado por despacho.
+  const dias = diasEntre(despachadoAt, ahora)
+  if (dias === null || dias < PLAZO_MANUAL_DIAS) return 'pendiente'
+  return 'faltante'
 }
 
 /**
@@ -298,7 +372,7 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS, hasta?: Date): Pr
   const desde = new Date(techo.getTime() - dias * DIA)
   const desdeAbiertos = new Date(ahora.getTime() - Math.max(dias, PISO_ABIERTOS_DIAS) * DIA)
 
-  const [todos, primero, apicolaPendiente] = await Promise.all([
+  const [todos, primero, apicolaPendiente, manuales] = await Promise.all([
     prisma.envioSeguimiento.findMany({
       where: {
         OR: [
@@ -321,7 +395,20 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS, hasta?: Date): Pr
       where: { despachado: false, fecha_compra: { gte: desdeAbiertos } },
       orderBy: { fecha_compra: 'asc' },
     }),
+    // Todos los acuses de manual, sin ventana: la tabla es chica (una fila por pedido) y
+    // recortarla por fecha haría que un envío viejo pareciera "sin manual" solo porque su
+    // acuse quedó fuera del rango. El filtro recorta qué envíos se miran, nunca la evidencia
+    // de que el manual se mandó.
+    prisma.entregaManual.findMany({ select: { referencia: true, enviado_at: true } }),
   ])
+
+  // Un pedido puede tener dos equipos y por lo tanto dos acuses: vale el primero, que es
+  // cuando el comprador efectivamente recibió material.
+  const manualPorRef = new Map<string, Date>()
+  for (const m of manuales) {
+    const previo = manualPorRef.get(m.referencia)
+    if (!previo || m.enviado_at < previo) manualPorRef.set(m.referencia, m.enviado_at)
+  }
 
   const abiertosRaw = todos.filter(e => !e.entregado_at)
   const entregados = todos.filter(e => e.entregado_at && e.despachado_at)
@@ -329,6 +416,7 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS, hasta?: Date): Pr
   const abiertos: FilaEnvio[] = abiertosRaw
     .map(e => {
       const d = diasEntre(e.despachado_at, ahora)
+      const manualAt = manualPorRef.get(e.referencia) ?? null
       return {
         tracking: e.tracking,
         referencia: e.referencia,
@@ -339,6 +427,8 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS, hasta?: Date): Pr
         dias: d,
         accion: accionDe(e.estado, d),
         error: e.error,
+        manual: estadoManual(e.origen, e.producto, e.despachado_at, manualAt, ahora),
+        manualAt: manualAt?.toISOString() ?? null,
       }
     })
     .concat(
@@ -352,10 +442,45 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS, hasta?: Date): Pr
         dias: diasEntre(e.fecha_compra, ahora),
         accion: 'Despachar' as const,
         error: null,
+        manual: 'na' as const,
+        manualAt: null,
       })),
     )
     // Por días en tránsito y no por fecha de despacho: el que más lleva esperando es el
     // que está más cerca de convertirse en reclamo.
+    .sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1))
+
+  // Cobertura de manual sobre TODOS los envíos propios de la ventana, entregados incluidos.
+  // Se recorre `todos` y no `abiertos` porque el caso que motivó el indicador es justamente
+  // el que ya se cerró: el paquete llegó y el material nunca salió, así que mirar solo la
+  // cola de abiertos lo dejaría fuera otra vez.
+  const filasManual: FilaEnvio[] = todos
+    .filter(e => e.origen === 'tn')
+    .map(e => {
+      const manualAt = manualPorRef.get(e.referencia) ?? null
+      // Para un envío ya entregado el reloj se corta en la entrega, no en `ahora`: lo que se
+      // evalúa es si el manual salió a tiempo, no cuánto hace que existe el pedido.
+      const manual = estadoManual(e.origen, e.producto, e.despachado_at, manualAt, ahora)
+      return {
+        tracking: e.tracking,
+        referencia: e.referencia,
+        origen: e.origen,
+        destino: e.provincia,
+        producto: e.producto,
+        estado: e.entregado_at ? 'entregado' : e.estado,
+        dias: diasEntre(e.despachado_at, e.entregado_at ?? ahora),
+        accion: null,
+        error: e.error,
+        manual,
+        manualAt: manualAt?.toISOString() ?? null,
+      }
+    })
+
+  // Solo lo accionable: `faltante` se arregla reenviando el mail, `sin_material` produciendo
+  // el contenido. Los dos van a la lista porque los dos dejan a un comprador sin nada, pero
+  // el KPI los cuenta separados para no mezclar dos trabajos distintos.
+  const sinManualFilas = filasManual
+    .filter(e => e.manual === 'faltante' || e.manual === 'sin_material')
     .sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1))
 
   const duraciones = entregados
@@ -413,8 +538,11 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS, hasta?: Date): Pr
         entregados.map(e => diasEntre(e.ingresado_at, e.entregado_at)).filter((d): d is number => d !== null),
       ),
       entregadosMedidos: duraciones.length,
+      sinManual: sinManualFilas.filter(e => e.manual === 'faltante').length,
+      sinMaterial: sinManualFilas.filter(e => e.manual === 'sin_material').length,
     },
     abiertos,
+    sinManual: sinManualFilas,
     cumplimiento: {
       dentro,
       total: duraciones.length,

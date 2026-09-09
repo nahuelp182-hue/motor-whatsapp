@@ -628,3 +628,33 @@ model ReputacionMl {
 
   @@index([leido_at])
 }
+
+/// Acuse de que el material post-venta (manual/guías) le llegó al comprador.
+///
+/// Existe porque el envío del manual y el envío del paquete son dos sistemas que no se
+/// hablaban: `envio_manuales_sku.py` corre en el VPS y su única memoria era un .jsonl local,
+/// así que nadie podía preguntar "¿qué compradores quedaron sin manual?" sin entrar por SSH.
+/// El 09/09/2026 un cliente con retiro en punto quedó sin material durante días y no lo
+/// detectó ninguna alerta: apareció porque escribió. Ver [[project_envio_manuales_sistemas]].
+///
+/// Es un REGISTRO DE ENTREGA, no una cola: solo entra lo que efectivamente se mandó. Los
+/// pendientes NO viven acá — se derivan cruzando contra los envíos, porque una fila que
+/// alguien tiene que acordarse de borrar vuelve a ser una segunda fuente de verdad.
+model EntregaManual {
+  /// `<nº de pedido TN>:<sku>`, la misma clave de dedup que ya usa el script en el VPS.
+  /// Un pedido con dos equipos recibe dos manuales y son dos entregas distintas.
+  id         String   @id
+  /// Nº de pedido de Tiendanube. Es la clave de cruce con `EnvioSeguimiento.referencia`,
+  /// que es String: se guarda como String para que el join no dependa de un cast.
+  referencia String
+  sku        String
+  producto   String?
+  email      String?
+  /// Cuándo se mandó el mail. Es el dato del acuse; `creado_at` solo dice cuándo se enteró
+  /// el panel, que puede ser mucho después si el push estuvo caído.
+  enviado_at DateTime
+  creado_at  DateTime @default(now())
+
+  @@index([referencia])
+  @@index([enviado_at])
+}

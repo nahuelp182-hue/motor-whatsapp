@@ -1,11 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Truck, PackageX, Package, Clock, TriangleAlert, MapPin, ChartNoAxesColumn, Gauge } from 'lucide-react'
+import { Truck, PackageX, Package, Clock, TriangleAlert, MapPin, ChartNoAxesColumn, Gauge, BookOpenCheck } from 'lucide-react'
 import { PanelShell } from '@/components/PanelShell'
 import { RailOperacion } from '@/components/operacion/Rail'
 import { FiltroMaestro, useRangoMaestro } from '@/components/operacion/FiltroMaestro'
 import { PISO_ABIERTOS_DIAS } from '@/lib/operacion/rango'
+import { PLAZO_MANUAL_DIAS } from '@/lib/supuestos'
 import {
   Tarjeta, Kpi, Medidor, Pastilla, Encabezado, Aviso,
   DOMINIO, TONO, dec, num, type EstadoTarjeta, type Tono,
@@ -34,6 +35,8 @@ type FilaEnvio = {
   dias: number | null
   accion: 'Reclamar' | 'Avisar' | 'Despachar' | null
   error: string | null
+  manual: 'ok' | 'pendiente' | 'faltante' | 'sin_material' | 'na'
+  manualAt: string | null
 }
 
 type Logistica = {
@@ -43,8 +46,11 @@ type Logistica = {
     frenados: number; enTransito: number; sinDespachar: number
     promedioDias: number | null; promedioDespacho: number | null; promedioCorreo: number | null
     entregadosMedidos: number
+    sinManual: number
+    sinMaterial: number
   }
   abiertos: FilaEnvio[]
+  sinManual: FilaEnvio[]
   cumplimiento: { dentro: number; total: number; pct: number | null }
   porProvincia: Array<{ provincia: string; dias: number; entregas: number }>
   porSemana: Array<{ semana: string; dias: number; entregas: number }>
@@ -58,6 +64,17 @@ const ETIQUETA_ESTADO: Record<string, { texto: string; tono: Tono }> = {
   entregado: { texto: 'entregado', tono: 'ok' },
   sin_dato: { texto: 'sin dato', tono: 'neutro' },
   no_trackeable: { texto: 'sin seguimiento', tono: 'neutro' },
+}
+
+// El manual es un control de cobertura, no un estado de envío: por eso tiene su propia
+// escala. "ok" no se pinta de verde — lo normal no necesita llamar la atención, y si todo
+// verdea el ojo deja de encontrar el rojo, que es lo único que hay que atender.
+const ETIQUETA_MANUAL: Record<FilaEnvio['manual'], { texto: string; tono: Tono; ayuda: string }> = {
+  ok: { texto: 'enviado', tono: 'ok', ayuda: 'El comprador recibió el material por correo' },
+  pendiente: { texto: 'en ciclo', tono: 'neutro', ayuda: 'Sale a las 24 h del despacho; el envío es reciente' },
+  faltante: { texto: 'SIN MANUAL', tono: 'crit', ayuda: 'Pasó el plazo y no hay acuse de envío del material' },
+  sin_material: { texto: 'sin material', tono: 'warn', ayuda: 'El producto todavía no tiene manual escrito' },
+  na: { texto: '—', tono: 'neutro', ayuda: 'Envío apícola: no lleva material propio' },
 }
 
 /** El color de los días sale del umbral, no del estado: 8 días es rojo aunque el correo diga "en tránsito". */
@@ -142,6 +159,16 @@ export default function LogisticaPage() {
     ? `El pedido #${masViejo.referencia} lleva ${masViejo.dias} días sin entregar${masViejo.destino ? ` a ${masViejo.destino}` : ''} — el más viejo abierto`
     : null
 
+  // Va como aviso propio y por encima del de demora: un envío demorado se resuelve solo con
+  // el tiempo, un comprador sin manual no. Nombra los pedidos porque el reenvío se hace por
+  // número de pedido, y un contador sin números obliga a bajar a buscarlos.
+  const faltantes = datos?.sinManual.filter(f => f.manual === 'faltante') ?? []
+  const avisoManual = faltantes.length
+    ? `${faltantes.length === 1 ? 'Un comprador quedó' : `${faltantes.length} compradores quedaron`} sin manual: ` +
+      `${faltantes.slice(0, 4).map(f => `#${f.referencia}`).join(', ')}` +
+      `${faltantes.length > 4 ? ` y ${faltantes.length - 4} más` : ''} — reenviar el material`
+    : null
+
   return (
     <PanelShell
       titulo="Operación · Logística"
@@ -173,6 +200,8 @@ export default function LogisticaPage() {
         <Aviso tono="warn" mensaje={`No se pudo actualizar: ${fallo}. Lo de abajo es el último dato bueno.`} />
       )}
 
+      {avisoManual && <Aviso tono="crit" mensaje={avisoManual} />}
+
       {aviso && <Aviso tono="crit" mensaje={aviso} />}
 
       <Encabezado
@@ -181,7 +210,7 @@ export default function LogisticaPage() {
         bajada="Ordenado por días en tránsito, no por fecha de despacho: el que más tiempo lleva esperando es el que hay que atender primero. Los umbrales son 5 días para avisar y 8 para reclamar — a los 8 el reclamo del cliente ya entró."
       />
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores de logística">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Indicadores de logística">
         <Kpi
           dominio="log" icono={<TriangleAlert className="size-4" />}
           valor={k ? num(k.frenados) : '—'} unidad="envíos"
@@ -210,6 +239,18 @@ export default function LogisticaPage() {
               ? `sobre ${num(k.entregadosMedidos)} entregas medidas · plazo prometido 2 a 5`
               : 'todavía sin entregas medidas'
           }
+        />
+        <Kpi
+          dominio="log" icono={<BookOpenCheck className="size-4" />}
+          valor={k ? num(k.sinManual) : '—'} unidad={k?.sinManual === 1 ? 'comprador' : 'compradores'}
+          etiqueta="Compradores sin manual"
+          pie={
+            k == null ? 'sin dato'
+              : k.sinManual ? 'reenviar el material'
+              : k.sinMaterial ? `todos cubiertos · ${num(k.sinMaterial)} sin material escrito`
+              : 'todos recibieron su manual'
+          }
+          delta={k?.sinManual ? 'atender hoy' : undefined} deltaTono="crit"
         />
       </section>
 
@@ -264,7 +305,7 @@ export default function LogisticaPage() {
               <tr>
                 {([
                   ['Pedido', 'referencia'], ['Canal', null], ['Destino', 'destino'],
-                  ['Producto', null], ['Estado', 'estado'], ['Días', 'dias'], ['Acción', null],
+                  ['Producto', null], ['Estado', 'estado'], ['Manual', null], ['Días', 'dias'], ['Acción', null],
                 ] as const).map(([titulo, col]) => (
                   <th
                     key={titulo}
@@ -292,6 +333,7 @@ export default function LogisticaPage() {
             <tbody>
               {filas.map(f => {
                 const e = ETIQUETA_ESTADO[f.estado] ?? { texto: f.estado, tono: 'neutro' as Tono }
+                const m = ETIQUETA_MANUAL[f.manual]
                 return (
                   <tr key={f.tracking} className="hover:bg-[var(--pnl-panel-2)]">
                     <td className="num whitespace-nowrap border-b border-[var(--pnl-hair)] px-3 py-2.5">#{f.referencia}</td>
@@ -304,6 +346,11 @@ export default function LogisticaPage() {
                     </td>
                     <td className="whitespace-nowrap border-b border-[var(--pnl-hair)] px-3 py-2.5">
                       <Pastilla tono={e.tono}>{e.texto}</Pastilla>
+                    </td>
+                    <td className="whitespace-nowrap border-b border-[var(--pnl-hair)] px-3 py-2.5">
+                      <span title={m.ayuda + (f.manualAt ? ` · ${fechaCorta(f.manualAt)}` : '')}>
+                        <Pastilla tono={m.tono}>{m.texto}</Pastilla>
+                      </span>
                     </td>
                     <td
                       className="num whitespace-nowrap border-b border-[var(--pnl-hair)] px-3 py-2.5 text-right font-semibold"
@@ -323,6 +370,67 @@ export default function LogisticaPage() {
         <p className="text-xs leading-relaxed text-[var(--pnl-text-3)]">
           De los apícolas solo se sabe si el fabricante despachó: el traslado lo hace MercadoLibre y esa
           trazabilidad no la tenemos. No se inventa un &ldquo;en tránsito&rdquo; que nadie puede verificar.
+        </p>
+      </Tarjeta>
+
+      <Tarjeta
+        dominio="log" icono={<BookOpenCheck className="size-3.5" />}
+        titulo="Compradores sin material"
+        sub="El control de que nadie se quede sin manual. Incluye los pedidos YA ENTREGADOS: cuando el paquete llega, el envío sale de la cola de arriba, pero si el material nunca salió el problema sigue vivo — así fue como se escapó el caso que motivó esta tarjeta."
+        estado={estadoBase === 'normal' && (datos?.sinManual.length ?? 0) === 0 ? 'vacio' : estadoBase}
+        vacio="Todo comprador con manual disponible lo recibió."
+        error={fallo}
+        ultimoDato={datos?.corte ? horaCorta(datos.corte) : null}
+        onReintentar={cargar}
+      >
+        <div className="overflow-x-auto rounded-md border border-[var(--pnl-hair)]">
+          <table className="w-full border-collapse text-[13px]">
+            <thead>
+              <tr>
+                {['Pedido', 'Producto', 'Envío', 'Manual', 'Qué hacer'].map(t => (
+                  <th key={t} scope="col" className="whitespace-nowrap border-b border-[var(--pnl-hair)] bg-[var(--pnl-panel-2)] px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--pnl-text-3)]">
+                    {t}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(datos?.sinManual ?? []).map(f => {
+                const m = ETIQUETA_MANUAL[f.manual]
+                const e = ETIQUETA_ESTADO[f.estado] ?? { texto: f.estado, tono: 'neutro' as Tono }
+                return (
+                  <tr key={f.tracking} className="hover:bg-[var(--pnl-panel-2)]">
+                    <td className="num whitespace-nowrap border-b border-[var(--pnl-hair)] px-3 py-2.5">#{f.referencia}</td>
+                    <td className="max-w-[26ch] truncate border-b border-[var(--pnl-hair)] px-3 py-2.5 text-[var(--pnl-text-2)]" title={f.producto ?? ''}>
+                      {f.producto ?? '—'}
+                    </td>
+                    <td className="whitespace-nowrap border-b border-[var(--pnl-hair)] px-3 py-2.5">
+                      <Pastilla tono={e.tono}>{e.texto}</Pastilla>
+                    </td>
+                    <td className="whitespace-nowrap border-b border-[var(--pnl-hair)] px-3 py-2.5">
+                      <span title={m.ayuda}><Pastilla tono={m.tono}>{m.texto}</Pastilla></span>
+                    </td>
+                    {/* La acción es distinta según la causa, y por eso no se unifican: un
+                        faltante se resuelve reenviando, un "sin material" solo se resuelve
+                        escribiendo el manual. Mostrar "reenviar" en el segundo caso manda a
+                        alguien a apretar un botón que no puede funcionar. */}
+                    <td className="whitespace-nowrap border-b border-[var(--pnl-hair)] px-3 py-2.5 font-semibold" style={{ color: f.manual === 'faltante' ? TONO.crit : TONO.warn }}>
+                      {f.manual === 'faltante' ? 'Reenviar manual' : 'Falta escribir el manual'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs leading-relaxed text-[var(--pnl-text-3)]">
+          El manual sale solo, a las 24 h del despacho, desde el VPS. Un pedido aparece acá cuando pasaron
+          más de {PLAZO_MANUAL_DIAS} días del despacho y no llegó el acuse: es margen para una corrida
+          perdida, no para el ciclo normal. Los pedidos con retiro en punto nunca marcan despacho en
+          Tiendanube y se rescatan a los 3 días del pago — si uno queda acá, es que ese rescate tampoco
+          corrió. Reenviar:{' '}
+          <code className="rounded bg-[var(--pnl-panel-2)] px-1">python3 envio_manuales_sku.py --ventana 60</code>{' '}
+          en el VPS.
         </p>
       </Tarjeta>
 

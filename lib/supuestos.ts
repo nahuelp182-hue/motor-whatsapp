@@ -94,6 +94,18 @@ export const PLAZO_PROMETIDO = { min: 2, max: 5 } as const
  */
 export const UMBRAL_ENVIO = { alerta: 5, reclamo: 8 } as const
 
+/**
+ * Días desde el despacho tras los cuales la falta de manual deja de ser normal.
+ *
+ * El script del VPS manda a las 24 h del despacho y corre cada 3 h, así que un envío recién
+ * despachado sin acuse no es un problema: es el ciclo. Se da margen para una corrida perdida
+ * antes de gritar — un indicador que se enciende solo por el reloj no se mira más.
+ *
+ * Vive acá y no en `operacion/envios.ts` porque lo usan las dos puntas, y ese módulo importa
+ * Prisma: traerlo a un componente de cliente solo por una constante arrastraría el server al bundle.
+ */
+export const PLAZO_MANUAL_DIAS = 2
+
 // ── Caja ────────────────────────────────────────────────────────────────────
 
 /** Días que MercadoPago retiene el cobro antes de liberarlo. */

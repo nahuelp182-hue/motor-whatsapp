@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { diasEntre, accionDe } from '@/lib/operacion/envios'
-import { UMBRAL_ENVIO, PLAZO_PROMETIDO } from '@/lib/supuestos'
+import { diasEntre, accionDe, estadoManual } from '@/lib/operacion/envios'
+import { UMBRAL_ENVIO, PLAZO_PROMETIDO, PLAZO_MANUAL_DIAS } from '@/lib/supuestos'
 
 // Los umbrales de Logística deciden qué se le muestra a Nahuel como "atender hoy". Si se
 // corren sin querer, la pantalla sigue pintando lindo y deja de avisar: no hay forma de
@@ -70,5 +70,42 @@ describe('lo que NO es un envío frenado', () => {
   it('un envío por un correo que no se puede consultar no pide nada', () => {
     // Sin trazabilidad no se sabe si llegó: puede haberse entregado hace una semana.
     expect(accionDe('no_trackeable', 15)).toBeNull()
+  })
+})
+
+// El control de manuales existe porque un comprador se quedó sin material y NADA avisó: el
+// caso apareció cuando el cliente escribió. Estos casos fijan las cuatro formas en que el
+// indicador podría volver a callarse.
+describe('control de manual entregado', () => {
+  const ahora = dia(20)
+
+  it('con acuse es "ok", aunque el envío sea viejo', () => {
+    expect(estadoManual('tn', 'Incubadora INC101', dia(1), dia(2), ahora)).toBe('ok')
+  })
+
+  it('sin acuse y recién despachado es "pendiente": el manual sale a las 24 h', () => {
+    expect(estadoManual('tn', 'Incubadora INC101', dia(20), null, ahora)).toBe('pendiente')
+  })
+
+  it('sin acuse pasado el plazo es "faltante": es el caso que hay que ver', () => {
+    const despacho = dia(20 - PLAZO_MANUAL_DIAS - 1)
+    expect(estadoManual('tn', 'Incubadora INC101', despacho, null, ahora)).toBe('faltante')
+  })
+
+  it('un producto sin manual escrito no se cuenta como faltante', () => {
+    // Si HALO figurara "faltante" se encendería para siempre sin que nadie pueda apagarlo,
+    // y un indicador que siempre grita deja de mirarse. Se arregla escribiendo el manual.
+    expect(estadoManual('tn', 'Lámpara HALO', dia(1), null, ahora)).toBe('sin_material')
+  })
+
+  it('el apícola no lleva material propio: nunca es faltante', () => {
+    // Marcarlo como deuda inventaría un problema que no existe y taparía los casos reales.
+    expect(estadoManual('ml', 'Traje apicultor', dia(1), null, ahora)).toBe('na')
+  })
+
+  it('un envío sin despachar no es faltante todavía', () => {
+    // El retiro en punto nunca marca despacho: lo rescata el script del VPS a los 3 días del
+    // pago. Contarlo como faltante desde el día uno llenaría la lista de falsos positivos.
+    expect(estadoManual('tn', 'Incubadora INC101', null, null, ahora)).toBe('pendiente')
   })
 })
