@@ -78,7 +78,7 @@ export async function porDiaMeta(since: string, until: string): Promise<MetaInsi
   }
 }
 
-export type Adset = { id: string; nombre: string; campana: string | null; spend: number; frecuencia: number | null }
+export type Adset = { id: string; nombre: string; campana: string | null; spend: number; frecuencia: number | null; activo: boolean }
 
 /**
  * Frecuencia y gasto por conjunto de anuncios.
@@ -90,6 +90,11 @@ export type Adset = { id: string; nombre: string; campana: string | null; spend:
  *
  * `null` en frecuencia cuando Meta no la devuelve (adset sin entrega en el período): eso no
  * es un cero, es que no hay nada que medir.
+ *
+ * El estado (`activo`) no sale de insights —esa API no lo tiene— sino de `/adsets` con
+ * `effective_status`, en una segunda llamada. Es el estado DE HOY, no el del período: un
+ * adset gastó en el rango pero puede estar pausado ahora mismo, y es justo eso lo que se
+ * quiere distinguir en pantalla.
  */
 export async function frecuenciaPorAdset(since: string, until: string): Promise<Adset[]> {
   const token = process.env.META_ADS_TOKEN
@@ -103,14 +108,38 @@ export async function frecuenciaPorAdset(since: string, until: string): Promise<
     const data = (await res.json()) as {
       data?: Array<{ adset_id?: string; adset_name?: string; campaign_name?: string; spend?: string; frequency?: string }>
     }
-    return (data.data ?? []).map(a => ({
+    const filas = data.data ?? []
+    const activos = await estadoAdsets(filas.map(a => a.adset_id).filter((id): id is string => !!id))
+    return filas.map(a => ({
       id: a.adset_id ?? '',
       nombre: a.adset_name ?? '(sin nombre)',
       campana: a.campaign_name ?? null,
       spend: parseFloat(a.spend ?? '0'),
       frecuencia: a.frequency != null ? parseFloat(a.frequency) : null,
+      activo: activos.get(a.adset_id ?? '') ?? false,
     }))
   } catch {
     return []
+  }
+}
+
+/**
+ * Estado actual (`effective_status`) de una lista de adsets, en una sola llamada batched por
+ * ids. Si falla, todos quedan `false`: mejor mostrar "pausado" de más que un LED verde falso.
+ */
+async function estadoAdsets(ids: string[]): Promise<Map<string, boolean>> {
+  const token = process.env.META_ADS_TOKEN
+  const vacio = new Map<string, boolean>()
+  if (!token || ids.length === 0) return vacio
+  try {
+    const url = `${API}/?ids=${ids.join(',')}` +
+      `&fields=effective_status&access_token=${token}`
+    const res = await fetch(url)
+    const data = (await res.json()) as Record<string, { effective_status?: string }>
+    const mapa = new Map<string, boolean>()
+    for (const id of ids) mapa.set(id, data[id]?.effective_status === 'ACTIVE')
+    return mapa
+  } catch {
+    return vacio
   }
 }

@@ -19,7 +19,7 @@ import { FiltroMaestro, useRangoMaestro } from '@/components/operacion/FiltroMae
 // rotulado como lo que es —un piso— y el incremental queda declarado como pendiente.
 
 type Canal = { key: string; label: string; color: string; orders: number; revenue: number }
-type Adset = { id: string; nombre: string; campana: string | null; spend: number; frecuencia: number | null }
+type Adset = { id: string; nombre: string; campana: string | null; spend: number; frecuencia: number | null; activo: boolean }
 type Escenario = { gastoDia: number; cac: number; ventasMes: number; margenMes: number; estado: string }
 
 type Adquisicion = {
@@ -80,8 +80,10 @@ export default function AdquisicionPage() {
   // útil que una pantalla en blanco, que es exactamente lo que dice hacer lib/operacion.
   const estadoBase: EstadoTarjeta = cargando && !datos ? 'cargando' : fallo && !datos ? 'error' : 'normal'
   const d = datos
+  const [soloActivos, setSoloActivos] = useState(false)
   const quemados = d?.adsets.filter(a => (a.frecuencia ?? 0) >= d.umbralFrecuencia) ?? []
   const frecMax = d?.adsets.reduce<number | null>((m, a) => (a.frecuencia != null && (m === null || a.frecuencia > m) ? a.frecuencia : m), null) ?? null
+  const adsetsVisibles = d ? (soloActivos ? d.adsets.filter(a => a.activo) : d.adsets) : []
 
   return (
     <PanelShell
@@ -208,19 +210,47 @@ export default function AdquisicionPage() {
       >
         {d && d.adsets.length > 0 && (
           <div className="flex flex-col gap-3">
-            {d.adsets.map(a => (
-              <Medidor
-                key={a.id}
-                etiqueta={`${a.nombre}${a.campana ? ` · ${a.campana}` : ''} — ${ars(a.spend)}`}
-                valor={a.frecuencia != null ? `${dec(a.frecuencia)}x` : 'sin entrega'}
-                pct={((a.frecuencia ?? 0) / (d.umbralFrecuencia * 1.5)) * 100}
-                color={(a.frecuencia ?? 0) >= d.umbralFrecuencia ? 'var(--pnl-red)' : DOMINIO.ml.color}
-                marca={(1 / 1.5) * 100}
+            <label className="ml-auto flex items-center gap-2 text-xs text-[var(--pnl-text-2)]">
+              <input
+                type="checkbox"
+                checked={soloActivos}
+                onChange={e => setSoloActivos(e.target.checked)}
+                className="size-3.5 accent-[var(--pnl-green)]"
               />
+              Solo activos ahora
+            </label>
+            {adsetsVisibles.length === 0 && (
+              <p className="py-2 text-center text-[13px] text-[var(--pnl-text-3)]">
+                Ningún conjunto activo en este momento.
+              </p>
+            )}
+            {adsetsVisibles.map(a => (
+              <div key={a.id} className="flex items-center gap-2">
+                <span
+                  className="size-2 shrink-0 rounded-full"
+                  style={{
+                    background: a.activo ? 'var(--pnl-green)' : 'var(--pnl-text-3)',
+                    boxShadow: a.activo ? '0 0 6px var(--pnl-green)' : undefined,
+                  }}
+                  title={a.activo ? 'Activo ahora' : 'No activo ahora'}
+                  aria-hidden
+                />
+                <span className="sr-only">{a.activo ? 'Activo ahora' : 'No activo ahora'}</span>
+                <div className="min-w-0 flex-1">
+                  <Medidor
+                    etiqueta={`${a.nombre}${a.campana ? ` · ${a.campana}` : ''} — ${ars(a.spend)}`}
+                    valor={a.frecuencia != null ? `${dec(a.frecuencia)}x` : 'sin entrega'}
+                    pct={((a.frecuencia ?? 0) / (d.umbralFrecuencia * 1.5)) * 100}
+                    color={(a.frecuencia ?? 0) >= d.umbralFrecuencia ? 'var(--pnl-red)' : DOMINIO.ml.color}
+                    marca={(1 / 1.5) * 100}
+                  />
+                </div>
+              </div>
             ))}
             <p className="text-xs leading-relaxed text-[var(--pnl-text-3)]">
               La marca vertical es el umbral de {dec(d.umbralFrecuencia)}. Un conjunto recién entregado
-              no se juzga por esto: hacen falta 72 h y volumen antes de mover nada.
+              no se juzga por esto: hacen falta 72 h y volumen antes de mover nada. El punto verde es el
+              estado de la cuenta ahora mismo, no el del período mostrado arriba.
             </p>
           </div>
         )}

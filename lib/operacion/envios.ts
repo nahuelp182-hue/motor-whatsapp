@@ -284,13 +284,18 @@ export function accionDe(estado: string, dias: number | null): FilaEnvio['accion
  * existe. `historicoDesde` deja que la pantalla lo diga con esas palabras en vez de
  * mostrar un promedio calculado sobre dos envíos.
  */
-export async function leerLogistica(dias = PISO_ABIERTOS_DIAS): Promise<Logistica> {
+export async function leerLogistica(dias = PISO_ABIERTOS_DIAS, hasta?: Date): Promise<Logistica> {
   const ahora = new Date()
+  // `hasta` es el tope superior del rango manual. Sin él, un rango que terminaba en el
+  // pasado (ej. "01/07 al 31/07") calculaba igual `desde = ahora - dias` y traía entregas
+  // hasta HOY: el filtro cambiaba el ancho de la ventana pero no dónde termina, así que
+  // elegir fechas manuales no movía un solo número en pantalla.
+  const techo = hasta ?? ahora
   // Dos ventanas: el histórico usa la del filtro; los abiertos, la más ancha de las dos.
   // Acotar los abiertos sigue siendo necesario (un envío que nunca llega a "entregado" se
   // quedaría en la lista para siempre y al año la pantalla sería una pila de fantasmas),
   // pero el piso garantiza que achicar el filtro no oculte nada accionable.
-  const desde = new Date(ahora.getTime() - dias * DIA)
+  const desde = new Date(techo.getTime() - dias * DIA)
   const desdeAbiertos = new Date(ahora.getTime() - Math.max(dias, PISO_ABIERTOS_DIAS) * DIA)
 
   const [todos, primero, apicolaPendiente] = await Promise.all([
@@ -300,8 +305,9 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS): Promise<Logistic
           { entregado_at: null, despachado_at: { gte: desdeAbiertos } },
           { entregado_at: null, despachado_at: null, creado_at: { gte: desdeAbiertos } },
           // Los entregados sí usan la ventana del filtro: son historia, y es exactamente lo
-          // que el rango tiene que poder recortar.
-          { entregado_at: { gte: desde } },
+          // que el rango tiene que poder recortar. El techo evita que un rango manual del
+          // pasado siga trayendo entregas de después de `hasta`.
+          { entregado_at: { gte: desde, lte: techo } },
         ],
       },
       orderBy: { despachado_at: 'asc' },

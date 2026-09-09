@@ -22,7 +22,10 @@ export async function GET(req: NextRequest) {
     req.nextUrl.searchParams.get('hasta'),
   )
   try {
-    const datos = await leerLogistica(rango.dias)
+    // `hasta` con hora 23:59:59.999: el rango es inclusive del día, y sin la hora tope una
+    // entrega registrada esa misma tarde quedaba afuera por comparar contra medianoche.
+    const techo = new Date(`${rango.hasta}T23:59:59.999Z`)
+    const datos = await leerLogistica(rango.dias, techo)
     return NextResponse.json(datos)
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'error desconocido'
