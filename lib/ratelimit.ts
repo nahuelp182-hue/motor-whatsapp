@@ -133,6 +133,23 @@ export async function tomarLatch(clave: string): Promise<boolean> {
 }
 
 /**
+ * Reabre un latch. Para el caso en que se tomó por adelantado y la acción que protegía
+ * terminó fallando: sin esto el latch miente y dice que algo pasó cuando no pasó.
+ *
+ * Falla en silencio a propósito: si no se puede reabrir, el peor caso es un mail que no
+ * sale (el estado que ya teníamos), nunca uno duplicado.
+ */
+export async function soltarLatch(clave: string): Promise<void> {
+  const pool = getPool()
+  if (!pool) return
+  try {
+    await pool.query(`DELETE FROM "RateLimit" WHERE "key" = $1`, [`${PREFIJO_LATCH}${clave}`])
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
  * Borra ventanas vencidas. Se llama de forma oportunista (1 de cada 50 requests) para que
  * la tabla no crezca sin control, sin sumar un cron nuevo.
  *

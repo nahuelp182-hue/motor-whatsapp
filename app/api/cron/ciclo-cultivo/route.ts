@@ -9,8 +9,8 @@
 //
 // Deduplicación: cada hito se "late" una sola vez por pedido usando la tabla RateLimit
 // (limite 1, ventana de un año). No hizo falta tabla nueva ni migración. Ante caída de la
-// base el limitador falla ABIERTO, así que en el peor caso se repite un mail: preferimos esa
-// molestia a callarnos el aviso.
+// base el limitador falla CERRADO: no se manda. El mail sale tarde (en la corrida siguiente)
+// en vez de salir dos veces, y por eso la ventana de cada hito tiene que ser ancha.
 import { NextRequest, NextResponse } from 'next/server'
 import { chequearCron } from '@/lib/cron-auth'
 import {
@@ -29,7 +29,7 @@ import {
   mailShock,
 } from '@/lib/mails-cliente'
 import { mailLead1, mailLead2, mailLead3 } from '@/lib/mails-lead'
-import { tomarLatch } from '@/lib/ratelimit'
+import { soltarLatch, tomarLatch } from '@/lib/ratelimit'
 import { marcarHeartbeat } from '@/lib/cron-heartbeat'
 
 export const runtime = 'nodejs'
@@ -48,7 +48,11 @@ type Hito = {
 }
 
 const HITOS: Hito[] = [
-  { id: 'bienvenida', reloj: 'pago', desde: 0, hasta: 2, arma: mailBienvenida },
+  // La bienvenida no caduca: mientras el pedido esté en la ventana de 70 días y el latch no
+  // esté tomado, sale. Con `hasta: 2` cualquier caída del cron o del SMTP de más de dos días
+  // dejaba al cliente sin el mail para siempre y en silencio (#1646, 09/09/26). El latch ya
+  // garantiza que no se duplique; acotar la ventana no protegía de nada.
+  { id: 'bienvenida', reloj: 'pago', desde: 0, hasta: 70, arma: mailBienvenida },
   { id: 'entrega', reloj: 'entrega', desde: 1, hasta: 4, arma: mailEntrega },
   { id: 'shock', reloj: 'entrega', desde: 21, hasta: 25, arma: mailShock },
   { id: 'cosecha', reloj: 'entrega', desde: 35, hasta: 40, arma: mailCosecha },
@@ -113,7 +117,8 @@ export async function GET(req: NextRequest) {
     compras.map(async (c) => {
       const hito = hitoDe(c)
       if (!hito) return null
-      if (!(await tomarLatch(`ciclo:${c.numero}:${hito.id}`))) return null
+      const clave = `ciclo:${c.numero}:${hito.id}`
+      if (!(await tomarLatch(clave))) return null
 
       const token = await crearTokenEntrada(
         { num: c.numero, nom: c.nombre, eq: c.equipos },
@@ -124,6 +129,10 @@ export async function GET(req: NextRequest) {
         // Siempre INC101 (hardware), nunca material digital: soloDigital = false.
         hito.arma(c.nombre, `${BASE_URL}/e/${token}`, false),
       )
+      // El latch se toma ANTES de enviar (para que dos corridas simultáneas no manden dos
+      // mails), así que si el envío falla hay que devolverlo: si no, el pedido queda marcado
+      // como avisado para siempre y el cliente nunca recibe el mail. Pasó con el #1646.
+      if (!ok) await soltarLatch(clave)
       return { pedido: c.numero, hito: hito.id, ok }
     }),
   )
@@ -175,7 +184,9 @@ export async function GET(req: NextRequest) {
     console.error('[ciclo-cultivo] falló la secuencia de leads:', e)
   }
 
-  await marcarHeartbeat('ciclo-cultivo', true, fallidos ? `${fallidos} fallidos` : undefined)
+  // Un envío fallido es una falla del job, no un detalle: si se reporta ok=true el monitor
+  // queda verde mientras un cliente se queda sin su mail.
+  await marcarHeartbeat('ciclo-cultivo', fallidos === 0, fallidos ? `${fallidos} fallidos` : undefined)
   return NextResponse.json({
     revisadas: compras.length,
     enviados,
