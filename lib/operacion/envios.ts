@@ -252,13 +252,31 @@ export type FilaEnvio = {
 export type EstadoManual = 'ok' | 'pendiente' | 'faltante' | 'sin_material' | 'na'
 
 /**
- * SKUs de hardware que todavía no tienen material escrito. Espejo de `SKU_SIN_MATERIAL` en
- * `envio_manuales_sku.py` (VPS): están declarados en los dos lados a propósito, porque si el
- * panel no los conociera los mostraría como "faltante" para siempre y el indicador se
- * volvería ruido que se aprende a ignorar.
+ * Qué productos llevan manual, mirados por su NOMBRE.
  *
- * Se matchea por nombre de producto de Tiendanube, que es lo único que guarda
- * `EnvioSeguimiento`. Sacar de acá lo que ya tenga manual producido.
+ * El panel no guarda el SKU del pedido — `EnvioSeguimiento.producto` es el nombre del primer
+ * producto de la orden — así que la clasificación se hace por nombre. Es un espejo del dict
+ * `MANUALES` de `envio_manuales_sku.py` (VPS), que es quien decide de verdad.
+ *
+ * Tener el criterio duplicado es deuda conocida y acotada: mientras el panel no reciba el
+ * SKU, la alternativa es peor. Lo que NO se puede hacer es dejarlo implícito — si el panel
+ * no supiera qué lleva manual, marcaría "faltante" todo accesorio suelto (Booster, Kit de
+ * Recipientes) para siempre, y un indicador que grita sin motivo se deja de mirar.
+ *
+ * Al agregar un producto con manual al VPS, sumarlo también acá.
+ *
+ * Límite conocido: `producto` es el PRIMER ítem de la orden, así que un pedido de
+ * "Kit de Recipientes + INC101" se clasifica por el kit y cae en `na` hasta que llega el
+ * acuse (ahí pasa a `ok`). Falla hacia el lado seguro — deja de reportar algo que sí tiene
+ * manual, en vez de inventar un faltante — pero significa que un equipo comprado junto a un
+ * accesorio no está cubierto por el control. Se arregla el día que el push mande el SKU.
+ */
+const PRODUCTOS_CON_MANUAL = [/inc101|incubadora/i, /pc400|tableta/i]
+
+/**
+ * Productos de hardware que todavía no tienen material escrito. Espejo de
+ * `SKU_SIN_MATERIAL` (VPS). Se muestran aparte y no como faltante: se arreglan escribiendo
+ * el manual, no reenviando un mail.
  */
 const PRODUCTOS_SIN_MATERIAL = [/halo/i]
 
@@ -342,6 +360,12 @@ export function estadoManual(
   if (origen !== 'tn') return 'na'
   if (enviadoAt) return 'ok'
   if (producto && PRODUCTOS_SIN_MATERIAL.some(re => re.test(producto))) return 'sin_material'
+  // Un accesorio suelto (Booster, Kit de Recipientes) no lleva manual propio: el material va
+  // con el equipo. Sin este corte, cada accesorio vendido solo quedaría "faltante" para
+  // siempre — falso positivo permanente, que es la forma más rápida de que el indicador
+  // deje de mirarse. Un producto desconocido cae acá y NO se reporta: el panel avisa de lo
+  // que sabe que falla, no de lo que no conoce.
+  if (!producto || !PRODUCTOS_CON_MANUAL.some(re => re.test(producto))) return 'na'
   // Sin despacho todavía no corresponde: el manual sale con el envío. El caso de retiro en
   // punto (que nunca marca despacho) lo rescata el script del VPS a los 3 días del pago;
   // acá se ve igual, porque al llegar el acuse pasa a `ok` sin haber pasado por despacho.

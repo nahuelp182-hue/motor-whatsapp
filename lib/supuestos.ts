@@ -98,13 +98,18 @@ export const UMBRAL_ENVIO = { alerta: 5, reclamo: 8 } as const
  * Días desde el despacho tras los cuales la falta de manual deja de ser normal.
  *
  * El script del VPS manda a las 24 h del despacho y corre cada 3 h, así que un envío recién
- * despachado sin acuse no es un problema: es el ciclo. Se da margen para una corrida perdida
- * antes de gritar — un indicador que se enciende solo por el reloj no se mira más.
+ * despachado sin acuse no es un problema: es el ciclo.
+ *
+ * Son 3 y no 2 porque medido contra la realidad 2 daba un falso positivo: el pedido #1649,
+ * despachado la noche anterior, ya contaba "2 días" por redondeo de fechas mientras el
+ * script todavía estaba dentro de su espera legítima de 24 h. El margen cubre el ciclo
+ * completo (24 h + una corrida perdida) — un indicador que se enciende por el redondeo del
+ * reloj enseña a ignorarlo, y entonces no sirve el día que marca algo real.
  *
  * Vive acá y no en `operacion/envios.ts` porque lo usan las dos puntas, y ese módulo importa
  * Prisma: traerlo a un componente de cliente solo por una constante arrastraría el server al bundle.
  */
-export const PLAZO_MANUAL_DIAS = 2
+export const PLAZO_MANUAL_DIAS = 3
 
 // ── Caja ────────────────────────────────────────────────────────────────────
 

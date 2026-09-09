@@ -87,9 +87,22 @@ describe('control de manual entregado', () => {
     expect(estadoManual('tn', 'Incubadora INC101', dia(20), null, ahora)).toBe('pendiente')
   })
 
+  it('un despacho de anoche sigue en ciclo: el script espera 24 h', () => {
+    // Medido: #1649, despachado la noche anterior, contaba "2 días" por redondeo de fechas
+    // mientras el VPS estaba dentro de su espera legítima. El plazo tiene que cubrir eso.
+    expect(estadoManual('tn', 'Incubadora INC101', dia(18), null, ahora)).toBe('pendiente')
+  })
+
   it('sin acuse pasado el plazo es "faltante": es el caso que hay que ver', () => {
     const despacho = dia(20 - PLAZO_MANUAL_DIAS - 1)
     expect(estadoManual('tn', 'Incubadora INC101', despacho, null, ahora)).toBe('faltante')
+  })
+
+  it('un accesorio suelto no es faltante: el manual va con el equipo', () => {
+    // Medido el 09/09/2026: el pedido #1611 (Booster de Humedad solo) salía "faltante". Los
+    // accesorios no llevan material propio, así que habría quedado encendido para siempre.
+    expect(estadoManual('tn', 'Booster de Humedad', dia(1), null, ahora)).toBe('na')
+    expect(estadoManual('tn', 'Kit de Recipientes de Cultivo (Pack x4)', dia(1), null, ahora)).toBe('na')
   })
 
   it('un producto sin manual escrito no se cuenta como faltante', () => {
