@@ -206,6 +206,10 @@ export const CATALOGO: Record<string, EntradaCatalogo> = {
     origen: 'vps', maxHoras: 800,
     que: 'Resumen mensual de ventas apícolas',
   },
+  tn_token_sync: {
+    origen: 'vps', maxHoras: 2,
+    que: 'Copia el token de Tiendanube de la DB (dueña) al JSON del VPS',
+  },
   envio_manuales_sku: {
     origen: 'vps', maxHoras: 7,
     que: 'Manda el manual del producto según SKU a quien compró',
