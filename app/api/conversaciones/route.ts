@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPool } from '@/lib/db'
+import { ultimaDerivacion, handoffEsPermanente } from '@/lib/diag'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+/** Debe coincidir con el mismo nombre en atencion-watchdog/route.ts (ver el comentario ahí
+ *  sobre por qué esta constante no se pudo compartir entre dos rutas de Next). */
+const HANDOFF_HORAS = 6
+const HANDOFF_HORAS_MAX = 24 * 30
 
 type Mensaje = {
   ts: string; role: 'user' | 'bot'; text: string
@@ -20,6 +26,18 @@ type Conversacion = {
   ultimoTs: string
   mensajes: Mensaje[]
   derivada: boolean
+  /**
+   * Horas esperando a que una persona atienda este handoff. `null` si no está derivado
+   * ahora mismo, si ya lo cerraron a mano, o si el handoff venció y volvió al bot.
+   *
+   * POR QUÉ EXISTE (auditoría 10/09/2026 — parte de la Fase 2.4)
+   * El sistema de alertas (atencion-watchdog) es push: si te perdés un mail o el WhatsApp
+   * de la alerta, no hay dónde mirar a mano. Solo WhatsApp (canal !== 'wa' no tiene esta
+   * cuenta porque `ultimaDerivacion`/`handoffEsPermanente` son específicas de ese canal).
+   * Se calcula SOLO para el canal WhatsApp y solo cuando `derivada` es true, para no pagar
+   * dos queries extra por cada conversación de la lista (la mayoría no está derivada).
+   */
+  horasEsperando: number | null
   manual: boolean
   seguimiento: boolean
   feedback: boolean
@@ -70,7 +88,7 @@ export async function GET(req: NextRequest) {
       const clave = `${r.canal}:${r.sender}`
       let c = map.get(clave)
       if (!c) {
-        c = { sender: r.sender, canal: r.canal, nombre: null, usuario: null, ultimoTs: r.ts, mensajes: [], derivada: false, manual: false, seguimiento: false, feedback: false, error: false }
+        c = { sender: r.sender, canal: r.canal, nombre: null, usuario: null, ultimoTs: r.ts, mensajes: [], derivada: false, horasEsperando: null, manual: false, seguimiento: false, feedback: false, error: false }
         map.set(clave, c)
       }
       c.ultimoTs = r.ts
@@ -110,6 +128,7 @@ export async function GET(req: NextRequest) {
     }
 
     await sumarEnviosAutomaticos(p, map, days)
+    await calcularHorasEsperando(map)
 
     const conversaciones = Array.from(map.values())
       .filter((c) => c.mensajes.length > 0)
@@ -145,6 +164,35 @@ const NOMBRE_EVENTO: Record<string, string> = {
   transfer_instructions: 'datos para transferir',
   cross_sell: 'recomendación post-compra',
   ciclo_cultivo: 'seguimiento del cultivo',
+}
+
+/**
+ * Horas esperando de cada conversación de WhatsApp marcada `derivada` — mismo cálculo que
+ * usa `atencion-watchdog` para decidir si avisar, reusado acá para MOSTRAR, no para avisar.
+ *
+ * POR QUÉ EXISTE (Fase 2.4, auditoría 10/09/2026)
+ * El watchdog es push: si se pierde un mail, o el WhatsApp de la alerta, o simplemente
+ * nadie mira esa bandeja un rato, no hay ninguna pantalla donde ver "esto sigue abierto y
+ * hace cuánto". Con esto, el filtro "Derivados" del panel deja de ser un sí/no: ordena por
+ * antigüedad y muestra las horas, así que sirve como vista de PULL además del push de las
+ * alertas — sin depender de que ninguna alerta haya llegado.
+ *
+ * Solo recorre las conversaciones marcadas `derivada` (no todas): la mayoría de una lista
+ * de conversaciones no está derivada, y `ultimaDerivacion`/`handoffEsPermanente` son 2-3
+ * queries cada una — pagarlas para todas sería caro sin necesidad.
+ */
+async function calcularHorasEsperando(map: Map<string, Conversacion>): Promise<void> {
+  for (const c of map.values()) {
+    if (!c.derivada || c.canal !== 'wa') continue
+    try {
+      const permanente = await handoffEsPermanente(c.sender)
+      const desde = await ultimaDerivacion(c.sender, permanente ? HANDOFF_HORAS_MAX : HANDOFF_HORAS)
+      if (!desde) continue // ya se cerró o el handoff venció y volvió al bot: no está "esperando"
+      c.horasEsperando = Math.round((Date.now() - desde.getTime()) / 3_600_000)
+    } catch {
+      // best-effort: si falla, la conversación sigue viéndose, solo sin el dato de horas.
+    }
+  }
 }
 
 /**

@@ -18,6 +18,9 @@ type Conversacion = {
   ultimoTs: string
   mensajes: Mensaje[]
   derivada: boolean
+  /** Horas esperando a que una persona atienda — null si no aplica (no derivado, ya
+   *  cerrado, o el handoff venció). Ver el comentario largo en la API. */
+  horasEsperando: number | null
   manual: boolean
   seguimiento: boolean
   feedback: boolean
@@ -70,6 +73,15 @@ function hora(ts: string): string {
   })
 }
 
+// Horas → texto corto para el badge de "derivado". En días arriba de 24h porque un caso
+// de varios días en horas ("384 h") no se lee de un vistazo — la unidad tiene que cambiar
+// con la magnitud, no mostrar siempre el mismo número creciendo sin parar.
+function textoHoras(h: number): string {
+  if (h < 24) return `${h} h`
+  const dias = Math.round(h / 24)
+  return `${dias} d`
+}
+
 // Cómo se muestra el interlocutor. En WhatsApp es un teléfono; en Instagram y Messenger es
 // un identificador interno de Meta que no dice nada, así que se acorta para que no ocupe la
 // fila entera fingiendo ser información.
@@ -116,7 +128,7 @@ export default function ConversacionesPage() {
   const t = data?.totales
   const testFiltro = FILTROS.find((f) => f.id === filtro)?.test ?? (() => true)
   const qn = q.trim().toLowerCase()
-  const convs = todas.filter((c) => {
+  const convsFiltradas = todas.filter((c) => {
     if (canal !== 'todos' && c.canal !== canal) return false
     if (!testFiltro(c)) return false
     if (!qn) return true
@@ -125,6 +137,18 @@ export default function ConversacionesPage() {
     if (c.sender.includes(qn.replace(/\D/g, ''))) return true
     return c.mensajes.some((m) => m.text.toLowerCase().includes(qn))
   })
+  // Dentro del filtro "Derivados", lo urgente arriba: el que lleva más tiempo esperando.
+  // Fuera de ese filtro se respeta el orden por actividad reciente de siempre (ver la
+  // API), que es lo que espera cualquier lista de conversaciones normal.
+  //
+  // POR QUÉ EXISTE (Fase 2.4, auditoría 10/09/2026)
+  // Antes de esto, "Derivados" ya filtraba pero mostraba los casos en el mismo orden que
+  // el resto — el que llevaba 16 días esperando podía estar page-abajo de uno derivado
+  // hace 20 minutos. Como vista de pull (para cuando nadie mira las alertas de push), el
+  // orden importa tanto como el filtro.
+  const convs = filtro === 'derivada'
+    ? [...convsFiltradas].sort((a, b) => (b.horasEsperando ?? -1) - (a.horasEsperando ?? -1))
+    : convsFiltradas
   // La clave lleva el canal: dos plataformas podrían repetir un identificador, y
   // seleccionar el hilo equivocado sería peor que no mostrarlo.
   const claveDe = (c: Conversacion) => `${c.canal}:${c.sender}`
@@ -340,7 +364,11 @@ export default function ConversacionesPage() {
                   {c.mensajes[c.mensajes.length - 1]?.text || ''}
                 </div>
                 <div className="mt-1.5 flex flex-wrap gap-1">
-                  {c.derivada && <Badge color="#F5A623">derivado</Badge>}
+                  {c.derivada && (
+                    <Badge color={c.horasEsperando != null && c.horasEsperando >= 24 ? '#E8503A' : '#F5A623'}>
+                      {c.horasEsperando != null ? `derivado · ${textoHoras(c.horasEsperando)}` : 'derivado'}
+                    </Badge>
+                  )}
                   {c.seguimiento && <Badge color="#7E86B8">seguimiento</Badge>}
                   {c.manual && <Badge color="#4CAF7D">manual</Badge>}
                   {c.feedback && <Badge color="#969DC9">feedback</Badge>}
