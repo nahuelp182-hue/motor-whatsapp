@@ -385,10 +385,25 @@ const ACCIONES_HANDOFF_PERMANENTE = new Set([
 /**
  * Texto del cliente o motivo del modelo que vuelve el handoff permanente aunque la acción
  * no esté en la lista de arriba. Son las palabras que marcan que el caso ya no es una
- * consulta: es plata, cancelación o un conflicto.
+ * consulta: es plata, cancelación, un conflicto — o, desde la ampliación de abajo, un
+ * producto roto/faltante.
+ *
+ * AMPLIACIÓN 10/09/2026: producto dañado o envío incompleto
+ * De las 17 derivaciones auditadas en 10 días reales, al menos 3 eran justamente esto
+ * (rotura de fábrica, "no calienta" tras agotar el diagnóstico del bot, envío al que le
+ * faltaban 2 kits) y el regex original no las cubría — solo cubría plata/legal. Con la
+ * ampliación del `WHERE` del cron (ver revisarZonaCiega en atencion-watchdog/route.ts) esos
+ * casos ya entran al radar, pero sin esto se soltarían a las 6 h (HANDOFF_HORAS) igual que
+ * una consulta cualquiera, cuando en realidad nadie más que Nahuel/Mateo puede resolver un
+ * defecto físico o un faltante de mercadería.
+ *
+ * Cuidado al tocar esto: se probó contra frases benignas que comparten vocabulario ("me
+ * falta información", "no entiendo cómo funciona") antes de sumar cada término, porque un
+ * falso positivo acá vuelve permanente —y por lo tanto insistente cada 2 h, ver
+ * REALERTA_PERMANENTE_H— un caso que en realidad era una consulta común.
  */
 const RE_HANDOFF_PERMANENTE =
-  /\b(?:cancel\w*|reembols\w*|reintegr\w*|devoluci[óo]n\s+del\s+dinero|defensa\s+del\s+consumidor|denunci\w*|abogad\w*|estaf\w*|fraude|desconozco\s+(?:el\s+)?(?:cargo|cobro)|contracargo|chargeback)\b/i
+  /\b(?:cancel\w*|reembols\w*|reintegr\w*|devoluci[óo]n\s+del\s+dinero|defensa\s+del\s+consumidor|denunci\w*|abogad\w*|estaf\w*|fraude|desconozco\s+(?:el\s+)?(?:cargo|cobro)|contracargo|chargeback|rot\w*|quebrad\w*|part(?:id[oa]|i[oó])|dañad\w*|golpead\w*|no\s+(?:calienta|funciona|anda|enciende)|incomplet\w*|no\s+(?:me\s+)?(?:lleg[oó]|llegaron)|falt(?:an|aron|a)\s+(?:el|la|los|las|\d))\b/i
 
 /**
  * Tope de antigüedad de un handoff permanente.
@@ -490,14 +505,68 @@ export async function handoffEsPermanente(sender: string): Promise<boolean> {
 
 /**
  * ¿Este mensaje interno (de Nahuel al número del bot) cierra el handoff de alguien?
- * Formato: "cerrar 5493513298375" (o con +, espacios o guiones). Devuelve el sender
- * normalizado a dígitos, o null si el mensaje no es una orden de cierre.
+ * Formato estricto: "cerrar 5493513298375" (o con +, espacios o guiones). Devuelve el
+ * sender normalizado a dígitos, o null si el mensaje no es una orden de cierre.
+ *
+ * SOLO reconoce este formato exacto: no confundir con `respuestaCierraAlerta`, que
+ * interpreta un "listo"/"ok" sin número cuando el mensaje RESPONDE a una alerta del
+ * watchdog (ahí el número sale del contexto citado, no del texto).
  */
 export function esCierreDeHandoff(texto: string): string | null {
   const m = texto?.match(/\bcerrar\s+\+?([\d\s-]{8,20})\b/i)
   if (!m) return null
   const digitos = m[1].replace(/\D/g, '')
   return digitos.length >= 8 ? digitos : null
+}
+
+/**
+ * Palabras sueltas que, SOLO cuando el mensaje responde/cita una alerta del watchdog
+ * (`context.id` apunta a un wamid que nosotros mandamos), significan "dalo por cerrado".
+ *
+ * POR QUÉ EXISTE (auditoría del 10/09/2026)
+ * El 09/09/2026 Nahuel escribió "Terminado este reclamo" al bot. No matcheaba
+ * `esCierreDeHandoff` (no tiene la palabra "cerrar" ni un teléfono) y el caso quedó abierto:
+ * en 12 días salieron 153 alertas del watchdog y solo 1 cierre manual en toda la historia.
+ * El formato "cerrar <tel>" no es descubrible bajo presión — nadie copia un número de
+ * teléfono a mano para cerrar algo que tiene un botón de "Responder" al lado.
+ *
+ * Por qué exigir que sea RESPUESTA a una alerta y no cualquier mensaje con estas palabras:
+ * "listo", "ok", "gracias", "dale" son también el vocabulario normal de un cliente
+ * cerrando su propia conversación. Sin el anclaje al `context.id` de la alerta, esto
+ * abriría falsos cierres cada vez que alguien le agradece algo al bot.
+ */
+// Sin \b final: `\b` en JS se basa en \w (ASCII), así que después de una vocal acentuada
+// como en "está" el límite de palabra no se reconoce y la alternancia falla en silencio
+// (encontrado escribiendo el test de este mismo cambio — "Ya está resuelto" no matcheaba).
+// El (?:$|[\s.,!¡¿?]) de abajo cubre lo mismo sin depender de acentos.
+const RE_CIERRE_INFORMAL =
+  /^\s*(?:listo|ok|dale|resuelto|cerrado|terminado|ya\s+est[aá]|solucionado)(?:$|[\s.,!¡¿?])/i
+
+/**
+ * ¿Este mensaje interno, respondiendo a una alerta del watchdog, la cierra en lenguaje
+ * informal? `walertaWamid` es el wamid del mensaje de WhatsApp al que este texto responde
+ * (viene de `context.id` en el payload del webhook) — null si no es una respuesta a nada.
+ * Devuelve el sender que hay que cerrar, o null si no aplica.
+ */
+export async function respuestaCierraAlerta(
+  texto: string,
+  walertaWamid: string | null,
+): Promise<string | null> {
+  if (!walertaWamid || !RE_CIERRE_INFORMAL.test(texto ?? '')) return null
+  try {
+    const p = getPool()
+    if (!p) return null
+    const r = await p.query(
+      `SELECT detail->>'sender' AS sender FROM ig_diag
+        WHERE kind = 'watchdog_alerta_wamid' AND detail->>'wamid' = $1
+        ORDER BY id DESC LIMIT 1`,
+      [walertaWamid],
+    )
+    return r.rows[0]?.sender ?? null
+  } catch (e) {
+    console.error('respuestaCierraAlerta error:', e)
+    return null
+  }
 }
 
 /**

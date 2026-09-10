@@ -80,7 +80,28 @@ function paramSeguro(s: string, max: number): string {
   return s.replace(/\s*\n+\s*/g, ' · ').slice(0, max)
 }
 
-async function viaWhatsAppPlantilla(subject: string, body: string): Promise<boolean> {
+/**
+ * Wamid del mensaje que Meta acaba de aceptar, si la respuesta trae uno y trae `.json()`.
+ * Se lee de `text()` (ya consumido por el caller para loguear) en vez de `.json()`/`.clone()`
+ * directo sobre `r`: los tests de este archivo mockean fetch con `{ ok, text }` sin `.json`
+ * ni `.clone`, y una llamada real a un método ausente rompería el mock en vez de degradar
+ * a null. Nunca lanza — sin wamid, el cierre informal por respuesta simplemente no aplica
+ * a ese aviso puntual; el resto de los canales sigue funcionando igual.
+ */
+function wamidDeTexto(bodyText: string): string | null {
+  try {
+    const j = JSON.parse(bodyText) as { messages?: Array<{ id?: string }> }
+    return j.messages?.[0]?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+/** `ok: true` si Meta aceptó el mensaje; `wamid` puede venir null igual (respuesta sin
+ *  cuerpo parseable, o de un mock de test) sin que eso signifique que no entregó. */
+type EnvioWa = { ok: boolean; wamid: string | null }
+
+async function viaWhatsAppPlantilla(subject: string, body: string): Promise<EnvioWa> {
   const r = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
@@ -101,26 +122,40 @@ async function viaWhatsAppPlantilla(subject: string, body: string): Promise<bool
       },
     }),
   })
-  return r.ok
+  if (!r.ok) return { ok: false, wamid: null }
+  const texto = await r.text().catch(() => '')
+  return { ok: true, wamid: wamidDeTexto(texto) }
 }
 
-async function viaWhatsAppTexto(text: string): Promise<void> {
-  await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
+async function viaWhatsAppTexto(text: string): Promise<EnvioWa> {
+  const r = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ messaging_product: 'whatsapp', to: NAHUEL_WA, type: 'text', text: { body: text } }),
   })
+  if (!r.ok) return { ok: false, wamid: null }
+  const texto = await r.text().catch(() => '')
+  return { ok: true, wamid: wamidDeTexto(texto) }
 }
 
 /**
  * Prueba primero la plantilla (entrega siempre, aprobada o no la ventana de 24h). Si Meta la
  * rechaza —todavía PENDING, o algo cambió en la revisión— cae a texto plano, que entrega
  * solo si la ventana está abierta. Nunca deja el aviso sin intentar por las dos vías.
+ *
+ * Devuelve el wamid del mensaje efectivamente enviado (o null si entregó pero no se pudo
+ * leer el wamid de la respuesta, o si ninguna vía entregó), para que el caller pueda
+ * correlacionar una futura respuesta ("listo", citando este mensaje) con la alerta que la
+ * originó — ver `respuestaCierraAlerta` en lib/diag.ts. Ojo: el chequeo para decidir el
+ * fallback a texto plano es `ok`, NO la presencia de wamid — una plantilla que entregó bien
+ * pero cuya respuesta no trajo wamid (ej. un mock de test) no debe reintentar por texto.
  */
-async function viaWhatsApp(subject: string, body: string): Promise<void> {
-  if (!WA_PHONE_ID || !WA_TOKEN) return
-  const ok = await viaWhatsAppPlantilla(subject, body).catch(() => false)
-  if (!ok) await viaWhatsAppTexto(`${subject}\n\n${body}`)
+async function viaWhatsApp(subject: string, body: string): Promise<string | null> {
+  if (!WA_PHONE_ID || !WA_TOKEN) return null
+  const plantilla = await viaWhatsAppPlantilla(subject, body).catch((): EnvioWa => ({ ok: false, wamid: null }))
+  if (plantilla.ok) return plantilla.wamid
+  const texto = await viaWhatsAppTexto(`${subject}\n\n${body}`).catch((): EnvioWa => ({ ok: false, wamid: null }))
+  return texto.wamid
 }
 
 export type Adjunto = { filename: string; content: Buffer; contentType?: string }
@@ -141,8 +176,16 @@ export async function notifyNahuelAdjunto(subject: string, body: string, adjunto
   }
 }
 
-/** Avisa a Nahuel por todos los canales disponibles. Nunca lanza. */
-export async function notifyNahuel(subject: string, body: string): Promise<void> {
+/**
+ * Avisa a Nahuel por todos los canales disponibles. Nunca lanza.
+ *
+ * Devuelve el wamid del mensaje de WhatsApp efectivamente enviado (null si ese canal no
+ * entregó o no está configurado). Es opt-in: los ~20 callers existentes ignoran el
+ * resultado (`await notifyNahuel(...)` sin destructurar) y siguen funcionando igual; solo
+ * el watchdog de atención lo usa, para poder reconocer un "listo" que responde a esta
+ * alerta puntual — ver `respuestaCierraAlerta` en lib/diag.ts.
+ */
+export async function notifyNahuel(subject: string, body: string): Promise<{ wamidWa: string | null }> {
   const full = `${subject}\n\n${body}`
   const results = await Promise.allSettled([
     viaEmail(subject, body),
@@ -152,4 +195,7 @@ export async function notifyNahuel(subject: string, body: string): Promise<void>
   results.forEach((r, i) => {
     if (r.status === 'rejected') console.error(`notifyNahuel canal ${i} falló:`, r.reason)
   })
+  const waResult = results[2]
+  const wamidWa = waResult.status === 'fulfilled' ? waResult.value : null
+  return { wamidWa }
 }
