@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { diasEntre, accionDe, estadoManual } from '@/lib/operacion/envios'
 import { UMBRAL_ENVIO, PLAZO_PROMETIDO, PLAZO_MANUAL_DIAS } from '@/lib/supuestos'
+import { CATALOGO } from '@/lib/cron-heartbeat'
 
 // Los umbrales de Logística deciden qué se le muestra a Nahuel como "atender hoy". Si se
 // corren sin querer, la pantalla sigue pintando lindo y deja de avisar: no hay forma de
@@ -120,5 +121,24 @@ describe('control de manual entregado', () => {
     // El retiro en punto nunca marca despacho: lo rescata el script del VPS a los 3 días del
     // pago. Contarlo como faltante desde el día uno llenaría la lista de falsos positivos.
     expect(estadoManual('tn', 'Incubadora INC101', null, null, ahora)).toBe('pendiente')
+  })
+})
+
+// El indicador tiene dos formas de mentir, y las dos dejan a alguien sin manual:
+// callarse cuando hay un faltante real, o gritar cuando lo que se cayó es el push.
+describe('el control no puede mentir cuando la fuente se cae', () => {
+  it('el plazo del panel es más ancho que el ciclo del VPS', () => {
+    // El VPS espera 24 h post-despacho y corre cada 3 h. Si el plazo del panel bajara por
+    // debajo de eso, marcaría faltantes a envíos que están en cola legítima — que es el
+    // falso positivo medido con el pedido #1649.
+    expect(PLAZO_MANUAL_DIAS).toBeGreaterThanOrEqual(2)
+  })
+
+  it('el job del push está en el catálogo, o su caída sería invisible', () => {
+    // Sin entrada en el catálogo, `manualFresco` caería al default y /sistema no lo
+    // vigilaría: el push podría estar muerto hace días sin que nada lo diga.
+    expect(CATALOGO['operacion-manuales']).toBeDefined()
+    // La tolerancia tiene que cubrir el cron (cada 3 h) más margen para una corrida perdida.
+    expect(CATALOGO['operacion-manuales'].maxHoras).toBeGreaterThan(3)
   })
 })

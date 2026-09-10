@@ -68,6 +68,12 @@ export type Resumen = {
   envios: {
     frenados: number; enTransito: number; sinDespachar: number; promedioDias: number | null
     corte: string | null; fresco: boolean; horasDesdeCorte: number | null
+    /**
+     * Compradores que quedaron sin material. `manualFresco` es la misma distinción que
+     * `fresco` para los envíos: en false, `sinManual` es 0 porque el push de acuses no
+     * llegó, NO porque todos lo hayan recibido.
+     */
+    sinManual: number; sinMaterial: number; manualFresco: boolean
   }
   /** Lo que todavía no tiene fuente, con el motivo. La pantalla lo muestra tal cual. */
   sinFuente: Record<string, string>
@@ -82,7 +88,7 @@ export type Resumen = {
  * dónde cargarse, la pantalla de Caja YA existía) y nadie se enteró, porque un texto fijo
  * no puede quedar en evidencia. Ahora cada ítem entra solo si su fuente sigue vacía.
  */
-async function faltantes(logisticaFresca: boolean, ml: VentasMl, ga4: Ga4): Promise<Record<string, string>> {
+async function faltantes(logisticaFresca: boolean, manualFresco: boolean, ml: VentasMl, ga4: Ga4): Promise<Record<string, string>> {
   const [conteos, cortes] = await Promise.all([
     prisma.conteoStock.count(),
     prisma.corteCaja.count(),
@@ -100,6 +106,11 @@ async function faltantes(logisticaFresca: boolean, ml: VentasMl, ga4: Ga4): Prom
   if (!logisticaFresca) {
     falta['Estado de los envíos'] =
       'El cron operacion-envios no dejó un corte reciente. Los envíos abiertos que se muestren pueden estar viejos: Andreani solo informa el presente y lo que no se consultó no se recupera.'
+  }
+
+  if (!manualFresco) {
+    falta['Manuales entregados'] =
+      'El VPS no empuja los acuses de manual (manuales_push.py, cron 40 */3). Sin eso no se puede saber quién quedó sin material: el control se calla en vez de marcar como faltante a gente que sí lo recibió.'
   }
 
   if (!ml.fresco) {
@@ -158,7 +169,7 @@ export async function leerResumen(rango: Rango): Promise<Resumen> {
   // tasa de conversión infinita se pinta igual de convincente que una buena.
   const conversion = ga4.ok && ga4.sesiones > 0 ? (pedidos / ga4.sesiones) * 100 : null
 
-  const sinFuente = await faltantes(fresco, ml, ga4)
+  const sinFuente = await faltantes(fresco, logistica.kpis.manualFresco, ml, ga4)
 
   return {
     rango,
@@ -189,6 +200,9 @@ export async function leerResumen(rango: Rango): Promise<Resumen> {
       corte: logistica.corte,
       fresco,
       horasDesdeCorte: horas,
+      sinManual: logistica.kpis.sinManual,
+      sinMaterial: logistica.kpis.sinMaterial,
+      manualFresco: logistica.kpis.manualFresco,
     },
     sinFuente,
   }

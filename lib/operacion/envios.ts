@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { PISO_ABIERTOS_DIAS } from '@/lib/operacion/rango'
 import { getEstadoAndreani, pareceTrackingAndreani, ORDEN_ENTREGADO, ORDEN_EN_SUCURSAL } from '@/lib/andreani'
 import { PLAZO_PROMETIDO, UMBRAL_ENVIO, PLAZO_MANUAL_DIAS } from '@/lib/supuestos'
+import { CATALOGO } from '@/lib/cron-heartbeat'
 
 const TN_TOKEN = process.env.TN_ACCESS_TOKEN
 const TN_STORE = process.env.TN_STORE_ID ?? '1957278'
@@ -309,6 +310,13 @@ export type Logistica = {
     sinManual: number
     /** Despachados cuyo producto todavía no tiene manual escrito. */
     sinMaterial: number
+    /**
+     * Si el registro de manuales está fresco. En false, `sinManual` es 0 porque no se sabe,
+     * NO porque nadie quedó sin material: la pantalla tiene que decir eso con esas palabras.
+     */
+    manualFresco: boolean
+    /** Horas desde el último push de acuses. Null si nunca llegó ninguno. */
+    manualHoras: number | null
   }
   abiertos: FilaEnvio[]
   /**
@@ -396,7 +404,7 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS, hasta?: Date): Pr
   const desde = new Date(techo.getTime() - dias * DIA)
   const desdeAbiertos = new Date(ahora.getTime() - Math.max(dias, PISO_ABIERTOS_DIAS) * DIA)
 
-  const [todos, primero, apicolaPendiente, manuales] = await Promise.all([
+  const [todos, primero, apicolaPendiente, manuales, ultimoPush] = await Promise.all([
     prisma.envioSeguimiento.findMany({
       where: {
         OR: [
@@ -424,6 +432,16 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS, hasta?: Date): Pr
     // acuse quedó fuera del rango. El filtro recorta qué envíos se miran, nunca la evidencia
     // de que el manual se mandó.
     prisma.entregaManual.findMany({ select: { referencia: true, enviado_at: true } }),
+    // Cuándo llegó el último push. Es la diferencia entre "nadie quedó sin manual" y "hace
+    // tres días que nadie mira": si `manuales_push.py` se cae, la tabla deja de recibir
+    // acuses, los envíos nuevos cumplen el plazo y el panel los marcaría FALTANTE — mandando
+    // a reenviar manuales que en realidad sí salieron. El indicador se calla en vez de
+    // gritar en falso, y dice por qué.
+    prisma.jobRun.findFirst({
+      where: { slug: 'operacion-manuales', ok: true },
+      orderBy: { inicio: 'desc' },
+      select: { inicio: true },
+    }),
   ])
 
   // Un pedido puede tener dos equipos y por lo tanto dos acuses: vale el primero, que es
@@ -500,11 +518,22 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS, hasta?: Date): Pr
       }
     })
 
+  // ¿La fuente de acuses está viva? La tolerancia sale del catálogo de crons y no de un
+  // número escrito acá: el día que cambie la cadencia del push, cambia en un solo lugar.
+  const horasPush = ultimoPush
+    ? (ahora.getTime() - ultimoPush.inicio.getTime()) / 3_600_000
+    : null
+  const manualFresco = horasPush !== null && horasPush <= (CATALOGO['operacion-manuales']?.maxHoras ?? 5)
+
   // Solo lo accionable: `faltante` se arregla reenviando el mail, `sin_material` produciendo
   // el contenido. Los dos van a la lista porque los dos dejan a un comprador sin nada, pero
   // el KPI los cuenta separados para no mezclar dos trabajos distintos.
+  //
+  // Con la fuente caída NO se reportan faltantes: sin acuses frescos, "faltante" solo
+  // significa "el push no llegó". `sin_material` sí sobrevive — no depende del push, sale
+  // del nombre del producto. La pantalla muestra el motivo en vez de una lista inventada.
   const sinManualFilas = filasManual
-    .filter(e => e.manual === 'faltante' || e.manual === 'sin_material')
+    .filter(e => (manualFresco && e.manual === 'faltante') || e.manual === 'sin_material')
     .sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1))
 
   const duraciones = entregados
@@ -564,6 +593,8 @@ export async function leerLogistica(dias = PISO_ABIERTOS_DIAS, hasta?: Date): Pr
       entregadosMedidos: duraciones.length,
       sinManual: sinManualFilas.filter(e => e.manual === 'faltante').length,
       sinMaterial: sinManualFilas.filter(e => e.manual === 'sin_material').length,
+      manualFresco,
+      manualHoras: horasPush,
     },
     abiertos,
     sinManual: sinManualFilas,

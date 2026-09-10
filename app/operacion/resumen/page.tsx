@@ -51,6 +51,7 @@ type Resumen = {
   techoCac: number
   envios: {
     frenados: number; enTransito: number; sinDespachar: number; promedioDias: number | null
+    sinManual: number; sinMaterial: number; manualFresco: boolean
     corte: string | null; fresco: boolean; horasDesdeCorte: number | null
   }
   sinFuente: Record<string, string>
@@ -141,6 +142,18 @@ export default function ResumenPage() {
 
       <FiltroMaestro rango={rango} onCambio={aplicar} />
 
+
+      {d && d.envios.manualFresco && d.envios.sinManual > 0 && (
+        <Aviso
+          tono="crit"
+          mensaje={`${d.envios.sinManual} ${d.envios.sinManual === 1 ? 'comprador quedó' : 'compradores quedaron'} sin manual — reenviar el material`}
+          accion={
+            <a href={hrefLogistica} className="text-[13px] underline underline-offset-4">
+              Ver logística
+            </a>
+          }
+        />
+      )}
 
       {d && d.envios.fresco && d.envios.frenados > 0 && (
         <Aviso
@@ -282,6 +295,13 @@ export default function ResumenPage() {
                   { k: 'Frenados (8 días o más)', v: num(d.envios.frenados), c: d.envios.frenados ? TONO.crit : TONO.neutro },
                   { k: 'En tránsito', v: num(d.envios.enTransito), c: 'var(--pnl-text)' },
                   { k: 'Pagados sin despachar', v: num(d.envios.sinDespachar), c: d.envios.sinDespachar ? TONO.warn : TONO.neutro },
+                  // "sin dato" y no 0 con el push caído: un cero acá diría que todos
+                  // recibieron su manual, que es lo contrario de lo que se sabe.
+                  {
+                    k: 'Compradores sin manual',
+                    v: d.envios.manualFresco ? num(d.envios.sinManual) : 'sin dato',
+                    c: d.envios.manualFresco && d.envios.sinManual ? TONO.crit : TONO.neutro,
+                  },
                   { k: 'Promedio a destino', v: d.envios.promedioDias != null ? `${dec(d.envios.promedioDias)} d` : 'sin medir', c: 'var(--pnl-text)' },
                 ].map(f => (
                   <div key={f.k} className="flex items-center gap-3 text-[13px]">

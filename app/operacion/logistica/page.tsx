@@ -48,6 +48,8 @@ type Logistica = {
     entregadosMedidos: number
     sinManual: number
     sinMaterial: number
+    manualFresco: boolean
+    manualHoras: number | null
   }
   abiertos: FilaEnvio[]
   sinManual: FilaEnvio[]
@@ -162,6 +164,8 @@ export default function LogisticaPage() {
   // Va como aviso propio y por encima del de demora: un envío demorado se resuelve solo con
   // el tiempo, un comprador sin manual no. Nombra los pedidos porque el reenvío se hace por
   // número de pedido, y un contador sin números obliga a bajar a buscarlos.
+  // Solo si la fuente respira: con el push caído no hay faltantes que reportar, hay un push
+  // caído — y eso se avisa aparte, sin mandar a nadie a reenviar manuales que sí salieron.
   const faltantes = datos?.sinManual.filter(f => f.manual === 'faltante') ?? []
   const avisoManual = faltantes.length
     ? `${faltantes.length === 1 ? 'Un comprador quedó' : `${faltantes.length} compradores quedaron`} sin manual: ` +
@@ -242,15 +246,22 @@ export default function LogisticaPage() {
         />
         <Kpi
           dominio="log" icono={<BookOpenCheck className="size-4" />}
-          valor={k ? num(k.sinManual) : '—'} unidad={k?.sinManual === 1 ? 'comprador' : 'compradores'}
+          // Con el push caído el valor es "—" y no 0: un cero acá se lee como "nadie quedó
+          // sin manual", que es justo lo contrario de lo que pasa — no se sabe.
+          valor={k == null ? '—' : k.manualFresco ? num(k.sinManual) : '—'}
+          unidad={k?.manualFresco ? (k.sinManual === 1 ? 'comprador' : 'compradores') : undefined}
           etiqueta="Compradores sin manual"
           pie={
             k == null ? 'sin dato'
+              : !k.manualFresco
+                ? (k.manualHoras == null
+                    ? 'el registro de manuales nunca llegó'
+                    : `sin acuses desde hace ${dec(k.manualHoras)} h`)
               : k.sinManual ? 'reenviar el material'
               : k.sinMaterial ? `todos cubiertos · ${num(k.sinMaterial)} sin material escrito`
               : 'todos recibieron su manual'
           }
-          delta={k?.sinManual ? 'atender hoy' : undefined} deltaTono="crit"
+          delta={k?.manualFresco && k.sinManual ? 'atender hoy' : undefined} deltaTono="crit"
         />
       </section>
 
@@ -333,7 +344,12 @@ export default function LogisticaPage() {
             <tbody>
               {filas.map(f => {
                 const e = ETIQUETA_ESTADO[f.estado] ?? { texto: f.estado, tono: 'neutro' as Tono }
-                const m = ETIQUETA_MANUAL[f.manual]
+                // Con el push caído, "en ciclo" y "enviado" dejan de ser verificables: lo
+                // único honesto es decir que no se sabe. `na` (apícola) sí se mantiene: no
+                // depende del push, esos envíos nunca llevan material propio.
+                const m = k && !k.manualFresco && f.manual !== 'na'
+                  ? { texto: 'sin dato', tono: 'neutro' as Tono, ayuda: 'El registro de manuales no está fresco' }
+                  : ETIQUETA_MANUAL[f.manual]
                 return (
                   <tr key={f.tracking} className="hover:bg-[var(--pnl-panel-2)]">
                     <td className="num whitespace-nowrap border-b border-[var(--pnl-hair)] px-3 py-2.5">#{f.referencia}</td>
@@ -377,7 +393,19 @@ export default function LogisticaPage() {
         dominio="log" icono={<BookOpenCheck className="size-3.5" />}
         titulo="Compradores sin material"
         sub="El control de que nadie se quede sin manual. Incluye los pedidos YA ENTREGADOS: cuando el paquete llega, el envío sale de la cola de arriba, pero si el material nunca salió el problema sigue vivo — así fue como se escapó el caso que motivó esta tarjeta."
-        estado={estadoBase === 'normal' && (datos?.sinManual.length ?? 0) === 0 ? 'vacio' : estadoBase}
+        // Con el push caído la lista no está vacía: es desconocida. Decir "todo comprador lo
+        // recibió" cuando nadie empujó los acuses es exactamente la mentira tranquilizadora
+        // que dejó pasar el caso original.
+        estado={
+          estadoBase === 'normal' && k && !k.manualFresco ? 'sin_fuente'
+            : estadoBase === 'normal' && (datos?.sinManual.length ?? 0) === 0 ? 'vacio'
+            : estadoBase
+        }
+        falta={
+          k?.manualHoras == null
+            ? 'El registro de manuales todavía no llegó al panel. Lo empuja `manuales_push.py` desde el VPS (cron 40 */3).'
+            : `Sin acuses nuevos desde hace ${dec(k.manualHoras)} h: mientras tanto no se puede saber quién quedó sin material. Revisar \`manuales_push\` en el VPS.`
+        }
         vacio="Todo comprador con manual disponible lo recibió."
         error={fallo}
         ultimoDato={datos?.corte ? horaCorta(datos.corte) : null}
