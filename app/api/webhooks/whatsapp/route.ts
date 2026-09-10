@@ -6,6 +6,7 @@ import {
   diag, getHistorial, logClaudeUsage, hayMensajePosterior, textosDeLaRafaga,
   wamidEsNuevo, ultimaDerivacion, huboAvisoReciente, origenCtwa,
   handoffEsPermanente, esCierreDeHandoff, KIND_HANDOFF_CERRADO, contarRespuestaRepetida,
+  respuestaCierraAlerta, contarAccionReciente,
   type Turno,
 } from '@/lib/diag'
 import { getEstadoAndreani, pareceTrackingAndreani } from '@/lib/andreani'
@@ -392,6 +393,35 @@ function esRespuestaDeMenu(texto: string): boolean {
 }
 
 /**
+ * ¿El cliente pidió EXPLÍCITAMENTE hablar con una persona? ("pasame con alguien", "hablar
+ * con un humano"), no una duda que de casualidad menciona "alguien" o "persona".
+ *
+ * POR QUÉ EXISTE (auditoría 10/09/2026)
+ * Antes esto dependía por completo del modelo marcando [DERIVAR] — sin red de seguridad
+ * determinista, como si un link roto (ver contarRespuestaRepetida) o el saludo-menú.
+ * Dos fallas reales en 10 días:
+ *  - Victor (07/09): pidió "Pasame con una persona del equipo" DOS VECES seguidas — el bot
+ *    la procesó dos veces y le mandó dos alertas del mismo caso.
+ *  - Ian (08/09 y 09/09, dos días distintos): pidió hablar con alguien, el modelo derivó
+ *    las dos veces recién en el turno donde lo pidió, no antes — bien en ese caso, pero sin
+ *    esta red no hay garantía de que el modelo siempre lo detecte a la primera.
+ *
+ * No reemplaza al modelo: es una red de seguridad ANTES de llamarlo, igual que
+ * `esConsultaIntervencion` — un pedido tan explícito no necesita interpretación y no debe
+ * arriesgarse a que el modelo conteste otra cosa primero.
+ *
+ * Calibrado contra falsos positivos reales antes de sumarlo: "¿alguien me puede confirmar
+ * el precio?" o "necesito hablar con vos sobre el envío" NO deben derivar — son consultas
+ * normales que casualmente usan esas palabras, no un pedido de humano.
+ */
+const RE_PIDE_HUMANO =
+  /\b(?:pas[aá]me\s+con\s+(?:un[ao]?\s+)?(?:persona|alguien|equipo|humano)|hablar\s+con\s+(?:un[ao]?\s+)?(?:persona|alguien|equipo|humano)|quiero\s+(?:hablar|que\s+me\s+atienda)\s+(?:con\s+)?(?:un[ao]?\s+)?(?:persona|alguien)|una\s+persona\s+(?:real|de\s+verdad)|no\s+quiero\s+(?:un\s+)?bot|sos\s+(?:un\s+)?bot\??$)\b/i
+
+function pideHumanoExplicito(texto: string): boolean {
+  return RE_PIDE_HUMANO.test(texto ?? '')
+}
+
+/**
  * Números de pedido que el cliente nombró EN LA CONVERSACIÓN, del más reciente al más viejo.
  *
  * POR QUÉ EXISTE (caso Leo, 20/08/2026)
@@ -415,6 +445,28 @@ function pedidosMencionados(historial: Turno[], mensajeActual: string): string[]
     // "#1597" o "pedido 1597": el # o la palabra lo distinguen de un DNI o un código postal.
     for (const m of t.matchAll(/(?:#\s*|\b(?:pedido|orden|compra)\s+#?\s*)(\d{3,6})\b/gi)) {
       if (!numeros.includes(m[1])) numeros.push(m[1])
+    }
+    // NÚMERO PELADO SOLO (ej. "1645" a secas, sin "#" ni "pedido"): cuenta igual que un
+    // número prefijado SI el mensaje es puramente un identificador (`esSoloIdentificador`,
+    // ≤5 palabras además de los dígitos) — la forma natural de responder cuando el bot ya
+    // preguntó "¿cuál es tu pedido?" o cuando alguien vuelve a escribir después de haberlo
+    // dado una vez.
+    //
+    // POR QUÉ EXISTE (caso Maximiliano, 04/09/2026)
+    // Escribió "1645" tres veces. Las dos primeras `buscarPedido` lo resolvió igual —vía el
+    // fallback `tokens`, que sí matchea números pelados— y confirmó "pago pendiente". La
+    // tercera vez el modelo no supo qué hacer con un dígito suelto sin contexto de menú
+    // ("¿es tu número de pedido?") y terminó derivando con "no pude encontrar tu compra",
+    // usando el MISMO dato que había funcionado minutos antes. Sin el número fijado acá
+    // como "ya mencionado", cada turno repetía la ambigüedad desde cero.
+    if (esSoloIdentificador(t)) {
+      // \b en los dos extremos, a propósito: sin el límite derecho, un DNI de 8 dígitos
+      // pelado ("35185724") matcheaba sus primeros 6 dígitos ("351857") como si fuera un
+      // número de pedido — un valor inventado que no es ni el DNI completo ni un pedido
+      // real. Encontrado escribiendo el test de este mismo cambio.
+      for (const m of t.matchAll(/\b\d{3,6}\b/g)) {
+        if (!numeros.includes(m[0])) numeros.push(m[0])
+      }
     }
   }
   return numeros
@@ -588,6 +640,7 @@ COMPRA QUE EL CLIENTE NO RECONOCE (esta regla gana sobre TODAS las demás): si d
 - Respondé UNA o DOS líneas que lo tranquilicen: desde nuestro lado no hay ningún cobro hecho, no tiene que pagar ni mandar nada, y el equipo lo revisa ahora. El sistema deriva y avisa al equipo solo.
 
 FEEDBACK / QUEJA SOBRE EL PRODUCTO: si el cliente comenta una falla, defecto, crítica o problema de calidad del equipo (algo que llegó torcido/roto/mal, o una observación de mejora), marcá [FEEDBACK]. Respondé breve, agradecido y empático, pero NO des instrucciones de reparación ni le pidas que lo arregle/desarme él mismo (nada de "despegá y volvé a pegar", "ajustá", "cambiá vos"). Para cualquier arreglo o reposición lo ve el equipo. El sistema le avisa a Nahuel.
+FOTO DE UN DEFECTO (no de un comprobante de pago): a veces el mensaje incluye una IMAGEN además del texto — típicamente porque el cliente te muestra un golpe, una rotura o una pieza que ve mal. MIRÁ la imagen: describí en una frase lo que ves (sin inventar si no se distingue bien) y seguí la regla de FEEDBACK de arriba (agradecido, sin instrucciones de reparación, [FEEDBACK] + derivar si hace falta ver el equipo en persona). Auditoría del 10/09/2026: antes de esto, el sistema NUNCA veía la imagen y le decía al cliente "la foto no llegó bien, mandala de nuevo" aunque hubiera llegado perfecto — eso pasó 5 veces seguidas con una clienta real. Si la imagen no es nítida o no se distingue el detalle, decilo así (nunca "no llegó" cuando sí llegó) y pedile que lo describa con palabras además.
 REGLA DURA ANTI-DIY (aplica en CUALQUIER turno, no solo el primero): NUNCA le confirmes, apruebes ni le sugieras al cliente desarmar, despegar, pegar, forzar, ajustar tornillos ni intervenir físicamente el equipo — AUNQUE sea ÉL quien lo proponga ("voy a despegarla y pegarla de nuevo"). En ese caso NO respondas "perfecto, hacelo": pedile que NO lo manipule, que lo dejamos que lo vea el equipo para no arriesgar el equipo ni su garantía, y marcá [FEEDBACK].
 MODIFICAR EL EQUIPO (ver la norma general en la KB): modificación es todo lo que REEMPLACE, CORTE o INTERVENGA LA ESTRUCTURA — cortar, perforar, desarmar el chasis o partes eléctricas, cambiar o agregar piezas. Ante eso: no está aconsejado, puede afectar el funcionamiento y la garantía, lo que no esté en el manual lo hace el servicio técnico autorizado, y DERIVÁ. NUNCA contestes que una parte de la estructura "se puede sacar" o "no pasa nada", ni aunque lo proponga el cliente ni aunque insista.
 OJO, no confundas uso normal con modificación: SACAR O DESTAPAR LA CÚPULA es normal (es una pieza separada de la base), igual que destapar el tupper interno o hidratar el booster. Eso se responde tranquilo y SIN mencionar garantías ni advertencias.
@@ -656,11 +709,19 @@ function parseSalida(raw: string, mensajeCliente = ''): Salida {
 }
 
 // ─────────── Cerebro de Ariel ───────────
-async function pensar(mensaje: string, catalogo: string, historial: Turno[]): Promise<Salida> {
+
+/** Una llamada al modelo con el historial + system ya armados. Común a `pensar()` y
+ *  `pensarConImagen()` — lo único que cambia entre ambas es el `content` del último turno. */
+async function llamarCerebro(
+  historial: Turno[],
+  catalogo: string,
+  ultimoTurno: Anthropic.MessageParam['content'],
+  mensajeParaParseo: string,
+): Promise<Salida> {
   const client = new Anthropic()
-  const messages = [
+  const messages: Anthropic.MessageParam[] = [
     ...historial.map((t) => ({ role: t.role, content: t.content })),
-    { role: 'user' as const, content: `Mensaje del cliente por WhatsApp: "${mensaje}"\n\nRespondé usando el formato de etiquetas.` },
+    { role: 'user', content: ultimoTurno },
   ]
   const response = await client.messages.create({
     model: MODELO,
@@ -674,7 +735,54 @@ async function pensar(mensaje: string, catalogo: string, historial: Turno[]): Pr
   await logClaudeUsage('whatsapp', MODELO, response.usage)
   const block = response.content[0]
   const raw = block && block.type === 'text' ? block.text : ''
-  return parseSalida(raw, mensaje)
+  return parseSalida(raw, mensajeParaParseo)
+}
+
+async function pensar(mensaje: string, catalogo: string, historial: Turno[]): Promise<Salida> {
+  return llamarCerebro(
+    historial, catalogo,
+    `Mensaje del cliente por WhatsApp: "${mensaje}"\n\nRespondé usando el formato de etiquetas.`,
+    mensaje,
+  )
+}
+
+/**
+ * Variante de `pensar()` para cuando el cliente mandó una IMAGEN que no es un comprobante
+ * de pago (ver `pareceComprobante` en `manejarArchivo`) — típicamente la foto de un defecto.
+ *
+ * POR QUÉ EXISTÍA "NO LLAMA AL CEREBRO" (hasta el 10/09/2026)
+ * `manejarArchivo` acusaba recibo con un texto fijo y mandaba la imagen por mail a Nahuel,
+ * sin que el modelo la viera nunca. Tenía sentido para comprobantes (verificar un pago es
+ * tarea humana, no del bot) pero se aplicaba a TODA imagen. El caso real: una clienta
+ * (Cecilia, 07/09/2026) mandó la foto de un tornillo mal ajustado 5 veces; las 5 el bot
+ * contestó "recibimos tu archivo" y en un momento le dijo "la foto no llegó bien, mandala
+ * de nuevo" — mintiéndole, porque las 5 imágenes sí habían llegado (quedó registrado el
+ * mediaId de cada una). El bot nunca tuvo forma de saberlo: no la había mirado.
+ *
+ * Acá SÍ se manda el bloque de imagen al modelo (Haiku 4.5 es multimodal). El resto del
+ * pipeline es idéntico a `pensar()`: mismo preámbulo, misma KB, mismo parseo de etiquetas
+ * — así que [FEEDBACK]/[DERIVAR] siguen funcionando igual que con un mensaje de texto.
+ */
+async function pensarConImagen(
+  caption: string, imagenBase64: string, mimeType: string, catalogo: string, historial: Turno[],
+): Promise<Salida> {
+  const textoDelMensaje = caption
+    ? `[el cliente mandó una imagen con este texto]: "${caption}"`
+    : '[el cliente mandó una imagen sin texto]'
+  return llamarCerebro(
+    historial, catalogo,
+    [
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: imagenBase64 },
+      },
+      {
+        type: 'text',
+        text: `${textoDelMensaje}\n\nEs una foto por WhatsApp (no un comprobante de pago). Mirala y respondé usando el formato de etiquetas.`,
+      },
+    ],
+    textoDelMensaje,
+  )
 }
 
 // ─────────── WA Cloud API send ───────────
@@ -781,9 +889,39 @@ async function descargarMediaWA(mediaId: string): Promise<{ buffer: Buffer; mime
   }
 }
 
-// Recibe un archivo del cliente (típicamente un comprobante de pago): acusa recibo,
-// reenvía el archivo a Nahuel/Mateo por mail (adjunto) y NO llama al cerebro. Mateo
-// verifica el saldo acreditado y marca "pagado" en Tiendanube a mano.
+/**
+ * ¿Esta imagen tiene pinta de comprobante de pago? Los documentos (PDF de transferencia)
+ * siempre lo son — nadie manda un PDF de un tornillo roto. Para imágenes, la señal es el
+ * caption (menciona pago/comprobante/transferencia) o que el sender tenga un pago pendiente
+ * reciente (`accion: 'pago_pendiente'` en los últimos 30 min): alguien a quien el bot le
+ * acaba de pedir el comprobante casi seguro está mandando eso, aunque no escriba nada en
+ * el caption. Nunca lanza — ante error de base, trata la imagen como comprobante (el modo
+ * de falla conservador: peor caso, una foto de un defecto sin caption cae al flujo viejo en
+ * vez de pasar al modelo, no al revés).
+ */
+async function pareceComprobante(sender: string, kind: 'image' | 'document', caption: string): Promise<boolean> {
+  if (kind === 'document') return true
+  if (/pago|comprob|transfer|deposit/i.test(caption)) return true
+  try {
+    return (await contarAccionReciente(sender, 'pago_pendiente', 30)) > 0
+  } catch {
+    return true
+  }
+}
+
+/**
+ * Recibe un archivo del cliente. Bifurca en dos caminos (auditoría 10/09/2026 — antes TODA
+ * imagen caía en el primero, ver el comentario largo en `pensarConImagen`):
+ *
+ *  - COMPROBANTE (documento, o imagen con señal de pago): acusa recibo con el texto fijo de
+ *    siempre, reenvía a Nahuel/Mateo por mail y NO llama al cerebro — verificar un pago es
+ *    tarea humana, no del bot, y no cambia acá.
+ *  - CUALQUIER OTRA IMAGEN (típicamente la foto de un defecto): se manda igual por mail
+ *    (por si es justo el caso de un defecto real que conviene que alguien vea), pero
+ *    ADEMÁS se la pasa al modelo para que la mire y responda — en vez del acuse genérico
+ *    que llevó a decirle a una clienta real "la foto no llegó bien" cinco veces seguidas
+ *    con las cinco fotos ya guardadas en la base.
+ */
 async function manejarArchivo(
   from: string, nombre: string | undefined, mediaId: string, kind: 'image' | 'document',
   caption: string, filenameHint: string | undefined,
@@ -791,27 +929,74 @@ async function manejarArchivo(
   await wdiag('recibido_archivo', from, { kind, caption: caption.slice(0, 200), nombre, mediaId })
   await espejarEntrante(from, `[${kind === 'image' ? 'imagen' : 'documento'} recibido]${caption ? ` — ${caption}` : ''}`, nombre)
   const media = await descargarMediaWA(mediaId)
+  const esComprobante = await pareceComprobante(from, kind, caption)
+
   const ext = kind === 'document'
     ? (filenameHint?.split('.').pop() || (media?.mime.split('/')[1] ?? 'pdf'))
     : (media?.mime.split('/')[1] ?? 'jpg')
-  const fname = `comprobante_${nombre?.replace(/[^\w]+/g, '_') || from}.${ext}`
+  const fname = `${esComprobante ? 'comprobante' : 'archivo'}_${nombre?.replace(/[^\w]+/g, '_') || from}.${ext}`
   const cuerpo =
-    `Un cliente envió un archivo por WhatsApp (probable comprobante de pago).\n\n` +
+    `Un cliente envió un ${kind === 'image' ? 'imagen' : 'documento'} por WhatsApp` +
+    `${esComprobante ? ' (probable comprobante de pago)' : ' (el bot ya la respondió, revisar igual por si hace falta ver el equipo)'}.\n\n` +
     `Número: ${from}\n` + (nombre ? `Nombre: ${nombre}\n` : '') +
     (caption ? `Texto: "${caption}"\n` : '') +
-    `\nVerificá el saldo acreditado y, si está OK, marcá "pagado" en Tiendanube.`
+    (esComprobante
+      ? `\nVerificá el saldo acreditado y, si está OK, marcá "pagado" en Tiendanube.`
+      : `\nNo es un comprobante: el bot la miró y ya le contestó al cliente. Revisar si conviene un seguimiento humano.`)
   if (media) {
-    await notifyNahuelAdjunto('🧾 WhatsApp: comprobante / archivo recibido', cuerpo, {
-      filename: fname, content: media.buffer, contentType: media.mime,
-    }, EMAIL_EMPRESA)
+    await notifyNahuelAdjunto(
+      esComprobante ? '🧾 WhatsApp: comprobante / archivo recibido' : '📷 WhatsApp: foto recibida (el bot ya respondió)',
+      cuerpo,
+      { filename: fname, content: media.buffer, contentType: media.mime },
+      EMAIL_EMPRESA,
+    )
   } else {
     await notifyNahuel('🧾 WhatsApp: archivo recibido (no se pudo bajar)', cuerpo + `\n\n(No se pudo descargar el archivo; revisá el chat directo.)`)
   }
-  const ack = kind === 'document' || /pago|comprob|transfer/i.test(caption)
-    ? '¡Recibimos tu comprobante! 🙌 El equipo verifica el pago y te confirma a la brevedad. Apenas quede confirmado, despachamos 👌'
-    : '¡Recibimos tu archivo! 🙌 Si es el comprobante de pago, el equipo lo verifica y te confirma. Si es una consulta, contame en un texto así te ayudo 👌'
-  await enviarMensajeWA(from, ack)
-  await wdiag('pensado', from, { derivar: false, accion: 'archivo_recibido', respuesta: ack.slice(0, MAX_TEXTO_DIAG) })
+
+  if (esComprobante) {
+    const ack = kind === 'document' || /pago|comprob|transfer/i.test(caption)
+      ? '¡Recibimos tu comprobante! 🙌 El equipo verifica el pago y te confirma a la brevedad. Apenas quede confirmado, despachamos 👌'
+      : '¡Recibimos tu archivo! 🙌 Si es el comprobante de pago, el equipo lo verifica y te confirma. Si es una consulta, contame en un texto así te ayudo 👌'
+    await enviarMensajeWA(from, ack)
+    await wdiag('pensado', from, { derivar: false, accion: 'archivo_recibido', respuesta: ack.slice(0, MAX_TEXTO_DIAG) })
+    return
+  }
+
+  // No es comprobante: si se pudo bajar, se la mostramos al modelo. Si no se pudo bajar
+  // (WA a veces falla), caemos al acuse genérico de siempre — ahí sí es cierto que "no
+  // llegó", porque no llegó a nuestro servidor, no porque WhatsApp la haya perdido.
+  if (!media) {
+    const ack = '¡Recibimos tu archivo, pero no pude abrirlo bien de este lado! 🙌 Si podés, contame en un texto qué es o mandala de nuevo 👌'
+    await enviarMensajeWA(from, ack)
+    await wdiag('pensado', from, { derivar: false, accion: 'archivo_no_descargable', respuesta: ack.slice(0, MAX_TEXTO_DIAG) })
+    return
+  }
+
+  try {
+    const [catalogo, historial] = await Promise.all([
+      bloqueCatalogo(utmDeConversacion((await origenCtwa(from))?.sourceId)),
+      getHistorial(from),
+    ])
+    const { respuesta, derivar, motivo, feedback } =
+      await pensarConImagen(caption, media.buffer.toString('base64'), media.mime, catalogo, historial)
+    const outText = respuesta || '¡Recibimos tu foto! 🙌 Contame con palabras qué ves y te ayudo.'
+    if (derivar) {
+      await derivarAlEquipo(from, outText)
+    } else {
+      await enviarMensajeWA(from, outText)
+    }
+    await wdiag('pensado', from, {
+      derivar, motivo, feedback, accion: 'imagen_analizada', respuesta: outText.slice(0, MAX_TEXTO_DIAG),
+    })
+  } catch (e) {
+    // Si el modelo falla (rate limit, error de red), no dejamos al cliente sin nada: cae
+    // al acuse genérico de antes, que sigue siendo mejor que silencio.
+    console.error('pensarConImagen error:', e)
+    const ack = '¡Recibimos tu archivo! 🙌 Contame en un texto de qué se trata así te ayudo mejor 👌'
+    await enviarMensajeWA(from, ack)
+    await wdiag('pensado', from, { derivar: false, accion: 'imagen_fallback', respuesta: ack.slice(0, MAX_TEXTO_DIAG) })
+  }
 }
 
 // Detecta respuestas AUTOMÁTICAS de otros negocios/bots (ej. el auto-responder de APIDAN)
@@ -946,6 +1131,10 @@ export async function POST(req: NextRequest) {
             // sola: sin esto, una venta cerrada por chat cae en "Orgánico/Directo" en
             // lib/attribution.ts y el CAC de la campaña queda sin poder calcularse.
             referral?: ReferralWa
+            // Presente cuando el usuario RESPONDE a un mensaje puntual (swipe-to-reply).
+            // `id` es el wamid del mensaje citado. Lo usamos para saber si "listo"/"ok" de
+            // Nahuel responde a una alerta del watchdog — ver `respuestaCierraAlerta`.
+            context?: { id?: string }
           }>
           statuses?: EstadoWa[]
         }
@@ -1080,7 +1269,15 @@ export async function POST(req: NextRequest) {
           // con ese cliente durante semanas aunque el problema ya estuviera resuelto:
           // Nahuel contestando desde su propio numero no deja rastro en la base, porque el
           // bridge de lectura de WhatsApp esta bloqueado.
+          //
+          // Además del formato exacto, se acepta un "listo"/"ok"/"terminado" INFORMAL
+          // cuando el mensaje responde (swipe-to-reply) a una alerta del watchdog: el
+          // 09/09/2026 "Terminado este reclamo" no cerró nada porque no tenía la palabra
+          // "cerrar" ni un teléfono, y en 12 días hubo 153 alertas contra 1 solo cierre
+          // manual en toda la historia. El formato con teléfono no es descubrible bajo
+          // presión — se mantiene como vía explícita, pero deja de ser la única.
           const aCerrar = esCierreDeHandoff(texto)
+            ?? await respuestaCierraAlerta(texto, msg.context?.id ?? null)
           if (aCerrar) {
             await wdiag(KIND_HANDOFF_CERRADO, aCerrar, { por: 'nahuel', wamid: msg.id })
             await enviarMensajeWA(from, `Listo: el bot vuelve a atender a ${aCerrar} con normalidad 👌`)
@@ -1193,6 +1390,21 @@ export async function POST(req: NextRequest) {
           if (await hayMensajePosterior(from, msg.id ?? '')) return
           const rafaga = await textosDeLaRafaga(from)
           const mensajeUsuario = rafaga.length > 1 ? rafaga.join('\n') : texto
+
+          // ─── Pedido explícito de humano: red de seguridad ANTES del modelo ───
+          // Auditoría 10/09/2026: Victor pidió "pasame con una persona" DOS VECES seguidas
+          // y el bot lo procesó las dos (dos alertas del mismo caso); sin esta red, derivar
+          // ante un pedido tan directo depende por completo de que el modelo lo marque bien
+          // cada vez. Va antes de llamar a `pensar()` — ni siquiera hace falta gastar la
+          // llamada al modelo para algo tan inequívoco.
+          if (pideHumanoExplicito(mensajeUsuario)) {
+            const outText = 'Dale, te paso con una persona del equipo 🙌'
+            await derivarAlEquipo(from, outText)
+            await wdiag('pensado', from, {
+              derivar: true, accion: 'pide_humano', respuesta: outText.slice(0, MAX_TEXTO_DIAG),
+            })
+            return
+          }
 
           // Si la charla nació de un anuncio, los links del catálogo salen etiquetados con
           // ese anuncio; si no, salen etiquetados como WhatsApp. En los dos casos dejan de
