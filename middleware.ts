@@ -17,6 +17,7 @@ const PUBLICOS = new Set([
   '/curiosos.js',             // tracker de curiosos
   '/sitios.js',               // bloque "Nuestros sitios" en el pie de la tienda
   '/mic.js',                  // motor de widgets (config y contenido vienen de la base)
+  '/marca.js',                // correcciones de marca y accesibilidad del storefront
   '/guia-primer-cultivo.pdf', // lead magnet: público a propósito
   '/logo-micelium.webp',      // logo de la capa pública de guías
 ])
